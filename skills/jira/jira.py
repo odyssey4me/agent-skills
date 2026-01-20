@@ -885,17 +885,25 @@ def update_issue(
     return {}
 
 
-def add_comment(issue_key: str, body: str) -> dict[str, Any]:
+def add_comment(issue_key: str, body: str, security_level: str | None = None) -> dict[str, Any]:
     """Add a comment to an issue.
 
     Args:
         issue_key: The issue key.
         body: Comment text.
+        security_level: Optional security level name (e.g., "Red Hat Internal", "Employees").
+                       Makes the comment private and visible only to users with this security level.
 
     Returns:
         Created comment dictionary.
     """
-    comment_body = {"body": format_rich_text(body)}
+    comment_body: dict[str, Any] = {"body": format_rich_text(body)}
+
+    if security_level:
+        comment_body["visibility"] = {
+            "type": "group",
+            "value": security_level
+        }
 
     response = post("jira", api_path(f"issue/{issue_key}/comment"), comment_body)
     if isinstance(response, dict):
@@ -926,6 +934,7 @@ def do_transition(
     issue_key: str,
     transition_name: str,
     comment: str | None = None,
+    security_level: str | None = None,
 ) -> dict[str, Any]:
     """Transition an issue to a new status.
 
@@ -933,6 +942,7 @@ def do_transition(
         issue_key: The issue key.
         transition_name: Name of the transition to perform.
         comment: Optional comment to add.
+        security_level: Optional security level for private comment.
 
     Returns:
         Response dictionary (empty on success).
@@ -956,12 +966,16 @@ def do_transition(
     data: dict[str, Any] = {"transition": {"id": transition_id}}
 
     if comment:
+        comment_data: dict[str, Any] = {"body": format_rich_text(comment)}
+        if security_level:
+            comment_data["visibility"] = {
+                "type": "group",
+                "value": security_level
+            }
         data["update"] = {
             "comment": [
                 {
-                    "add": {
-                        "body": format_rich_text(comment)
-                    }
+                    "add": comment_data
                 }
             ]
         }
@@ -1120,8 +1134,11 @@ def cmd_issue(args: argparse.Namespace) -> int:
             print(f"Updated issue: {args.issue_key}")
 
         elif args.issue_command == "comment":
-            add_comment(args.issue_key, args.body)
-            print(f"Added comment to {args.issue_key}")
+            add_comment(args.issue_key, args.body, security_level=args.security_level)
+            if args.security_level:
+                print(f"Added private comment to {args.issue_key} (security level: {args.security_level})")
+            else:
+                print(f"Added comment to {args.issue_key}")
 
         return 0
 
@@ -1152,8 +1169,13 @@ def cmd_transitions(args: argparse.Namespace) -> int:
                 )
 
         elif args.transition_command == "do":
-            do_transition(args.issue_key, args.transition, args.comment)
-            print(f"Transitioned {args.issue_key} to '{args.transition}'")
+            do_transition(args.issue_key, args.transition, args.comment, args.security_level)
+            msg = f"Transitioned {args.issue_key} to '{args.transition}'"
+            if args.comment and args.security_level:
+                msg += f" (with private comment, security level: {args.security_level})"
+            elif args.comment:
+                msg += " (with comment)"
+            print(msg)
 
         return 0
 
@@ -1244,6 +1266,10 @@ def main() -> int:
     comment_parser = issue_subparsers.add_parser("comment", help="Add comment to issue")
     comment_parser.add_argument("issue_key", help="Issue key")
     comment_parser.add_argument("body", help="Comment text")
+    comment_parser.add_argument(
+        "--security-level",
+        help="Security level for private comment (e.g., 'Red Hat Internal', 'Employees')"
+    )
 
     # ========================================================================
     # TRANSITIONS COMMAND
@@ -1264,6 +1290,10 @@ def main() -> int:
     do_parser.add_argument("issue_key", help="Issue key")
     do_parser.add_argument("transition", help="Transition name")
     do_parser.add_argument("--comment", help="Comment to add with transition")
+    do_parser.add_argument(
+        "--security-level",
+        help="Security level for private comment (e.g., 'Red Hat Internal', 'Employees')"
+    )
 
     # Parse and dispatch
     args = parser.parse_args()

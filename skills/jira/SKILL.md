@@ -101,6 +101,9 @@ python jira.py issue update DEMO-123 --summary "Updated summary"
 
 # Add comment
 python jira.py issue comment DEMO-123 "This is a comment"
+
+# Add private comment with security level
+python jira.py issue comment DEMO-123 "Internal note" --security-level "Red Hat Internal"
 ```
 
 ### transitions
@@ -114,6 +117,9 @@ python jira.py transitions list DEMO-123
 # Transition issue
 python jira.py transitions do DEMO-123 "In Progress"
 python jira.py transitions do DEMO-123 "Done" --comment "Completed"
+
+# Transition with private comment
+python jira.py transitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Red Hat Internal"
 ```
 
 ## Examples
@@ -148,6 +154,15 @@ python jira.py transitions do DEMO-123 "In Progress"
 
 # Complete the issue
 python jira.py transitions do DEMO-123 "Done" --comment "Implemented and tested"
+```
+
+### Add private comment
+
+```bash
+# Add comment visible only to specific security level
+python jira.py issue comment DEMO-123 \
+  "This is sensitive internal information" \
+  --security-level "Red Hat Internal"
 ```
 
 ### Search with specific fields
