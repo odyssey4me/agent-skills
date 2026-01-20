@@ -59,7 +59,7 @@ This will prompt for your credentials and store them securely in your system key
 Optionally configure defaults in `~/.config/agent-skills/jira.yaml` to reduce repetitive typing:
 
 ```yaml
-# Authentication (required)
+# Authentication (optional if using environment variables)
 url: https://yourcompany.atlassian.net
 email: you@example.com
 token: your-token
