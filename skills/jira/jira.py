@@ -51,7 +51,7 @@ except ImportError:
 
 
 # ============================================================================
-# KEYRING CREDENTIAL STORAGE (from shared/auth/keyring_store.py)
+# KEYRING CREDENTIAL STORAGE
 # ============================================================================
 
 SERVICE_NAME = "agent-skills"
@@ -90,7 +90,7 @@ def delete_credential(key: str) -> None:
 
 
 # ============================================================================
-# CREDENTIAL MANAGEMENT (from shared/auth/token.py)
+# CREDENTIAL MANAGEMENT
 # ============================================================================
 
 CONFIG_DIR = Path.home() / ".config" / "agent-skills"
@@ -306,7 +306,7 @@ def merge_jql_with_scope(user_jql: str, scope: str | None) -> str:
 
 
 # ============================================================================
-# JIRA API HELPERS (from skills/jira/api.py)
+# JIRA API HELPERS
 # ============================================================================
 
 # Module-level cache for deployment type detection
@@ -557,7 +557,7 @@ def clear_cache() -> None:
 
 
 # ============================================================================
-# HTTP/REST UTILITIES (from shared/http.py)
+# HTTP/REST UTILITIES
 # ============================================================================
 
 class APIError(Exception):
@@ -700,7 +700,7 @@ def delete(service: str, endpoint: str, **kwargs: Any) -> dict[str, Any] | list[
 
 
 # ============================================================================
-# OUTPUT FORMATTING (from shared/output.py)
+# OUTPUT FORMATTING
 # ============================================================================
 
 def format_json(data: Any, *, indent: int = 2) -> str:
@@ -833,7 +833,7 @@ def format_issues_list(issues: list[dict[str, Any]]) -> str:
 
 
 # ============================================================================
-# SEARCH FUNCTIONALITY (from skills/jira/scripts/search.py)
+# SEARCH FUNCTIONALITY
 # ============================================================================
 
 DEFAULT_FIELDS = [
@@ -879,7 +879,7 @@ def search_issues(
 
 
 # ============================================================================
-# ISSUE MANAGEMENT (from skills/jira/scripts/issue.py)
+# ISSUE MANAGEMENT
 # ============================================================================
 
 def get_issue(issue_key: str) -> dict[str, Any]:
@@ -1018,7 +1018,7 @@ def add_comment(issue_key: str, body: str, security_level: str | None = None) ->
 
 
 # ============================================================================
-# TRANSITION MANAGEMENT (from skills/jira/scripts/transitions.py)
+# TRANSITION MANAGEMENT
 # ============================================================================
 
 def get_transitions(issue_key: str) -> list[dict[str, Any]]:
