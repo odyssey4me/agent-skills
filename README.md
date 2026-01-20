@@ -1,14 +1,16 @@
 # Agent Skills
 
-Portable skills for AI coding assistants providing integrations with Jira and other development tools.
+Portable skills for Claude Code providing integrations with Jira and other development tools.
 
 ## Features
 
 - **Self-Contained**: Each skill is a single Python script - no framework dependencies
-- **Multi-Agent Support**: Works with Claude Code, OpenAI Codex, Gemini CLI, Cursor, Continue.dev, GitHub Copilot
+- **Claude Code Native**: Designed specifically for [Claude Code](https://claude.com/claude-code)
 - **Simple Installation**: Just Python + 3 packages (`requests`, `keyring`, `pyyaml`)
 - **Built-in Validation**: Each skill includes a `check` command for setup verification
 - **Secure Authentication**: Supports system keyring, environment variables, and config files
+
+> **Note**: Currently focused on Claude Code. Support for other AI agents (Cursor, Continue.dev, etc.) is planned for future releases. See [TODO.md](TODO.md) for roadmap.
 
 ## Quick Start
 
@@ -87,16 +89,16 @@ agent-skills/
 
 Each skill is self-contained - no dependencies on shared code.
 
-## Why Skills Over MCP Servers?
+## Why Skills?
 
-Skills offer advantages over MCP servers:
+Skills provide a simple, transparent approach to extending Claude Code:
 
-1. **Portability**: Work across multiple agents without modification
-2. **Simplicity**: No server process or protocol configuration
-3. **Transparency**: Single Python file - you can read and modify it
-4. **Self-Validating**: Built-in `check` command diagnoses setup issues
+1. **Simplicity**: No server process or protocol configuration required
+2. **Transparency**: Single Python file - you can read and modify it
+3. **Self-Validating**: Built-in `check` command diagnoses setup issues
+4. **Portable**: Can work with other AI agents in the future (see [TODO.md](TODO.md))
 
-See [docs/skills-vs-mcp.md](docs/skills-vs-mcp.md) for details.
+See [docs/skills-vs-mcp.md](docs/skills-vs-mcp.md) for comparison with MCP servers.
 
 ## Creating a New Skill
 

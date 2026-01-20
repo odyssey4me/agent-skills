@@ -1,8 +1,0 @@
-@~/.local/share/agent-skills/AGENTS.md
-
-Skills are available at ~/.local/share/agent-skills
-
-When using skills, always:
-1. Activate the virtual environment: `cd ~/.local/share/agent-skills && source .venv/bin/activate`
-2. Run scripts from the agent-skills directory
-3. Reference skill documentation with `@~/.local/share/agent-skills/skills/<skill-name>/SKILL.md`

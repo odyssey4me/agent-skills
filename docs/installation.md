@@ -1,6 +1,8 @@
 # Installation
 
-This guide explains how to install and use agent-skills across AI coding assistants.
+This guide explains how to install and use agent-skills with Claude Code.
+
+> **Note**: Currently focused on Claude Code only. Support for other AI agents is planned for future releases. See [../TODO.md](../TODO.md) for roadmap.
 
 ## For Users
 
@@ -72,11 +74,7 @@ pytest
 ruff check .
 ```
 
-## Agent Configuration
-
-Configure your AI agent to reference skills. Each agent has different mechanisms:
-
-### Claude Code
+## Claude Code Configuration
 
 [Claude Code](https://claude.com/claude-code) automatically loads `CLAUDE.md` files. Create `~/.claude/CLAUDE.md` for global configuration:
 
@@ -106,104 +104,7 @@ Use `/jira` or describe naturally:
 
 See the [Claude Code settings documentation](https://code.claude.com/docs/en/settings) and [CLAUDE.md guide](https://www.builder.io/blog/claude-md-guide) for details.
 
-### OpenAI Codex
-
-Configure via VS Code settings (`Ctrl+,` or `Cmd+,`). Add to your user or workspace `settings.json`:
-
-```json
-{
-  "codex.customInstructions": "Agent skills available at ~/.claude/skills. Refer to ~/.claude/skills/jira/SKILL.md for Jira integration."
-}
-```
-
-Install the [Codex VS Code extension](https://marketplace.visualstudio.com/items?itemName=openai.chatgpt).
-
-### Gemini CLI
-
-[Gemini CLI](https://ai.google.dev/gemini-api/docs/cli) uses `@` syntax to include files:
-
-```
-@~/.claude/skills/jira/SKILL.md
-
-Search for my open issues in PROJECT
-```
-
-For persistent configuration, create `~/.gemini/GEMINI.md`:
-
-```markdown
-# Agent Skills
-
-Skills are available at ~/.claude/skills
-
-## Jira
-
-Read ~/.claude/skills/jira/SKILL.md for Jira integration commands.
-```
-
-### Cursor
-
-In Cursor, go to **Settings** > **General** > **Rules for AI** and add global rules:
-
-```json
-{
-  "rules": [
-    "Agent skills are available at ~/.claude/skills",
-    "For Jira integration, refer to ~/.claude/skills/jira/SKILL.md"
-  ]
-}
-```
-
-Or create `.cursor/rules/agent-skills.mdc` in your project root:
-
-```markdown
-# Agent Skills
-
-Skills are available at ~/.claude/skills
-
-- **Jira**: ~/.claude/skills/jira/SKILL.md
-```
-
-See the [Cursor Rules documentation](https://docs.cursor.com/context/rules-for-ai).
-
-### Continue.dev
-
-Edit `~/.continue/config.json` to add custom slash commands:
-
-```json
-{
-  "slashCommands": [
-    {
-      "name": "jira",
-      "description": "Jira integration - see ~/.claude/skills/jira/SKILL.md"
-    }
-  ]
-}
-```
-
-See the [Continue configuration guide](https://docs.continue.dev/customize/deep-dives/configuration).
-
-### GitHub Copilot
-
-Create `.github/copilot-instructions.md` in each repository:
-
-```markdown
-# GitHub Copilot Instructions
-
-Agent skills available at ~/.claude/skills
-
-Refer to ~/.claude/skills/jira/SKILL.md for Jira integration.
-```
-
-**Tip**: Create a shell alias to copy instructions to new projects:
-
-```bash
-# Add to ~/.bashrc or ~/.zshrc
-alias copilot-skills='mkdir -p .github && cat > .github/copilot-instructions.md << "EOF"
-# Agent Skills
-Skills available at ~/.claude/skills
-- Jira: ~/.claude/skills/jira/SKILL.md
-EOF'
-```
+> **Other AI Agents**: Support for other agents (Cursor, Continue.dev, etc.) is planned. See [../TODO.md](../TODO.md).
 
 ## Authentication
 

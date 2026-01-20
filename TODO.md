@@ -55,12 +55,23 @@ This document tracks planned skills and features for the agent-skills repository
   - Topics
   - Review comments
 
+## Multi-Agent Support
+
+Currently focusing on Claude Code only. Other AI agents will be supported later:
+
+- [ ] **OpenAI Codex** - VS Code integration
+- [ ] **Gemini CLI** - Google's AI assistant
+- [ ] **Cursor** - AI-first code editor
+- [ ] **Continue.dev** - Open-source AI coding assistant
+- [ ] **GitHub Copilot** - GitHub's AI pair programmer
+
 ## Infrastructure Improvements
 
 - [ ] Increase test coverage to 80%
 - [ ] Add GCP project setup helper script for Google OAuth
 - [ ] Add skill discovery/listing command
 - [ ] Add skill installation/update mechanism
+- [ ] Create comprehensive skill tests (test real API calls with mocking)
 
 ## Completed
 
