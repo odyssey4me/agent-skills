@@ -65,12 +65,7 @@ Skills support three authentication methods (checked in order):
    export JIRA_API_TOKEN="your-token"
    ```
 
-2. **System keyring** (interactive setup):
-   ```bash
-   python scripts/setup_auth.py jira
-   ```
-
-3. **Config file** (`~/.config/agent-skills/config.yaml`):
+2. **Config file** (`~/.config/agent-skills/jira.yaml`):
    ```yaml
    jira:
      url: https://yourcompany.atlassian.net
@@ -85,12 +80,12 @@ Skills support three authentication methods (checked in order):
 **"No credentials found for service"** or **Missing authentication**
 - Run the check command first: `python skills/jira/jira.py check`
 - It will tell you exactly what's missing and how to configure it
-- Option 1: Set environment variables (see Authentication section above)
-- Option 2: Run `python scripts/setup_auth.py jira`
+- Set environment variables (see Authentication section above)
+- Or create a config file at `~/.config/agent-skills/jira.yaml`
 
 **"401 Unauthorized" or "403 Forbidden"**
 - Credentials may be expired or invalid
-- Re-run: `python scripts/setup_auth.py jira`
+- Verify authentication is correctly configured
 - For Jira: verify the API token is still valid at https://id.atlassian.com/manage-profile/security/api-tokens
 
 ### Dependency Errors

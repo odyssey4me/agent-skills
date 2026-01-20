@@ -39,13 +39,14 @@ export {{SERVICE_NAME_UPPER}}_TOKEN="your-api-token"
 
 Add these to your `~/.bashrc` or `~/.zshrc` for persistence.
 
-### Option 2: System Keyring (Interactive)
+### Option 2: Config File
 
-```bash
-python scripts/setup_auth.py {{SERVICE_NAME}}
+Create `~/.config/agent-skills/{{SERVICE_NAME}}.yaml`:
+
+```yaml
+url: https://your-instance.example.com
+token: your-api-token
 ```
-
-This will prompt for your credentials and store them securely in your system keyring.
 
 ### Required Credentials
 

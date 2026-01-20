@@ -117,18 +117,16 @@ Skills support three authentication methods (checked in order):
    export JIRA_API_TOKEN="your-token"
    ```
 
-2. **System keyring** (interactive setup):
-   ```bash
-   cd agent-skills
-   python scripts/setup_auth.py jira
-   ```
+2. **System keyring**:
+   Store credentials securely using your system's keyring with service name `agent-skills`:
+   - Keys: `jira-url`, `jira-email`, `jira-token`
+   - Use Python's `keyring` library to set values programmatically
 
-3. **Config file** (`~/.config/agent-skills/config.yaml`):
+3. **Config file** (`~/.config/agent-skills/jira.yaml`):
    ```yaml
-   jira:
-     url: https://yourcompany.atlassian.net
-     email: you@example.com
-     token: your-token
+   url: https://yourcompany.atlassian.net
+   email: you@example.com
+   token: your-token
    ```
 
 Environment variables are the easiest for most users. Add them to your `~/.bashrc` or `~/.zshrc`.

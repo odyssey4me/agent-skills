@@ -40,13 +40,15 @@ export JIRA_API_TOKEN="your-token"
 
 Add these to your `~/.bashrc` or `~/.zshrc` for persistence.
 
-### Option 2: System Keyring (Interactive)
+### Option 2: Config File
 
-```bash
-python scripts/setup_auth.py jira
+Create `~/.config/agent-skills/jira.yaml`:
+
+```yaml
+url: https://yourcompany.atlassian.net
+email: you@example.com
+token: your-token
 ```
-
-This will prompt for your credentials and store them securely in your system keyring.
 
 ### Required Credentials
 

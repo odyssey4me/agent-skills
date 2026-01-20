@@ -92,8 +92,6 @@ branch = true
 omit = [
     "*/__init__.py",
     "*/test_*.py",
-    # Exclude interactive scripts that require stdin
-    "scripts/setup_auth.py",
 ]
 
 [tool.coverage.report]

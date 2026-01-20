@@ -105,7 +105,7 @@ agent-skills/
 │   ├── SKILL.md            # Skill documentation
 │   └── <name>.py           # Self-contained skill script
 ├── scripts/                # Repository utilities
-│   ├── setup_auth.py       # Optional interactive auth setup
+│   ├── setup_helper.py     # AI agent configuration helper
 │   └── validate_skill.py   # Skill structure validation
 ├── templates/api-skill/    # Template for new skills
 ├── tests/                  # Test suite
