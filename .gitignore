@@ -33,6 +33,11 @@ env/
 *.swo
 *~
 
+# AI agents (only Claude Code is currently supported)
+.cursor/
+.continue/
+.continuerules
+
 # Testing
 .pytest_cache/
 .coverage

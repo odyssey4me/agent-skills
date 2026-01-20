@@ -1,9 +1,0 @@
-# Agent Skills Repository
-
-Refer to AGENTS.md for skill usage instructions.
-
-Refer to CONTRIBUTING.md for development guidelines.
-
-## Continue.dev Notes
-
-Use `/test`, `/lint`, `/format`, `/validate` slash commands defined in .continue/config.json.
