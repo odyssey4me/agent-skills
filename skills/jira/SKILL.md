@@ -54,6 +54,50 @@ This will prompt for your credentials and store them securely in your system key
 - **Email**: Your Atlassian account email
 - **API Token**: Create at https://id.atlassian.com/manage-profile/security/api-tokens
 
+## Configuration Defaults
+
+Optionally configure defaults in `~/.config/agent-skills/jira.yaml` to reduce repetitive typing:
+
+```yaml
+# Authentication (required)
+url: https://yourcompany.atlassian.net
+email: you@example.com
+token: your-token
+
+# Optional defaults
+defaults:
+  jql_scope: "project = DEMO AND assignee = currentUser()"
+  security_level: "Red Hat Internal"
+  max_results: 25
+  fields: ["summary", "status", "assignee", "priority", "created"]
+
+# Optional project-specific defaults
+projects:
+  DEMO:
+    issue_type: "Task"
+    priority: "Medium"
+  PROD:
+    issue_type: "Bug"
+    priority: "High"
+```
+
+### How Defaults Work
+
+- **CLI arguments always override** config defaults
+- **JQL scope** is prepended to all searches: `(scope) AND (your_query)`
+- **Security level** applies to comments and transitions with comments
+- **Project defaults** apply when creating issues in that project
+
+### View Configuration
+
+```bash
+# Show all configuration
+python jira.py config show
+
+# Show project-specific defaults
+python jira.py config show --project DEMO
+```
+
 ## Commands
 
 ### check
@@ -122,6 +166,23 @@ python jira.py transitions do DEMO-123 "Done" --comment "Completed"
 python jira.py transitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Red Hat Internal"
 ```
 
+### config
+
+Manage configuration and view effective defaults.
+
+```bash
+# Show all configuration and defaults
+python jira.py config show
+
+# Show project-specific defaults
+python jira.py config show --project DEMO
+```
+
+This displays:
+- Authentication settings (with masked token)
+- Default JQL scope, security level, max results, and fields
+- Project-specific defaults for issue type and priority
+
 ## Examples
 
 ### Verify Setup
@@ -171,6 +232,32 @@ python jira.py issue comment DEMO-123 \
 python jira.py search \
   "project = DEMO AND created >= -7d" \
   --fields "key,summary,status,assignee,created"
+```
+
+### Using Configuration Defaults
+
+With defaults configured as shown in the [Configuration Defaults](#configuration-defaults) section:
+
+```bash
+# Search uses JQL scope automatically
+python jira.py search "status = Open"
+# Becomes: (project = DEMO AND assignee = currentUser()) AND (status = Open)
+
+# Search with automatic max_results and fields from config
+python jira.py search "priority = High"
+# Uses configured max_results (25) and fields automatically
+
+# Create issue uses project defaults
+python jira.py issue create --project DEMO --summary "Fix login bug"
+# Automatically uses issue_type="Task" and priority="Medium" from DEMO project defaults
+
+# Comments use default security level
+python jira.py issue comment DEMO-123 "Internal note"
+# Automatically applies security_level="Red Hat Internal"
+
+# Override defaults when needed
+python jira.py search "status = Open" --max-results 100
+# CLI argument overrides the configured default of 25
 ```
 
 ## JQL Reference

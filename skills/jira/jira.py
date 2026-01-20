@@ -115,6 +115,60 @@ class Credentials:
         return bool(self.username and self.password and self.url)
 
 
+@dataclass
+class JiraDefaults:
+    """Container for Jira user defaults."""
+
+    jql_scope: str | None = None
+    security_level: str | None = None
+    max_results: int | None = None
+    fields: list[str] | None = None
+
+    @staticmethod
+    def from_config(config: dict[str, Any]) -> JiraDefaults:
+        """Load defaults from config dict.
+
+        Args:
+            config: Configuration dictionary.
+
+        Returns:
+            JiraDefaults object with available values.
+        """
+        defaults_dict = config.get("defaults", {})
+        return JiraDefaults(
+            jql_scope=defaults_dict.get("jql_scope"),
+            security_level=defaults_dict.get("security_level"),
+            max_results=defaults_dict.get("max_results"),
+            fields=defaults_dict.get("fields"),
+        )
+
+
+@dataclass
+class ProjectDefaults:
+    """Container for project-specific defaults."""
+
+    issue_type: str | None = None
+    priority: str | None = None
+
+    @staticmethod
+    def from_config(config: dict[str, Any], project: str) -> ProjectDefaults:
+        """Load project defaults from config dict.
+
+        Args:
+            config: Configuration dictionary.
+            project: Project key.
+
+        Returns:
+            ProjectDefaults object with available values.
+        """
+        projects = config.get("projects", {})
+        project_dict = projects.get(project, {})
+        return ProjectDefaults(
+            issue_type=project_dict.get("issue_type"),
+            priority=project_dict.get("priority"),
+        )
+
+
 def get_credentials(service: str) -> Credentials:
     """Get credentials for a service using priority order.
 
@@ -197,6 +251,58 @@ def save_config(service: str, config: dict[str, Any]) -> None:
     config_file = CONFIG_DIR / f"{service}.yaml"
     with open(config_file, "w") as f:
         yaml.safe_dump(config, f, default_flow_style=False)
+
+
+def get_jira_defaults() -> JiraDefaults:
+    """Get Jira defaults from config file.
+
+    Returns:
+        JiraDefaults object with available values, or empty defaults if not configured.
+    """
+    config = load_config("jira")
+    if not config:
+        return JiraDefaults()
+    return JiraDefaults.from_config(config)
+
+
+def get_project_defaults(project: str) -> ProjectDefaults:
+    """Get project-specific defaults from config file.
+
+    Args:
+        project: Project key.
+
+    Returns:
+        ProjectDefaults object with available values.
+    """
+    config = load_config("jira")
+    if not config:
+        return ProjectDefaults()
+    return ProjectDefaults.from_config(config, project)
+
+
+def merge_jql_with_scope(user_jql: str, scope: str | None) -> str:
+    """Merge user JQL with configured scope.
+
+    Strategy: Prepend scope as a filter that's always applied.
+    - If scope is None or empty, return user_jql unchanged
+    - If user_jql is empty, return scope
+    - Otherwise: "({scope}) AND ({user_jql})"
+
+    Args:
+        user_jql: JQL provided by user.
+        scope: Configured JQL scope from defaults.
+
+    Returns:
+        Merged JQL query.
+    """
+    if not scope or not scope.strip():
+        return user_jql
+
+    if not user_jql or not user_jql.strip():
+        return scope
+
+    # Wrap both in parentheses to ensure correct precedence
+    return f"({scope}) AND ({user_jql})"
 
 
 # ============================================================================
@@ -1080,8 +1186,26 @@ def cmd_check() -> int:
 def cmd_search(args: argparse.Namespace) -> int:
     """Handle search command."""
     try:
-        fields = args.fields.split(",") if args.fields else None
-        issues = search_issues(args.jql, args.max_results, fields)
+        # Load defaults
+        defaults = get_jira_defaults()
+
+        # Apply JQL scope
+        jql = merge_jql_with_scope(args.jql, defaults.jql_scope)
+
+        # Apply max_results (detect if user explicitly provided it)
+        max_results = args.max_results if args.max_results is not None else (
+            defaults.max_results or 50
+        )
+
+        # Apply fields
+        if args.fields:
+            fields = args.fields.split(",")
+        elif defaults.fields:
+            fields = defaults.fields
+        else:
+            fields = None
+
+        issues = search_issues(jql, max_results, fields)
 
         if args.json:
             print(format_json(issues))
@@ -1106,13 +1230,24 @@ def cmd_issue(args: argparse.Namespace) -> int:
                 print(format_issue(issue))
 
         elif args.issue_command == "create":
+            # Load project-specific defaults
+            project_defaults = get_project_defaults(args.project)
+
+            # Apply defaults with CLI precedence
+            issue_type = args.issue_type or project_defaults.issue_type
+            priority = args.priority or project_defaults.priority
+
+            if not issue_type:
+                print("Error: --type is required (no project default configured)", file=sys.stderr)
+                return 1
+
             labels = args.labels.split(",") if args.labels else None
             issue = create_issue(
                 project=args.project,
-                issue_type=args.issue_type,
+                issue_type=issue_type,
                 summary=args.summary,
                 description=args.description,
-                priority=args.priority,
+                priority=priority,
                 labels=labels,
                 assignee=args.assignee,
             )
@@ -1134,9 +1269,11 @@ def cmd_issue(args: argparse.Namespace) -> int:
             print(f"Updated issue: {args.issue_key}")
 
         elif args.issue_command == "comment":
-            add_comment(args.issue_key, args.body, security_level=args.security_level)
-            if args.security_level:
-                print(f"Added private comment to {args.issue_key} (security level: {args.security_level})")
+            defaults = get_jira_defaults()
+            security_level = args.security_level or defaults.security_level
+            add_comment(args.issue_key, args.body, security_level=security_level)
+            if security_level:
+                print(f"Added private comment to {args.issue_key} (security level: {security_level})")
             else:
                 print(f"Added comment to {args.issue_key}")
 
@@ -1169,15 +1306,68 @@ def cmd_transitions(args: argparse.Namespace) -> int:
                 )
 
         elif args.transition_command == "do":
-            do_transition(args.issue_key, args.transition, args.comment, args.security_level)
+            defaults = get_jira_defaults()
+            security_level = args.security_level or (defaults.security_level if args.comment else None)
+            do_transition(args.issue_key, args.transition, args.comment, security_level)
             msg = f"Transitioned {args.issue_key} to '{args.transition}'"
-            if args.comment and args.security_level:
-                msg += f" (with private comment, security level: {args.security_level})"
+            if args.comment and security_level:
+                msg += f" (with private comment, security level: {security_level})"
             elif args.comment:
                 msg += " (with comment)"
             print(msg)
 
         return 0
+
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_config(args: argparse.Namespace) -> int:
+    """Handle config command."""
+    try:
+        if args.config_command == "show":
+            config = load_config("jira")
+            if not config:
+                print("No configuration file found at ~/.config/agent-skills/jira.yaml")
+                return 0
+
+            print("Configuration: ~/.config/agent-skills/jira.yaml\n")
+
+            # Show auth (masked)
+            print("Authentication:")
+            print(f"  URL: {config.get('url', 'Not configured')}")
+            print(f"  Email: {config.get('email', 'Not configured')}")
+            print(f"  Token: {'*' * 8 if config.get('token') else 'Not configured'}")
+            print()
+
+            # Show defaults
+            defaults = JiraDefaults.from_config(config)
+            print("Defaults:")
+            print(f"  JQL Scope: {defaults.jql_scope or 'Not configured'}")
+            print(f"  Security Level: {defaults.security_level or 'Not configured'}")
+            print(f"  Max Results: {defaults.max_results or 'Not configured (default: 50)'}")
+            print(f"  Fields: {', '.join(defaults.fields) if defaults.fields else 'Not configured'}")
+            print()
+
+            # Show project defaults
+            if args.project:
+                project_defaults = ProjectDefaults.from_config(config, args.project)
+                print(f"Project Defaults for {args.project}:")
+                print(f"  Issue Type: {project_defaults.issue_type or 'Not configured'}")
+                print(f"  Priority: {project_defaults.priority or 'Not configured'}")
+            else:
+                projects = config.get("projects", {})
+                if projects:
+                    print("Project-Specific Defaults:")
+                    for project, settings in projects.items():
+                        print(f"  {project}:")
+                        print(f"    Issue Type: {settings.get('issue_type', 'Not configured')}")
+                        print(f"    Priority: {settings.get('priority', 'Not configured')}")
+                else:
+                    print("No project-specific defaults configured")
+
+            return 0
 
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -1215,8 +1405,8 @@ def main() -> int:
     search_parser.add_argument(
         "--max-results",
         type=int,
-        default=50,
-        help="Maximum number of results (default: 50)",
+        default=None,
+        help="Maximum number of results (default: 50, or use configured default)",
     )
     search_parser.add_argument(
         "--fields",
@@ -1245,7 +1435,7 @@ def main() -> int:
     # Create subcommand
     create_parser = issue_subparsers.add_parser("create", help="Create new issue")
     create_parser.add_argument("--project", required=True, help="Project key")
-    create_parser.add_argument("--type", required=True, dest="issue_type", help="Issue type")
+    create_parser.add_argument("--type", dest="issue_type", help="Issue type (required unless project default configured)")
     create_parser.add_argument("--summary", required=True, help="Issue summary")
     create_parser.add_argument("--description", help="Issue description")
     create_parser.add_argument("--priority", help="Priority name")
@@ -1295,6 +1485,22 @@ def main() -> int:
         help="Security level for private comment (e.g., 'Red Hat Internal', 'Employees')"
     )
 
+    # ========================================================================
+    # CONFIG COMMAND
+    # ========================================================================
+    config_parser = subparsers.add_parser(
+        "config",
+        help="Manage configuration",
+    )
+    config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
+
+    # Show subcommand
+    show_parser = config_subparsers.add_parser("show", help="Show effective configuration")
+    show_parser.add_argument(
+        "--project",
+        help="Show project-specific defaults for this project",
+    )
+
     # Parse and dispatch
     args = parser.parse_args()
 
@@ -1306,6 +1512,8 @@ def main() -> int:
         return cmd_issue(args)
     elif args.command == "transitions":
         return cmd_transitions(args)
+    elif args.command == "config":
+        return cmd_config(args)
 
     return 1
 
