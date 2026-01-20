@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-skills"
-version = "0.1.0"
+version = "0.2.0"
 description = "Portable skills for AI coding assistants"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -18,14 +18,17 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-dependencies = [
+
+# No runtime dependencies - skills are self-contained
+# Users install: pip install --user requests keyring pyyaml
+dependencies = []
+
+[project.optional-dependencies]
+# Development dependencies only
+dev = [
     "requests>=2.28.0",
     "keyring>=24.0.0",
     "pyyaml>=6.0",
-]
-
-[project.optional-dependencies]
-dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
@@ -44,7 +47,8 @@ Issues = "https://github.com/odyssey4me/agent-skills/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["shared*", "skills*", "scripts*"]
+include = ["skills*", "scripts*"]
+exclude = ["shared*"]
 
 [tool.ruff]
 line-length = 100
@@ -68,7 +72,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["shared", "skills", "scripts"]
+known-first-party = ["skills", "scripts"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -83,15 +87,13 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["shared", "skills", "scripts"]
+source = ["skills", "scripts"]
 branch = true
 omit = [
     "*/__init__.py",
     "*/test_*.py",
     # Exclude interactive scripts that require stdin
     "scripts/setup_auth.py",
-    # Exclude OAuth module that requires browser interaction
-    "shared/auth/oauth.py",
 ]
 
 [tool.coverage.report]

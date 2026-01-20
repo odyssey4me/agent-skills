@@ -1,0 +1,382 @@
+#!/usr/bin/env python3
+"""{{SKILL_NAME}} integration skill for AI agents.
+
+Usage:
+    python {{SERVICE_NAME}}.py check
+    python {{SERVICE_NAME}}.py list
+    python {{SERVICE_NAME}}.py get RESOURCE_ID
+    python {{SERVICE_NAME}}.py create --name "Resource Name"
+
+Requirements:
+    pip install --user requests keyring pyyaml
+"""
+
+import argparse
+import json
+import os
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+# === Dependency checks ===
+try:
+    import requests
+    import keyring
+    import yaml
+except ImportError as e:
+    print(f"Error: Missing dependency - {e}", file=sys.stderr)
+    print("Install with: pip install --user requests keyring pyyaml", file=sys.stderr)
+    sys.exit(1)
+
+# === Configuration ===
+SERVICE_NAME = "{{SERVICE_NAME}}"
+SERVICE_NAME_UPPER = "{{SERVICE_NAME_UPPER}}"
+
+# === Authentication utilities ===
+
+
+@dataclass
+class Credentials:
+    """Container for service credentials."""
+
+    url: str | None = None
+    token: str | None = None
+
+    def is_valid(self) -> bool:
+        """Check if credentials are complete."""
+        return bool(self.url and self.token)
+
+
+def get_credentials(service: str) -> Credentials:
+    """Get credentials with fallback: keyring → env vars → config file."""
+    creds = Credentials()
+
+    # Try keyring first
+    try:
+        creds.url = keyring.get_password(f"agent-skills-{service}", "url")
+        creds.token = keyring.get_password(f"agent-skills-{service}", "token")
+    except Exception:
+        pass  # Keyring not available or not configured
+
+    # Fallback to environment variables
+    if not creds.url:
+        creds.url = os.getenv(f"{service.upper()}_BASE_URL")
+    if not creds.token:
+        creds.token = os.getenv(f"{service.upper()}_TOKEN") or os.getenv(
+            f"{service.upper()}_API_TOKEN"
+        )
+
+    # Fallback to config file
+    if not creds.is_valid():
+        config_path = Path.home() / ".config" / "agent-skills" / "config.yaml"
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    config = yaml.safe_load(f)
+                    service_config = config.get(service, {})
+                    if not creds.url:
+                        creds.url = service_config.get("url")
+                    if not creds.token:
+                        creds.token = service_config.get("token")
+            except Exception:
+                pass  # Config file read failed
+
+    return creds
+
+
+# === HTTP utilities ===
+
+
+def _get_headers() -> dict[str, str]:
+    """Get HTTP headers with authentication."""
+    creds = get_credentials(SERVICE_NAME)
+    return {
+        "Authorization": f"Bearer {creds.token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+
+def _get_base_url() -> str:
+    """Get base URL for API requests."""
+    creds = get_credentials(SERVICE_NAME)
+    if not creds.url:
+        raise ValueError(f"{SERVICE_NAME_UPPER}_BASE_URL not configured")
+    return creds.url.rstrip("/")
+
+
+def http_get(endpoint: str, params: dict[str, Any] | None = None) -> Any:
+    """Make GET request to API."""
+    url = f"{_get_base_url()}{endpoint}"
+    response = requests.get(url, headers=_get_headers(), params=params, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+
+def http_post(endpoint: str, data: dict[str, Any] | None = None) -> Any:
+    """Make POST request to API."""
+    url = f"{_get_base_url()}{endpoint}"
+    response = requests.post(url, headers=_get_headers(), json=data, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+
+def http_put(endpoint: str, data: dict[str, Any] | None = None) -> Any:
+    """Make PUT request to API."""
+    url = f"{_get_base_url()}{endpoint}"
+    response = requests.put(url, headers=_get_headers(), json=data, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+
+def http_delete(endpoint: str) -> None:
+    """Make DELETE request to API."""
+    url = f"{_get_base_url()}{endpoint}"
+    response = requests.delete(url, headers=_get_headers(), timeout=30)
+    response.raise_for_status()
+
+
+# === Output formatting ===
+
+
+def format_json(data: Any) -> str:
+    """Format data as JSON."""
+    return json.dumps(data, indent=2)
+
+
+def format_table(items: list[dict], columns: list[str]) -> str:
+    """Format list of items as a table."""
+    if not items:
+        return "No items found."
+
+    # Calculate column widths
+    widths = {col: len(col) for col in columns}
+    for item in items:
+        for col in columns:
+            value = str(item.get(col, ""))
+            widths[col] = max(widths[col], len(value))
+
+    # Build header
+    header = " | ".join(col.ljust(widths[col]) for col in columns)
+    separator = "-+-".join("-" * widths[col] for col in columns)
+
+    # Build rows
+    rows = []
+    for item in items:
+        row = " | ".join(str(item.get(col, "")).ljust(widths[col]) for col in columns)
+        rows.append(row)
+
+    return "\n".join([header, separator] + rows)
+
+
+# === API functions ===
+
+
+def list_resources(max_results: int = 50) -> list[dict]:
+    """List resources from the API.
+
+    TODO: Implement API call to list resources.
+    Replace /api/resources with your actual endpoint.
+    """
+    params = {"limit": max_results}
+    response = http_get("/api/resources", params=params)
+    return response.get("items", [])
+
+
+def get_resource(resource_id: str) -> dict:
+    """Get a specific resource by ID.
+
+    TODO: Implement API call to get a resource.
+    Replace /api/resources/{id} with your actual endpoint.
+    """
+    return http_get(f"/api/resources/{resource_id}")
+
+
+def create_resource(name: str, description: str | None = None) -> dict:
+    """Create a new resource.
+
+    TODO: Implement API call to create a resource.
+    Replace /api/resources with your actual endpoint.
+    """
+    data = {"name": name}
+    if description:
+        data["description"] = description
+    return http_post("/api/resources", data=data)
+
+
+# === Command implementations ===
+
+
+def cmd_check(args) -> int:
+    """Check if skill requirements are met."""
+    print(f"{SERVICE_NAME.title()} Skill Requirements Check")
+    print("=" * 50)
+
+    all_ok = True
+
+    # Check Python dependencies
+    print("\nPython Dependencies:")
+    for package in ["requests", "keyring", "yaml"]:
+        try:
+            __import__(package)
+            print(f"  [OK] {package}")
+        except ImportError:
+            print(f"  [!!] {package} - MISSING")
+            all_ok = False
+
+    if not all_ok:
+        print("\nInstall missing packages:")
+        print("  pip install --user requests keyring pyyaml")
+        print()
+
+    # Check authentication
+    print("\nAuthentication:")
+    creds = get_credentials(SERVICE_NAME)
+
+    if creds.url:
+        print(f"  [OK] URL: {creds.url[:50]}...")
+    else:
+        print("  [!!] URL not configured")
+        all_ok = False
+
+    if creds.token:
+        print("  [OK] Token: ***")
+    else:
+        print("  [!!] Token not configured")
+        all_ok = False
+
+    if not all_ok:
+        print("\nConfigure authentication:")
+        print("  Option 1: Environment variables")
+        print(f"    export {SERVICE_NAME_UPPER}_BASE_URL='https://your-instance.example.com'")
+        print(f"    export {SERVICE_NAME_UPPER}_TOKEN='your-token'")
+        print()
+        print("  Option 2: System keyring (interactive)")
+        print(f"    python <path-to-setup-script> {SERVICE_NAME}")
+        print()
+
+    # Test connectivity (if credentials available)
+    if creds.is_valid():
+        print("\nConnectivity Test:")
+        try:
+            # TODO: Replace with a simple API call to test connectivity
+            # Example: http_get("/api/health") or http_get("/api/version")
+            list_resources(max_results=1)
+            print(f"  [OK] Connected to {SERVICE_NAME.title()}")
+        except Exception as e:
+            print(f"  [!!] Connection failed: {e}")
+            all_ok = False
+
+    print()
+    if all_ok:
+        print("✓ All requirements met - skill is ready to use!")
+        return 0
+    else:
+        print("✗ Some requirements not met - see messages above")
+        return 1
+
+
+def cmd_list(args) -> int:
+    """List resources."""
+    try:
+        items = list_resources(max_results=args.max_results)
+
+        if args.json:
+            print(format_json(items))
+        else:
+            # TODO: Adjust columns based on your API response
+            columns = ["id", "name", "created"]
+            print(format_table(items, columns))
+
+        return 0
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_get(args) -> int:
+    """Get a specific resource."""
+    try:
+        item = get_resource(args.resource_id)
+
+        if args.json:
+            print(format_json(item))
+        else:
+            # TODO: Customize output format
+            print(f"ID: {item.get('id')}")
+            print(f"Name: {item.get('name')}")
+            print(f"Created: {item.get('created')}")
+
+        return 0
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_create(args) -> int:
+    """Create a new resource."""
+    try:
+        item = create_resource(name=args.name, description=args.description)
+
+        if args.json:
+            print(format_json(item))
+        else:
+            print(f"Created resource: {item.get('id')}")
+            print(f"Name: {item.get('name')}")
+
+        return 0
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+# === Main CLI ===
+
+
+def main() -> int:
+    """Main entry point with subcommand routing."""
+    parser = argparse.ArgumentParser(
+        description=f"{SERVICE_NAME.title()} integration skill",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Check subcommand (first, for visibility)
+    check_parser = subparsers.add_parser("check", help="Check if requirements are met")
+
+    # List subcommand
+    list_parser = subparsers.add_parser("list", help="List resources")
+    list_parser.add_argument("--max-results", type=int, default=50, help="Maximum results")
+    list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Get subcommand
+    get_parser = subparsers.add_parser("get", help="Get a resource")
+    get_parser.add_argument("resource_id", help="Resource ID")
+    get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Create subcommand
+    create_parser = subparsers.add_parser("create", help="Create a resource")
+    create_parser.add_argument("--name", required=True, help="Resource name")
+    create_parser.add_argument("--description", help="Resource description")
+    create_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # TODO: Add more subcommands as needed
+
+    args = parser.parse_args()
+
+    # Route to command handlers
+    if args.command == "check":
+        return cmd_check(args)
+    elif args.command == "list":
+        return cmd_list(args)
+    elif args.command == "get":
+        return cmd_get(args)
+    elif args.command == "create":
+        return cmd_create(args)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

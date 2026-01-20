@@ -49,6 +49,9 @@ coverage.xml
 dmypy.json
 .pytype/
 
+# Linting
+.ruff_cache/
+
 # Documentation
 docs/_build/
 

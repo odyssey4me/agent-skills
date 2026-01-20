@@ -53,14 +53,12 @@ def validate_skill(skill_dir: Path) -> list[ValidationError]:
     else:
         errors.extend(validate_skill_md(skill_md))
 
-    # Check scripts directory exists
-    scripts_dir = skill_dir / "scripts"
-    if not scripts_dir.exists():
-        errors.append(ValidationError(str(scripts_dir), "scripts/ directory not found", "warning"))
-    elif not scripts_dir.is_dir():
-        errors.append(ValidationError(str(scripts_dir), "scripts/ is not a directory"))
+    # Check for skill script (skill_name.py)
+    skill_script = skill_dir / f"{skill_name}.py"
+    if not skill_script.exists():
+        errors.append(ValidationError(str(skill_script), f"{skill_name}.py not found"))
     else:
-        errors.extend(validate_scripts(scripts_dir, skill_name))
+        errors.extend(validate_skill_script(skill_script))
 
     return errors
 
@@ -87,45 +85,26 @@ def validate_skill_md(skill_md: Path) -> list[ValidationError]:
     if "## Examples" not in content:
         errors.append(ValidationError(str(skill_md), "Missing ## Examples section", "warning"))
 
+    # Check for Setup Verification section documenting check command (warning only)
+    if "## Setup Verification" not in content and "check" not in content.lower():
+        errors.append(
+            ValidationError(str(skill_md), "Missing ## Setup Verification section or check command documentation", "warning")
+        )
+
     return errors
 
 
-def validate_scripts(scripts_dir: Path, _skill_name: str) -> list[ValidationError]:
-    """Validate scripts in a skill.
+def validate_skill_script(skill_script: Path) -> list[ValidationError]:
+    """Validate a skill Python script.
 
     Args:
-        scripts_dir: Path to scripts directory.
-        _skill_name: Name of the skill (reserved for future use).
+        skill_script: Path to skill script file.
 
     Returns:
         List of validation errors.
     """
     errors: list[ValidationError] = []
-
-    python_files = list(scripts_dir.glob("*.py"))
-    if not python_files:
-        errors.append(ValidationError(str(scripts_dir), "No Python scripts found", "warning"))
-        return errors
-
-    for py_file in python_files:
-        if py_file.name == "__init__.py":
-            continue
-        errors.extend(validate_python_file(py_file))
-
-    return errors
-
-
-def validate_python_file(py_file: Path) -> list[ValidationError]:
-    """Validate a Python script file.
-
-    Args:
-        py_file: Path to Python file.
-
-    Returns:
-        List of validation errors.
-    """
-    errors: list[ValidationError] = []
-    content = py_file.read_text()
+    content = skill_script.read_text()
 
     # Check for docstring
     if not content.strip().startswith('"""') and not content.strip().startswith("'''"):
@@ -137,21 +116,36 @@ def validate_python_file(py_file: Path) -> list[ValidationError]:
                 has_docstring = True
                 break
         if not has_docstring:
-            errors.append(ValidationError(str(py_file), "Missing module docstring", "warning"))
+            errors.append(ValidationError(str(skill_script), "Missing module docstring", "warning"))
 
     # Check for main guard
     if "__name__" in content and "__main__" in content:
         pass  # Has main guard
-    elif "def main" in content or "def run" in content:
+    elif "def main" in content:
         errors.append(
-            ValidationError(str(py_file), "Has main/run function but no __name__ guard", "warning")
+            ValidationError(str(skill_script), "Has main function but no __name__ guard", "warning")
         )
 
-    # Check for type hints (basic check)
-    if "def " in content and ") ->" not in content and ") -> None" not in content:
-        # Simple heuristic: if there are function definitions without return type hints
+    # Check for required imports
+    required_imports = ["argparse", "sys"]
+    for imp in required_imports:
+        if f"import {imp}" not in content:
+            errors.append(
+                ValidationError(str(skill_script), f"Missing required import: {imp}", "warning")
+            )
+
+    # Check for check command (should have cmd_check or check subcommand)
+    if "cmd_check" not in content and '"check"' not in content and "'check'" not in content:
         errors.append(
-            ValidationError(str(py_file), "Some functions may be missing type hints", "warning")
+            ValidationError(str(skill_script), "Missing 'check' command implementation", "warning")
+        )
+
+    # Check for subparser pattern (argparse with subcommands)
+    if "subparsers" not in content and "add_subparsers" not in content:
+        errors.append(
+            ValidationError(
+                str(skill_script), "Should use argparse with subcommands (add_subparsers)", "warning"
+            )
         )
 
     return errors

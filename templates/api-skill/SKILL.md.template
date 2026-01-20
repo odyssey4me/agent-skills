@@ -1,0 +1,156 @@
+# {{SKILL_NAME}}
+
+{{DESCRIPTION}}
+
+## Installation
+
+1. **Install Python dependencies**:
+   ```bash
+   pip install --user requests keyring pyyaml
+   ```
+
+2. **Download the skill** from [Releases](https://github.com/odyssey4me/agent-skills/releases) or use directly from this repository.
+
+## Setup Verification
+
+After installation, verify the skill is properly configured:
+
+```bash
+python {{SERVICE_NAME}}.py check
+```
+
+This will check:
+- Python dependencies (requests, keyring, pyyaml)
+- Authentication configuration
+- Connectivity to {{SKILL_NAME}}
+
+If anything is missing, the check command will provide setup instructions.
+
+## Authentication
+
+Configure {{SKILL_NAME}} authentication using one of these methods:
+
+### Option 1: Environment Variables (Recommended)
+
+```bash
+export {{SERVICE_NAME_UPPER}}_BASE_URL="https://your-instance.example.com"
+export {{SERVICE_NAME_UPPER}}_TOKEN="your-api-token"
+```
+
+Add these to your `~/.bashrc` or `~/.zshrc` for persistence.
+
+### Option 2: System Keyring (Interactive)
+
+```bash
+python scripts/setup_auth.py {{SERVICE_NAME}}
+```
+
+This will prompt for your credentials and store them securely in your system keyring.
+
+### Required Credentials
+
+- **URL**: Your {{SKILL_NAME}} instance URL (e.g., `https://your-instance.example.com`)
+- **Token**: API token or personal access token
+
+## Commands
+
+### check
+
+Verify configuration and connectivity.
+
+```bash
+python {{SERVICE_NAME}}.py check
+```
+
+This validates:
+- Python dependencies are installed
+- Authentication is configured
+- Can connect to {{SKILL_NAME}}
+
+### list
+
+List resources.
+
+```bash
+python {{SERVICE_NAME}}.py list
+python {{SERVICE_NAME}}.py list --max-results 20
+```
+
+**Arguments:**
+- `--max-results`: Maximum number of results (default: 50)
+- `--json`: Output as JSON
+
+### get
+
+Get a specific resource by ID.
+
+```bash
+python {{SERVICE_NAME}}.py get RESOURCE_ID
+python {{SERVICE_NAME}}.py get RESOURCE_ID --json
+```
+
+**Arguments:**
+- `resource_id`: The resource identifier (required)
+- `--json`: Output as JSON
+
+### create
+
+Create a new resource.
+
+```bash
+python {{SERVICE_NAME}}.py create --name "New Resource" --description "Description"
+```
+
+**Arguments:**
+- `--name`: Resource name (required)
+- `--description`: Resource description
+- `--json`: Output as JSON
+
+## Examples
+
+### Verify Setup
+
+```bash
+python {{SERVICE_NAME}}.py check
+```
+
+### List all resources
+
+```bash
+python {{SERVICE_NAME}}.py list
+```
+
+### Get resource details
+
+```bash
+python {{SERVICE_NAME}}.py get my-resource-id
+```
+
+### Create a new resource
+
+```bash
+python {{SERVICE_NAME}}.py create --name "My Resource" --description "A description"
+```
+
+## Troubleshooting
+
+### Check command fails
+
+Run `python {{SERVICE_NAME}}.py check` to diagnose issues. It will provide specific error messages and setup instructions.
+
+### Authentication failed
+
+1. Verify your API token is correct
+2. Ensure the URL is correct
+3. Check token permissions
+
+### Permission denied
+
+You may not have access to the requested resource. Contact your administrator.
+
+### Import errors
+
+Ensure dependencies are installed:
+```bash
+pip install --user requests keyring pyyaml
+```

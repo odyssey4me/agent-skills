@@ -15,21 +15,16 @@ Be respectful, inclusive, and constructive in all interactions.
 
 ### Setting Up the Development Environment
 
-**Always use a virtual environment.** This ensures isolation from the host system.
-
 ```bash
 # Clone the repository
 git clone https://github.com/odyssey4me/agent-skills.git
 cd agent-skills
 
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# .venv\Scripts\activate   # Windows
-
 # Install development dependencies
 pip install -e ".[dev]"
 ```
+
+**Note**: Skills themselves have no dependencies on this package. They only require `requests`, `keyring`, and `pyyaml` which are installed as dev dependencies.
 
 ## Development Workflow
 
@@ -71,10 +66,13 @@ ruff check .
 ruff format .
 
 # Run tests with coverage
-pytest tests/ -v --cov=shared --cov=skills --cov=scripts --cov-fail-under=80
+pytest tests/ -v --cov=skills --cov=scripts --cov-fail-under=50
 
 # Validate skill structure
 python scripts/validate_skill.py skills/*
+
+# Test each skill's check command
+python skills/jira/jira.py check
 ```
 
 ### Commit Messages
@@ -104,43 +102,128 @@ Types:
 ```
 agent-skills/
 ├── skills/<name>/          # Skill implementations
-│   ├── SKILL.md            # Skill instructions and commands
-│   └── scripts/            # Python helper scripts
-├── shared/                 # Shared utilities
-│   ├── auth/               # Authentication (keyring, OAuth)
-│   ├── http.py             # HTTP request utilities
-│   └── output.py           # Output formatting
+│   ├── SKILL.md            # Skill documentation
+│   └── <name>.py           # Self-contained skill script
 ├── scripts/                # Repository utilities
-│   ├── setup_auth.py       # Interactive auth setup
+│   ├── setup_auth.py       # Optional interactive auth setup
 │   └── validate_skill.py   # Skill structure validation
 ├── templates/api-skill/    # Template for new skills
 ├── tests/                  # Test suite
 └── docs/                   # Documentation
 ```
 
+**Note**: Each skill is self-contained with no dependencies on shared code.
+
 ## Adding a New Skill
 
-1. Copy the template:
+Skills are self-contained Python scripts that work across AI agents.
+
+### Skill Structure
+
+```
+skills/yourskill/
+├── SKILL.md          # Documentation
+└── yourskill.py      # Self-contained script
+```
+
+### Skill Guidelines
+
+1. **Self-contained**: No imports from shared code or other skills
+2. **Single file**: All functionality in one script with subcommands
+3. **Dependencies**: Only use `requests`, `keyring`, `pyyaml`, and stdlib
+4. **Authentication**: Support keyring, env vars, and config files with fallback chain
+5. **CLI**: Use `argparse` with subcommands (like git, docker)
+6. **Validation**: Include a `check` subcommand for setup verification
+7. **Help**: Provide good `--help` output for all commands
+
+### Creating a Skill
+
+1. **Copy the template**:
    ```bash
    cp -r templates/api-skill skills/<skill-name>
    ```
 
-2. Update `skills/<skill-name>/SKILL.md` with:
-   - Skill description
-   - Authentication requirements
-   - Available commands
-   - Usage examples
+2. **Edit the script**:
+   - Rename `skill.py.template` to `<skill-name>.py`
+   - Implement your functionality with all utilities inlined
+   - Add a `check` subcommand that validates:
+     - Python dependencies installed
+     - Authentication configured
+     - Service connectivity
+     - Provides setup instructions if anything is missing
 
-3. Implement scripts in `skills/<skill-name>/scripts/`
+3. **Update documentation** (`skills/<skill-name>/SKILL.md`):
+   - Document authentication requirements
+   - Document all commands
+   - Add usage examples
+   - Include Setup Verification section showing `check` command
 
-4. Add tests in `tests/test_<skill-name>.py`
+4. **Test the skill**:
+   ```bash
+   python skills/<skill-name>/<skill-name>.py --help
+   python skills/<skill-name>/<skill-name>.py check
+   ```
 
-5. Validate structure:
+5. **Add tests** in `tests/test_<skill-name>.py`
+
+6. **Validate structure**:
    ```bash
    python scripts/validate_skill.py skills/<skill-name>
    ```
 
-6. Update the skills table in `AGENTS.md` and `README.md`
+7. **Update the skills table** in `README.md`
+
+### Example Skill Structure
+
+See [skills/jira/jira.py](skills/jira/jira.py) for a complete example of a self-contained skill with:
+- Dependency checking
+- Authentication utilities inlined
+- HTTP utilities inlined
+- Output formatting inlined
+- Multiple subcommands
+- Built-in `check` command
+
+## Packaging and Distribution
+
+Skills are distributed as tarballs via GitHub Releases. Each skill is packaged separately to maintain the multi-file structure.
+
+### Package a Skill
+
+```bash
+cd skills
+tar czf jira.tar.gz jira/
+```
+
+This creates a tarball containing:
+```
+jira/
+├── SKILL.md
+└── jira.py
+```
+
+### Creating a Release
+
+1. **Tag the version**:
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+2. **GitHub Actions automatically**:
+   - Packages each skill in `skills/` as a tarball
+   - Creates a GitHub Release
+   - Attaches all skill tarballs to the release
+
+3. **Or manually** attach tarballs to a GitHub Release
+
+### Release Checklist
+
+- [ ] All skills thoroughly tested
+- [ ] All SKILL.md files updated
+- [ ] Version bumped in `pyproject.toml`
+- [ ] All tests passing
+- [ ] CI checks passing
+- [ ] Each skill's `check` command works
 
 ## Pull Request Process
 

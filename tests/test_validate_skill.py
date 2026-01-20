@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from scripts.validate_skill import (
     ValidationError,
-    validate_python_file,
     validate_skill,
     validate_skill_md,
+    validate_skill_script,
 )
 
 
@@ -39,12 +39,13 @@ class TestValidateSkill:
 
     def test_validate_skill_missing_skill_md(self, tmp_path):
         """Test validation with missing SKILL.md."""
-        skill_dir = tmp_path / "test-skill"
+        skill_dir = tmp_path / "myskill"
         skill_dir.mkdir()
 
         errors = validate_skill(skill_dir)
 
         assert any("SKILL.md not found" in e.message for e in errors)
+        assert any("myskill.py not found" in e.message for e in errors)
 
     def test_validate_skill_valid(self, tmp_path):
         """Test validation of valid skill."""
@@ -61,35 +62,48 @@ A test skill.
 
 Use a token.
 
+## Setup Verification
+
+Run `python test-skill.py check`
+
 ## Commands
 
 ### list
 List items.
+
+### check
+Check requirements.
 
 ## Examples
 
 Example usage here.
 """)
 
-        # Create scripts directory
-        scripts_dir = skill_dir / "scripts"
-        scripts_dir.mkdir()
-
-        # Create a script
-        script = scripts_dir / "list.py"
+        # Create skill script
+        script = skill_dir / "test-skill.py"
         script.write_text('''#!/usr/bin/env python3
-"""List resources."""
+"""Test skill."""
 
-from __future__ import annotations
+import argparse
+import sys
+
+
+def cmd_check(args):
+    """Check requirements."""
+    return 0
 
 
 def main() -> int:
     """Main entry point."""
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command")
+    subparsers.add_parser("check", help="Check requirements")
+    args = parser.parse_args()
     return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
 ''')
 
         errors = validate_skill(skill_dir)
@@ -156,29 +170,62 @@ Command.
         assert any("## Examples" in e.message and e.severity == "warning" for e in errors)
 
 
-class TestValidatePythonFile:
-    """Tests for validate_python_file function."""
+class TestValidateSkillScript:
+    """Tests for validate_skill_script function."""
 
-    def test_validate_python_file_missing_docstring(self, tmp_path):
+    def test_validate_skill_script_missing_docstring(self, tmp_path):
         """Test warning for missing docstring."""
-        py_file = tmp_path / "script.py"
+        py_file = tmp_path / "skill.py"
         py_file.write_text("def main():\n    pass\n")
 
-        errors = validate_python_file(py_file)
+        errors = validate_skill_script(py_file)
 
         assert any("docstring" in e.message.lower() for e in errors)
 
-    def test_validate_python_file_with_shebang(self, tmp_path):
-        """Test file with shebang and docstring."""
-        py_file = tmp_path / "script.py"
+    def test_validate_skill_script_missing_check(self, tmp_path):
+        """Test warning for missing check command."""
+        py_file = tmp_path / "skill.py"
         py_file.write_text('''#!/usr/bin/env python3
 """Module docstring."""
+
+import argparse
+import sys
+
 
 def main() -> None:
     pass
 ''')
 
-        errors = validate_python_file(py_file)
+        errors = validate_skill_script(py_file)
+
+        assert any("check" in e.message.lower() for e in errors)
+
+    def test_validate_skill_script_with_shebang(self, tmp_path):
+        """Test file with shebang and docstring."""
+        py_file = tmp_path / "skill.py"
+        py_file.write_text('''#!/usr/bin/env python3
+"""Module docstring."""
+
+import argparse
+import sys
+
+
+def cmd_check(args):
+    return 0
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+    subparsers.add_parser("check")
+    pass
+
+
+if __name__ == "__main__":
+    main()
+''')
+
+        errors = validate_skill_script(py_file)
 
         # Should not complain about missing docstring
         assert not any("docstring" in e.message.lower() and e.severity == "error" for e in errors)

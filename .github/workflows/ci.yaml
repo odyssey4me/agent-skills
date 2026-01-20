@@ -43,7 +43,6 @@ jobs:
       - name: Run tests with coverage
         run: |
           pytest tests/ -v \
-            --cov=shared \
             --cov=skills \
             --cov=scripts \
             --cov-report=xml \
@@ -72,3 +71,27 @@ jobs:
 
       - name: Validate skill structure
         run: python scripts/validate_skill.py skills/*
+
+  test-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests keyring pyyaml
+
+      - name: Test skill execution
+        run: |
+          # Test each skill has valid syntax, --help works, and check command exists
+          for skill in skills/*/; do
+            skill_script=$(find "$skill" -name "*.py" -not -path "*/scripts/*" -not -name "__init__.py" | head -1)
+            if [ -n "$skill_script" ]; then
+              echo "Testing $skill_script"
+              python "$skill_script" --help
+              python "$skill_script" check || true  # May fail if not configured, that's ok
+            fi
+          done

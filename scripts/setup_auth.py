@@ -116,7 +116,7 @@ def show_existing_config(service: str) -> dict[str, tuple[str, str]]:
     if not has_any_config:
         print("  No existing configuration found.")
         print()
-        print(f"Credentials will be stored in: system keyring (service: agent-skills)")
+        print("Credentials will be stored in: system keyring (service: agent-skills)")
         print(f"Config file location (if needed): {CONFIG_DIR / f'{service}.yaml'}")
 
     print()
@@ -167,10 +167,7 @@ def prompt_for_field(
 
     prompt_text += ": "
 
-    if is_secret:
-        value = getpass.getpass(prompt_text).strip()
-    else:
-        value = input(prompt_text).strip()
+    value = getpass.getpass(prompt_text).strip() if is_secret else input(prompt_text).strip()
 
     if not value:
         return current_value or default
