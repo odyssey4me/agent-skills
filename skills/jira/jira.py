@@ -61,7 +61,7 @@ def get_credential(key: str) -> str | None:
     """Get a credential from the system keyring.
 
     Args:
-        key: The credential key (e.g., "jira-token", "github-pat").
+        key: The credential key (e.g., "jira-token", "jira-email").
 
     Returns:
         The credential value, or None if not found.
@@ -108,10 +108,10 @@ class Credentials:
 
     def is_valid(self) -> bool:
         """Check if credentials are sufficient for authentication."""
-        # Token-based auth (Jira, GitHub, GitLab)
+        # Token-based auth
         if self.token and self.url:
             return True
-        # Username/password auth (Gerrit)
+        # Username/password auth
         return bool(self.username and self.password and self.url)
 
 
@@ -124,7 +124,7 @@ def get_credentials(service: str) -> Credentials:
     3. Config file
 
     Args:
-        service: Service name (e.g., "jira", "github").
+        service: Service name (e.g., "jira").
 
     Returns:
         Credentials object with available values.
@@ -503,7 +503,7 @@ def make_request(
     """Make an authenticated HTTP request to a service.
 
     Args:
-        service: Service name (e.g., "jira", "github").
+        service: Service name (e.g., "jira").
         method: HTTP method (GET, POST, PUT, DELETE).
         endpoint: API endpoint path (will be appended to base URL).
         params: Query parameters.
@@ -541,7 +541,7 @@ def make_request(
             # Generic: email + API token as basic auth
             auth = (creds.email, creds.token)
         else:
-            # Bearer token style (GitHub, GitLab)
+            # Bearer token style
             request_headers["Authorization"] = f"Bearer {creds.token}"
     elif creds.username and creds.password:
         auth = (creds.username, creds.password)
