@@ -1,0 +1,67 @@
+{
+  "$schema": "https://continue.dev/schemas/config.json",
+  "name": "agent-skills",
+  "version": "1.0.0",
+  "docs": [
+    {
+      "name": "Development Guidelines",
+      "startUrl": "AGENTS.md"
+    },
+    {
+      "name": "Contributing",
+      "startUrl": "CONTRIBUTING.md"
+    },
+    {
+      "name": "Skills vs MCP",
+      "startUrl": "docs/skills-vs-mcp.md"
+    }
+  ],
+  "contextProviders": [
+    {
+      "name": "code",
+      "params": {}
+    },
+    {
+      "name": "docs",
+      "params": {}
+    },
+    {
+      "name": "diff",
+      "params": {}
+    },
+    {
+      "name": "terminal",
+      "params": {}
+    },
+    {
+      "name": "problems",
+      "params": {}
+    },
+    {
+      "name": "codebase",
+      "params": {}
+    }
+  ],
+  "slashCommands": [
+    {
+      "name": "test",
+      "description": "Run tests with coverage",
+      "command": "pytest tests/ -v --cov"
+    },
+    {
+      "name": "lint",
+      "description": "Run linting and format check",
+      "command": "ruff check . && ruff format --check ."
+    },
+    {
+      "name": "format",
+      "description": "Format code with ruff",
+      "command": "ruff format ."
+    },
+    {
+      "name": "validate",
+      "description": "Validate skill structure",
+      "command": "python scripts/validate_skill.py skills/*"
+    }
+  ]
+}

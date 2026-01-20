@@ -1,0 +1,15 @@
+{
+  "systemMessage": "Agent skills are available at ~/.local/share/agent-skills. Read ~/.local/share/agent-skills/AGENTS.md for usage instructions.",
+  "customCommands": [
+    {
+      "name": "jira",
+      "description": "Jira skill commands",
+      "prompt": "Read ~/.local/share/agent-skills/skills/jira/SKILL.md and help me with: {{{ input }}}"
+    },
+    {
+      "name": "jira-search",
+      "description": "Search Jira issues",
+      "prompt": "Run: cd ~/.local/share/agent-skills && source .venv/bin/activate && python skills/jira/scripts/search.py \"{{{ input }}}\""
+    }
+  ]
+}

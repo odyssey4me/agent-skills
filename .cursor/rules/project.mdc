@@ -1,0 +1,13 @@
+---
+description: Agent skills repository
+globs: ["**/*"]
+alwaysApply: true
+---
+
+Refer to @AGENTS.md for skill usage instructions.
+
+Refer to @CONTRIBUTING.md for development guidelines.
+
+## Cursor-Specific Notes
+
+Use `@` to reference files when asking about specific skills or code.

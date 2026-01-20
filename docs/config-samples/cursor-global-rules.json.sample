@@ -1,0 +1,3 @@
+{
+  "cursor.rules.global": "Refer to ~/.local/share/agent-skills/AGENTS.md for available skills. Run scripts from ~/.local/share/agent-skills with venv activated."
+}

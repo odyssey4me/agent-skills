@@ -1,0 +1,22 @@
+# Global Agent Skills
+
+Skills are available at ~/.local/share/agent-skills
+
+## Available Skills
+
+- **Jira**: Issue tracking - read ~/.local/share/agent-skills/skills/jira/SKILL.md
+
+## Running Scripts
+
+Always run from the agent-skills directory with venv activated:
+
+```bash
+cd ~/.local/share/agent-skills && source .venv/bin/activate
+python skills/jira/scripts/search.py "project = DEMO"
+```
+
+## Skill Invocation
+
+Use `/jira` or describe naturally:
+- "Search Jira for my open issues"
+- "Create a bug in PROJECT about login failures"
