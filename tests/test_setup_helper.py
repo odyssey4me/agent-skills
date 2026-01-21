@@ -315,6 +315,122 @@ class TestParseClaudeMd:
         assert "github" in config.configured_skills
 
 
+class TestValidateClaudeMdContent:
+    """Tests for validate_claude_md_content function."""
+
+    def test_validate_venv_activation(self):
+        """Test detection of venv activation patterns."""
+        from scripts.setup_helper import validate_claude_md_content
+
+        content = """# Skills
+
+## Running Scripts
+
+```bash
+source .venv/bin/activate
+python skills/jira/jira.py check
+```
+"""
+        warnings = validate_claude_md_content(content)
+
+        assert len(warnings) > 0
+        assert any("venv activation" in w for w in warnings)
+
+    def test_validate_cd_commands(self):
+        """Test detection of cd commands."""
+        from scripts.setup_helper import validate_claude_md_content
+
+        content = """# Skills
+
+## Running Scripts
+
+```bash
+cd /path/to/agent-skills && python skills/jira/jira.py
+```
+"""
+        warnings = validate_claude_md_content(content)
+
+        assert len(warnings) > 0
+        assert any("'cd' commands" in w for w in warnings)
+
+    def test_validate_scripts_subdirectory(self):
+        """Test detection of old scripts/ subdirectory structure."""
+        from scripts.setup_helper import validate_claude_md_content
+
+        content = """# Skills
+
+```bash
+python skills/jira/scripts/search.py
+```
+"""
+        warnings = validate_claude_md_content(content)
+
+        assert len(warnings) > 0
+        assert any("scripts/" in w for w in warnings)
+
+    def test_validate_missing_guidance(self):
+        """Test detection of missing 'run directly' guidance."""
+        from scripts.setup_helper import validate_claude_md_content
+
+        content = """# Skills
+
+## Running Scripts
+
+Some other instructions here.
+"""
+        warnings = validate_claude_md_content(content)
+
+        assert len(warnings) > 0
+        assert any("Always run skill scripts directly" in w for w in warnings)
+
+    def test_validate_correct_content(self):
+        """Test that correct content has no warnings."""
+        from scripts.setup_helper import validate_claude_md_content
+
+        content = """# Global Agent Skills
+
+Skills are available at ~/.claude/skills
+
+## Available Skills
+
+- **Jira**: Issue tracking - read ~/.claude/skills/jira/SKILL.md
+
+## Running Scripts
+
+Always run skill scripts directly:
+
+```bash
+python ~/.claude/skills/jira/jira.py check
+```
+
+## Skill Invocation
+
+Use `/jira` or describe naturally:
+- "Search Jira for my open issues"
+"""
+        warnings = validate_claude_md_content(content)
+
+        assert len(warnings) == 0
+
+    def test_validate_multiple_issues(self):
+        """Test detection of multiple issues."""
+        from scripts.setup_helper import validate_claude_md_content
+
+        content = """# Skills
+
+## Running Scripts
+
+```bash
+cd /home/user/agent-skills && source .venv/bin/activate
+python skills/jira/scripts/search.py
+```
+"""
+        warnings = validate_claude_md_content(content)
+
+        # Should catch venv, cd, and scripts/ subdirectory
+        assert len(warnings) >= 3
+
+
 class TestGenerateClaudeMdContent:
     """Tests for generate_claude_md_content function."""
 

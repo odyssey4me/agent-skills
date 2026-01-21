@@ -224,6 +224,58 @@ def parse_claude_md(path: Path) -> ClaudeMdConfig:
     )
 
 
+def validate_claude_md_content(content: str) -> list[str]:
+    """Validate CLAUDE.md content for outdated or problematic patterns.
+
+    Args:
+        content: CLAUDE.md file content to validate.
+
+    Returns:
+        List of warning messages (empty if no issues).
+    """
+    warnings = []
+
+    # Check for venv activation patterns (outdated)
+    venv_patterns = [
+        r"source\s+\.venv/bin/activate",
+        r"source\s+venv/bin/activate",
+        r"\.\s+\.venv/bin/activate",
+        r"activate\s+venv",
+    ]
+
+    for pattern in venv_patterns:
+        if re.search(pattern, content, re.IGNORECASE):
+            warnings.append(
+                "Found venv activation instructions. Skills should be installed "
+                "with 'pip install --user' and run directly without venv activation."
+            )
+            break
+
+    # Check for cd commands (should run scripts directly)
+    if re.search(r"cd\s+.*agent-skills.*&&", content):
+        warnings.append(
+            "Found 'cd' commands before running scripts. Scripts should be run "
+            "directly with absolute paths (e.g., 'python ~/.claude/skills/jira/jira.py check')."
+        )
+
+    # Check for scripts/ subdirectory references (old structure)
+    if re.search(r"skills/\w+/scripts/\w+\.py", content):
+        warnings.append(
+            "Found references to 'skills/*/scripts/*.py'. The new structure has "
+            "the main script directly in the skill directory (e.g., 'skills/jira/jira.py')."
+        )
+
+    # Check for expected patterns
+    if "## Running Scripts" in content:
+        if "Always run skill scripts directly:" not in content:
+            warnings.append(
+                "Running Scripts section exists but missing recommended guidance: "
+                "'Always run skill scripts directly:'"
+            )
+
+    return warnings
+
+
 # ============================================================================
 # CLAUDE.md GENERATION
 # ============================================================================
@@ -392,6 +444,15 @@ def show_current_config(
     status = "exists" if config.exists else "not found"
     print(f"CLAUDE.md: {config.path} ({status})")
     print()
+
+    # Validate existing content
+    if config.exists and config.content:
+        validation_warnings = validate_claude_md_content(config.content)
+        if validation_warnings:
+            print("⚠️  Configuration Warnings:")
+            for warning in validation_warnings:
+                print(f"  - {warning}")
+            print()
 
     if config.configured_skills:
         print("Configured skills:")
