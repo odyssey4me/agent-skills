@@ -121,15 +121,48 @@ This validates:
 Search for issues using JQL (Jira Query Language).
 
 ```bash
+# Standard JQL
 python jira.py search "project = DEMO AND status = Open"
 python jira.py search "assignee = currentUser() ORDER BY updated DESC" --max-results 20
+
+# ScriptRunner Enhanced Search (if available)
+# Find issues linked to a specific issue
+python jira.py search 'issue in linkedIssuesOf("DEMO-123")'
+
+# Find parent/child relationships
+python jira.py search 'issue in parentsOf("DEMO-123")'
+python jira.py search 'issue in subtasksOf("DEMO-123")'
+
+# Find issues commented on by a specific user
+python jira.py search 'issue in commentedByUser("username")'
+
+# Find epics and their issues
+python jira.py search 'issue in epicsOf("DEMO-123")'
+python jira.py search 'issue in issuesInEpics("EPIC-123")'
+
+# Find issues with specific link types (dependencies, blocks, etc.)
+python jira.py search 'issue in hasLinkType("Dependency")'
 ```
 
 **Arguments:**
-- `jql`: JQL query string (required)
+- `jql`: JQL query string (required) - supports ScriptRunner functions if installed
 - `--max-results`: Maximum number of results (default: 50)
 - `--fields`: Comma-separated list of fields to include
 - `--json`: Output as JSON
+
+**ScriptRunner Support:**
+
+The skill automatically detects if ScriptRunner Enhanced Search is installed and validates queries that use advanced JQL functions. If ScriptRunner functions are detected but the plugin is not available, you'll receive a warning.
+
+Common ScriptRunner functions include:
+- `linkedIssuesOf()`, `hasLinkType()` - Link and dependency queries
+- `subtasksOf()`, `parentsOf()`, `epicsOf()` - Hierarchy navigation
+- `commentedByUser()`, `transitionedBy()` - User activity tracking
+- And many more...
+
+**For complete ScriptRunner guidance** including user lookups, practical examples, and troubleshooting, read [SCRIPTRUNNER.md](SCRIPTRUNNER.md).
+
+Note: ScriptRunner works differently on Cloud vs Data Center/Server instances. The skill handles both automatically.
 
 ### issue
 
