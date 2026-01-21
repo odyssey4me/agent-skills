@@ -1,6 +1,6 @@
 # Agent Skills
 
-Portable skills for Claude Code providing integrations with Jira and other development tools.
+Portable skills for Claude Code providing integrations with Jira, Confluence, and other development tools.
 
 ## Features
 
@@ -70,6 +70,7 @@ ruff check .
 | Skill | Description | Download |
 |-------|-------------|----------|
 | [Jira](skills/jira/SKILL.md) | Issue tracking, search, create/update, transitions | [jira.tar.gz](https://github.com/odyssey4me/agent-skills/releases/latest/download/jira.tar.gz) |
+| [Confluence](skills/confluence/SKILL.md) | Content management, page CRUD with Markdown support, CQL search | [confluence.tar.gz](https://github.com/odyssey4me/agent-skills/releases/latest/download/confluence.tar.gz) |
 
 See [TODO.md](TODO.md) for planned skills.
 
@@ -78,9 +79,12 @@ See [TODO.md](TODO.md) for planned skills.
 ```
 agent-skills/
 ├── skills/              # Individual skills (self-contained)
-│   └── jira/
+│   ├── jira/
+│   │   ├── SKILL.md     # Documentation
+│   │   └── jira.py      # Self-contained script
+│   └── confluence/
 │       ├── SKILL.md     # Documentation
-│       └── jira.py      # Self-contained script
+│       └── confluence.py # Self-contained script
 ├── templates/           # Templates for new skills
 ├── scripts/             # Optional setup utilities
 ├── tests/               # Tests

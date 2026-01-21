@@ -4,14 +4,6 @@ This document tracks planned skills and features for the agent-skills repository
 
 ## Planned Skills
 
-### Phase 1: Atlassian (Confluence)
-
-- [ ] **confluence** - Confluence page management
-  - Page search
-  - Read page content
-  - Create/update pages
-  - Space management
-
 ### Phase 2: Google Workspace
 
 - [ ] **gmail** - Email management
@@ -80,3 +72,13 @@ Currently focusing on Claude Code only. Other AI agents will be supported later:
   - Get/create/update issues
   - Workflow transitions
   - Comments
+
+- [x] **confluence** - Confluence page management (Phase 1)
+  - CQL search for pages and content
+  - Get page content (with Markdown output)
+  - Create pages (with Markdown input support)
+  - Update pages (with Markdown input support)
+  - Space management (list, get, create)
+  - Automatic Cloud vs DC/Server detection
+  - Markdown ↔ Storage/ADF format conversion
+  - File-based content input (--body-file)
