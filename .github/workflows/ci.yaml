@@ -88,7 +88,7 @@ jobs:
         run: |
           # Test each skill has valid syntax, --help works, and check command exists
           for skill in skills/*/; do
-            skill_script=$(find "$skill" -name "*.py" -not -path "*/scripts/*" -not -name "__init__.py" | head -1)
+            skill_script=$(find "$skill/scripts" -name "*.py" -not -name "__init__.py" | head -1)
             if [ -n "$skill_script" ]; then
               echo "Testing $skill_script"
               python "$skill_script" --help

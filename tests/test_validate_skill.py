@@ -45,16 +45,33 @@ class TestValidateSkill:
         errors = validate_skill(skill_dir)
 
         assert any("SKILL.md not found" in e.message for e in errors)
-        assert any("myskill.py not found" in e.message for e in errors)
+        assert any("scripts/ directory not found" in e.message for e in errors)
 
     def test_validate_skill_valid(self, tmp_path):
         """Test validation of valid skill."""
         skill_dir = tmp_path / "test-skill"
         skill_dir.mkdir()
 
-        # Create SKILL.md
+        # Create scripts/ directory
+        scripts_dir = skill_dir / "scripts"
+        scripts_dir.mkdir()
+
+        # Create references/ directory
+        references_dir = skill_dir / "references"
+        references_dir.mkdir()
+
+        # Create SKILL.md with frontmatter
         skill_md = skill_dir / "SKILL.md"
-        skill_md.write_text("""# Test Skill
+        skill_md.write_text("""---
+name: test-skill
+description: A test skill for testing
+metadata:
+  author: test
+  version: "0.1.0"
+license: MIT
+---
+
+# Test Skill
 
 A test skill.
 
@@ -64,7 +81,7 @@ Use a token.
 
 ## Setup Verification
 
-Run `python test-skill.py check`
+Run `python scripts/test-skill.py check`
 
 ## Commands
 
@@ -79,8 +96,8 @@ Check requirements.
 Example usage here.
 """)
 
-        # Create skill script
-        script = skill_dir / "test-skill.py"
+        # Create skill script in scripts/
+        script = scripts_dir / "test-skill.py"
         script.write_text('''#!/usr/bin/env python3
 """Test skill."""
 
@@ -119,9 +136,16 @@ class TestValidateSkillMd:
     def test_validate_skill_md_missing_sections(self, tmp_path):
         """Test validation with missing sections."""
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text("# Test\n\nNo sections here.")
+        skill_md.write_text("""---
+name: test
+description: A test skill
+---
 
-        errors = validate_skill_md(skill_md)
+# Test
+
+No sections here.""")
+
+        errors = validate_skill_md(skill_md, "test")
 
         assert any("## Authentication" in e.message for e in errors)
         assert any("## Commands" in e.message for e in errors)
@@ -129,7 +153,16 @@ class TestValidateSkillMd:
     def test_validate_skill_md_valid(self, tmp_path):
         """Test validation of valid SKILL.md."""
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text("""# Test Skill
+        skill_md.write_text("""---
+name: test
+description: A test skill for validation
+metadata:
+  author: testauthor
+  version: "0.1.0"
+license: MIT
+---
+
+# Test Skill
 
 ## Authentication
 
@@ -145,13 +178,37 @@ Do something.
 Example here.
 """)
 
-        errors = validate_skill_md(skill_md)
+        errors = validate_skill_md(skill_md, "test")
 
         error_count = sum(1 for e in errors if e.severity == "error")
         assert error_count == 0
 
     def test_validate_skill_md_missing_examples_warning(self, tmp_path):
         """Test warning for missing examples section."""
+        skill_md = tmp_path / "SKILL.md"
+        skill_md.write_text("""---
+name: test
+description: Test skill
+---
+
+# Test
+
+## Authentication
+
+Token.
+
+## Commands
+
+### cmd
+Command.
+""")
+
+        errors = validate_skill_md(skill_md, "test")
+
+        assert any("## Examples" in e.message and e.severity == "warning" for e in errors)
+
+    def test_validate_skill_md_missing_frontmatter(self, tmp_path):
+        """Test error for missing YAML frontmatter."""
         skill_md = tmp_path / "SKILL.md"
         skill_md.write_text("""# Test
 
@@ -165,9 +222,24 @@ Token.
 Command.
 """)
 
-        errors = validate_skill_md(skill_md)
+        errors = validate_skill_md(skill_md, "test")
 
-        assert any("## Examples" in e.message and e.severity == "warning" for e in errors)
+        assert any("Missing YAML frontmatter" in e.message for e in errors)
+
+    def test_validate_skill_md_missing_required_fields(self, tmp_path):
+        """Test error for missing required frontmatter fields."""
+        skill_md = tmp_path / "SKILL.md"
+        skill_md.write_text("""---
+license: MIT
+---
+
+# Test
+""")
+
+        errors = validate_skill_md(skill_md, "test")
+
+        assert any("missing required field: 'name'" in e.message for e in errors)
+        assert any("missing required field: 'description'" in e.message for e in errors)
 
 
 class TestValidateSkillScript:

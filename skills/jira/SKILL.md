@@ -1,3 +1,12 @@
+---
+name: jira
+description: Search and manage Jira issues using JQL queries, create/update issues, and manage workflows. Use when working with Jira project management.
+metadata:
+  author: odyssey4me
+  version: "0.2.0"
+license: MIT
+---
+
 # Jira
 
 Interact with Jira for issue tracking, search, and workflow management.
@@ -16,7 +25,7 @@ Interact with Jira for issue tracking, search, and workflow management.
 After installation, verify the skill is properly configured:
 
 ```bash
-python jira.py check
+python scripts/jira.py check
 ```
 
 This will check:
@@ -94,10 +103,10 @@ projects:
 
 ```bash
 # Show all configuration
-python jira.py config show
+python scripts/jira.pyconfig show
 
 # Show project-specific defaults
-python jira.py config show --project DEMO
+python scripts/jira.pyconfig show --project DEMO
 ```
 
 ## Commands
@@ -107,7 +116,7 @@ python jira.py config show --project DEMO
 Verify configuration and connectivity.
 
 ```bash
-python jira.py check
+python scripts/jira.py check
 ```
 
 This validates:
@@ -122,26 +131,26 @@ Search for issues using JQL (Jira Query Language).
 
 ```bash
 # Standard JQL
-python jira.py search "project = DEMO AND status = Open"
-python jira.py search "assignee = currentUser() ORDER BY updated DESC" --max-results 20
+python scripts/jira.pysearch "project = DEMO AND status = Open"
+python scripts/jira.pysearch "assignee = currentUser() ORDER BY updated DESC" --max-results 20
 
 # ScriptRunner Enhanced Search (if available)
 # Find issues linked to a specific issue
-python jira.py search 'issue in linkedIssuesOf("DEMO-123")'
+python scripts/jira.pysearch 'issue in linkedIssuesOf("DEMO-123")'
 
 # Find parent/child relationships
-python jira.py search 'issue in parentsOf("DEMO-123")'
-python jira.py search 'issue in subtasksOf("DEMO-123")'
+python scripts/jira.pysearch 'issue in parentsOf("DEMO-123")'
+python scripts/jira.pysearch 'issue in subtasksOf("DEMO-123")'
 
 # Find issues commented on by a specific user
-python jira.py search 'issue in commentedByUser("username")'
+python scripts/jira.pysearch 'issue in commentedByUser("username")'
 
 # Find epics and their issues
-python jira.py search 'issue in epicsOf("DEMO-123")'
-python jira.py search 'issue in issuesInEpics("EPIC-123")'
+python scripts/jira.pysearch 'issue in epicsOf("DEMO-123")'
+python scripts/jira.pysearch 'issue in issuesInEpics("EPIC-123")'
 
 # Find issues with specific link types (dependencies, blocks, etc.)
-python jira.py search 'issue in hasLinkType("Dependency")'
+python scripts/jira.pysearch 'issue in hasLinkType("Dependency")'
 ```
 
 **Arguments:**
@@ -160,7 +169,7 @@ Common ScriptRunner functions include:
 - `commentedByUser()`, `transitionedBy()` - User activity tracking
 - And many more...
 
-**For complete ScriptRunner guidance** including user lookups, practical examples, and troubleshooting, read [SCRIPTRUNNER.md](SCRIPTRUNNER.md).
+**For complete ScriptRunner guidance** including user lookups, practical examples, and troubleshooting, read [scriptrunner.md](references/scriptrunner.md).
 
 Note: ScriptRunner works differently on Cloud vs Data Center/Server instances. The skill handles both automatically.
 
@@ -170,19 +179,19 @@ Get, create, update, or comment on issues.
 
 ```bash
 # Get issue details
-python jira.py issue get DEMO-123
+python scripts/jira.pyissue get DEMO-123
 
 # Create new issue
-python jira.py issue create --project DEMO --type Task --summary "New task"
+python scripts/jira.pyissue create --project DEMO --type Task --summary "New task"
 
 # Update issue
-python jira.py issue update DEMO-123 --summary "Updated summary"
+python scripts/jira.pyissue update DEMO-123 --summary "Updated summary"
 
 # Add comment
-python jira.py issue comment DEMO-123 "This is a comment"
+python scripts/jira.pyissue comment DEMO-123 "This is a comment"
 
 # Add private comment with security level
-python jira.py issue comment DEMO-123 "Internal note" --security-level "Red Hat Internal"
+python scripts/jira.pyissue comment DEMO-123 "Internal note" --security-level "Red Hat Internal"
 ```
 
 ### transitions
@@ -191,14 +200,14 @@ Manage issue workflow transitions.
 
 ```bash
 # List available transitions
-python jira.py transitions list DEMO-123
+python scripts/jira.pytransitions list DEMO-123
 
 # Transition issue
-python jira.py transitions do DEMO-123 "In Progress"
-python jira.py transitions do DEMO-123 "Done" --comment "Completed"
+python scripts/jira.pytransitions do DEMO-123 "In Progress"
+python scripts/jira.pytransitions do DEMO-123 "Done" --comment "Completed"
 
 # Transition with private comment
-python jira.py transitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Red Hat Internal"
+python scripts/jira.pytransitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Red Hat Internal"
 ```
 
 ### config
@@ -207,10 +216,10 @@ Manage configuration and view effective defaults.
 
 ```bash
 # Show all configuration and defaults
-python jira.py config show
+python scripts/jira.pyconfig show
 
 # Show project-specific defaults
-python jira.py config show --project DEMO
+python scripts/jira.pyconfig show --project DEMO
 ```
 
 This displays:
@@ -223,19 +232,19 @@ This displays:
 ### Verify Setup
 
 ```bash
-python jira.py check
+python scripts/jira.py check
 ```
 
 ### Find my open issues
 
 ```bash
-python jira.py search "assignee = currentUser() AND status != Done ORDER BY priority DESC"
+python scripts/jira.pysearch "assignee = currentUser() AND status != Done ORDER BY priority DESC"
 ```
 
 ### Create a bug report
 
 ```bash
-python jira.py issue create \
+python scripts/jira.pyissue create \
   --project DEMO \
   --type Bug \
   --summary "Login button not working" \
@@ -246,17 +255,17 @@ python jira.py issue create \
 
 ```bash
 # Start work on an issue
-python jira.py transitions do DEMO-123 "In Progress"
+python scripts/jira.pytransitions do DEMO-123 "In Progress"
 
 # Complete the issue
-python jira.py transitions do DEMO-123 "Done" --comment "Implemented and tested"
+python scripts/jira.pytransitions do DEMO-123 "Done" --comment "Implemented and tested"
 ```
 
 ### Add private comment
 
 ```bash
 # Add comment visible only to specific security level
-python jira.py issue comment DEMO-123 \
+python scripts/jira.pyissue comment DEMO-123 \
   "This is sensitive internal information" \
   --security-level "Red Hat Internal"
 ```
@@ -264,7 +273,7 @@ python jira.py issue comment DEMO-123 \
 ### Search with specific fields
 
 ```bash
-python jira.py search \
+python scripts/jira.pysearch \
   "project = DEMO AND created >= -7d" \
   --fields "key,summary,status,assignee,created"
 ```
@@ -275,23 +284,23 @@ With defaults configured as shown in the [Configuration Defaults](#configuration
 
 ```bash
 # Search uses JQL scope automatically
-python jira.py search "status = Open"
+python scripts/jira.pysearch "status = Open"
 # Becomes: (project = DEMO AND assignee = currentUser()) AND (status = Open)
 
 # Search with automatic max_results and fields from config
-python jira.py search "priority = High"
+python scripts/jira.pysearch "priority = High"
 # Uses configured max_results (25) and fields automatically
 
 # Create issue uses project defaults
-python jira.py issue create --project DEMO --summary "Fix login bug"
+python scripts/jira.pyissue create --project DEMO --summary "Fix login bug"
 # Automatically uses issue_type="Task" and priority="Medium" from DEMO project defaults
 
 # Comments use default security level
-python jira.py issue comment DEMO-123 "Internal note"
+python scripts/jira.pyissue comment DEMO-123 "Internal note"
 # Automatically applies security_level="Red Hat Internal"
 
 # Override defaults when needed
-python jira.py search "status = Open" --max-results 100
+python scripts/jira.pysearch "status = Open" --max-results 100
 # CLI argument overrides the configured default of 25
 ```
 
@@ -315,7 +324,7 @@ Combine with `AND`, `OR`, and use `ORDER BY` for sorting.
 
 ### Check command fails
 
-Run `python jira.py check` to diagnose issues. It will provide specific error messages and setup instructions.
+Run `python scripts/jira.pycheck` to diagnose issues. It will provide specific error messages and setup instructions.
 
 ### Authentication failed
 

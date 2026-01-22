@@ -572,7 +572,7 @@ def interactive_setup(
         print("  - ~/.local/share/agent-skills/skills/")
         print("  - ./skills/ (current directory)")
         print()
-        print("Install skills first following: docs/installation.md")
+        print("Install skills first following: docs/user-guide.md")
         print()
         print("To install a skill:")
         print("  mkdir -p ~/.claude/skills")

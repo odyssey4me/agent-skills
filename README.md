@@ -14,164 +14,66 @@ Portable skills for Claude Code providing integrations with Jira, Confluence, an
 
 ## Quick Start
 
-### For Users
+### Installation (Recommended)
 
-1. **Install Python dependencies**:
-   ```bash
-   pip install --user requests keyring pyyaml
-   ```
+Install skills using the official `add-skill` CLI:
 
-2. **Download a skill** from [Releases](https://github.com/odyssey4me/agent-skills/releases):
-   ```bash
-   mkdir -p ~/.claude/skills
-   cd ~/.claude/skills
-   curl -L https://github.com/odyssey4me/agent-skills/releases/latest/download/jira.tar.gz | tar xz
-   ```
+```bash
+# Install all skills
+npx add-skill odyssey4me/agent-skills
 
-3. **Configure authentication**:
-   ```bash
-   export JIRA_BASE_URL="https://yourcompany.atlassian.net"
-   export JIRA_EMAIL="you@example.com"
-   export JIRA_API_TOKEN="your-token"
-   ```
+# Or install individual skills
+npx add-skill odyssey4me/agent-skills --skill jira
+npx add-skill odyssey4me/agent-skills --skill confluence
 
-4. **Verify setup**:
-   ```bash
-   python ~/.claude/skills/jira/jira.py check
-   ```
+# Or install multiple specific skills
+npx add-skill odyssey4me/agent-skills --skill jira --skill confluence
+```
 
-5. **Use it**:
-   ```bash
-   python ~/.claude/skills/jira/jira.py search "project = DEMO"
-   ```
+This automatically:
+- Downloads skills to `~/.claude/skills/`
+- Makes them available to Claude Code
+- Handles all setup
+
+### Next Steps
+
+After installation:
+
+1. **Configure authentication** - See skill documentation for setup:
+   - [Jira SKILL.md](skills/jira/SKILL.md) - Jira authentication and usage
+   - [Confluence SKILL.md](skills/confluence/SKILL.md) - Confluence authentication and usage
+
+2. **Verify setup** - Each skill includes a `check` command to validate configuration
+
+3. **Start using** - Describe your needs naturally to Claude Code, or see skill docs for specific commands
+
+For comprehensive setup instructions, see the [User Guide](docs/user-guide.md).
 
 ### For Developers
 
-```bash
-# Clone repository
-git clone https://github.com/odyssey4me/agent-skills.git
-cd agent-skills
-
-# Install development dependencies
-pip install -e ".[dev]"
-
-# Test a skill
-python skills/jira/jira.py check
-
-# Run tests
-pytest
-
-# Lint
-ruff check .
-```
+Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and guidelines.
 
 ## Available Skills
 
-| Skill | Description | Download |
-|-------|-------------|----------|
-| [Jira](skills/jira/SKILL.md) | Issue tracking, search, create/update, transitions | [jira.tar.gz](https://github.com/odyssey4me/agent-skills/releases/latest/download/jira.tar.gz) |
-| [Confluence](skills/confluence/SKILL.md) | Content management, page CRUD with Markdown support, CQL search | [confluence.tar.gz](https://github.com/odyssey4me/agent-skills/releases/latest/download/confluence.tar.gz) |
+| Skill | Description |
+|-------|-------------|
+| [Jira](skills/jira/SKILL.md) | Issue tracking, search, create/update, transitions |
+| [Confluence](skills/confluence/SKILL.md) | Content management, page CRUD with Markdown support, CQL search |
 
 See [TODO.md](TODO.md) for planned skills.
 
-## Project Structure
-
-```
-agent-skills/
-├── skills/              # Individual skills (self-contained)
-│   ├── jira/
-│   │   ├── SKILL.md     # Documentation
-│   │   └── jira.py      # Self-contained script
-│   └── confluence/
-│       ├── SKILL.md     # Documentation
-│       └── confluence.py # Self-contained script
-├── templates/           # Templates for new skills
-├── scripts/             # Optional setup utilities
-├── tests/               # Tests
-└── docs/                # Documentation
-```
-
-Each skill is self-contained - no dependencies on shared code.
+**Installation**: Use `npx add-skill odyssey4me/agent-skills` to install all skills, or see individual SKILL.md files for details. Manual downloads available from [Releases](https://github.com/odyssey4me/agent-skills/releases).
 
 ## Why Skills?
 
 Skills provide a simple, transparent approach to extending Claude Code:
 
-1. **Simplicity**: No server process or protocol configuration required
-2. **Transparency**: Single Python file - you can read and modify it
-3. **Self-Validating**: Built-in `check` command diagnoses setup issues
-4. **Portable**: Can work with other AI agents in the future (see [TODO.md](TODO.md))
+- **Simple**: No server process or protocol configuration required
+- **Transparent**: Self-contained Python scripts you can read and modify
+- **Self-Validating**: Built-in `check` command diagnoses setup issues
+- **Portable**: Compatible with the [Agent Skills specification](https://agentskills.io/specification)
 
-See [docs/skills-vs-mcp.md](docs/skills-vs-mcp.md) for comparison with MCP servers.
-
-## Creating a New Skill
-
-1. **Copy template**:
-   ```bash
-   cp -r templates/api-skill skills/myskill
-   ```
-
-2. **Edit the script**:
-   - Rename `skill.py.template` to `myskill.py`
-   - Implement your functionality
-   - Include a `check` subcommand for validation
-
-3. **Update documentation**:
-   - Edit `SKILL.md` with usage instructions
-   - Document authentication requirements
-   - Add examples
-
-4. **Test**:
-   ```bash
-   python skills/myskill/myskill.py --help
-   python skills/myskill/myskill.py check
-   ```
-
-5. **Package for release**:
-   ```bash
-   cd skills
-   tar czf myskill.tar.gz myskill/
-   ```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-## Development
-
-### Setup
-
-```bash
-git clone https://github.com/odyssey4me/agent-skills.git
-cd agent-skills
-
-# Install dev dependencies
-pip install -e ".[dev]"
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov
-
-# Lint code
-ruff check .
-
-# Format code
-ruff format .
-```
-
-### Skill Development Guidelines
-
-1. **Self-contained**: No imports from shared code or other skills
-2. **Single file**: All functionality in one script with subcommands
-3. **Dependencies**: Only use `requests`, `keyring`, `pyyaml`, stdlib
-4. **Authentication**: Support keyring, env vars, and config files
-5. **CLI**: Use `argparse` with subcommands (like `git`, `docker`)
-6. **Validation**: Include a `check` subcommand for setup verification
-7. **Help**: Provide good `--help` output for all commands
+This repository follows the Agent Skills spec, ensuring compatibility with `npx add-skill` and other standard tooling.
 
 ## Contributing
 
@@ -179,10 +81,19 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this pr
 
 ## Documentation
 
-- [docs/installation.md](docs/installation.md) - Installation and agent configuration
-- [AGENTS.md](AGENTS.md) - Instructions for AI coding assistants
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Development and contribution guidelines
-- [docs/skills-vs-mcp.md](docs/skills-vs-mcp.md) - Skills vs MCP comparison
+### For Users
+- **[User Guide](docs/user-guide.md)** - Installation, setup, usage, and troubleshooting
+- Individual skill documentation:
+  - [Jira SKILL.md](skills/jira/SKILL.md)
+  - [Confluence SKILL.md](skills/confluence/SKILL.md)
+
+### For Developers
+- **[Developer Guide](docs/developer-guide.md)** - Architecture, creating skills, testing, and contributing
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and code standards
+- [AGENTS.md](AGENTS.md) - Instructions for AI coding assistants working with this repo
+
+### Migration
+- **[Migration Guide](docs/migration.md)** - Upgrade guide from v0.1.x to v0.2.0
 
 ## License
 

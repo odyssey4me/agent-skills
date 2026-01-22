@@ -1,8 +1,17 @@
+---
+name: confluence
+description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
+metadata:
+  author: odyssey4me
+  version: "0.2.0"
+license: MIT
+---
+
 # Confluence
 
 Interact with Confluence for content search, viewing pages, and space management.
 
-> **Creating/Updating Content?** See [CREATING_CONTENT.md](CREATING_CONTENT.md) for page creation and updates with Markdown.
+> **Creating/Updating Content?** See [references/creating-content.md](references/creating-content.md) for page creation and updates with Markdown.
 
 ## Installation
 
@@ -18,7 +27,7 @@ Interact with Confluence for content search, viewing pages, and space management
 After installation, verify the skill is properly configured:
 
 ```bash
-python confluence.py check
+python scripts/confluence.pycheck
 ```
 
 This will check:
@@ -88,10 +97,10 @@ defaults:
 
 ```bash
 # Show all configuration
-python confluence.py config show
+python scripts/confluence.pyconfig show
 
 # Show space-specific defaults
-python confluence.py config show --space DEMO
+python scripts/confluence.pyconfig show --space DEMO
 ```
 
 ## Commands
@@ -101,7 +110,7 @@ python confluence.py config show --space DEMO
 Verify configuration and connectivity.
 
 ```bash
-python confluence.py check
+python scripts/confluence.pycheck
 ```
 
 This validates:
@@ -116,17 +125,17 @@ Search for content using CQL (Confluence Query Language).
 
 ```bash
 # Basic search
-python confluence.py search "type=page AND space = DEMO"
-python confluence.py search "title~login" --space DEMO
+python scripts/confluence.pysearch "type=page AND space = DEMO"
+python scripts/confluence.pysearch "title~login" --space DEMO
 
 # Filter by type
-python confluence.py search "space = DEMO" --type page
+python scripts/confluence.pysearch "space = DEMO" --type page
 
 # Limit results
-python confluence.py search "type=page" --max-results 10
+python scripts/confluence.pysearch "type=page" --max-results 10
 
 # JSON output
-python confluence.py search "type=page" --json
+python scripts/confluence.pysearch "type=page" --json
 ```
 
 **Arguments:**
@@ -144,19 +153,19 @@ Get page content by ID or title.
 
 ```bash
 # Get by title (returns Markdown by default)
-python confluence.py page get "My Page Title"
+python scripts/confluence.pypage get "My Page Title"
 
 # Get by ID
-python confluence.py page get 123456
+python scripts/confluence.pypage get 123456
 
 # Get without body content
-python confluence.py page get "My Page" --no-body
+python scripts/confluence.pypage get "My Page" --no-body
 
 # Get in original format (not Markdown)
-python confluence.py page get "My Page" --raw
+python scripts/confluence.pypage get "My Page" --raw
 
 # JSON output
-python confluence.py page get 123456 --json
+python scripts/confluence.pypage get 123456 --json
 ```
 
 **Output**: By default, displays page metadata and body content converted to Markdown for readability.
@@ -171,7 +180,7 @@ python confluence.py page get 123456 --json
 #### Example Output
 
 ```bash
-$ python confluence.py page get "API Documentation"
+$ python scripts/confluence.pypage get "API Documentation"
 
 Page ID: 123456
 Title: API Documentation
@@ -196,16 +205,16 @@ This document describes our **REST API**.
 
 ### page create / update
 
-For creating and updating pages with Markdown support, see [CREATING_CONTENT.md](CREATING_CONTENT.md).
+For creating and updating pages with Markdown support, see [references/creating-content.md](references/creating-content.md).
 
 Quick examples:
 ```bash
 # Create page from Markdown file
-python confluence.py page create --space DEMO --title "Documentation" \
+python scripts/confluence.pypage create --space DEMO --title "Documentation" \
   --body-file README.md
 
 # Update page from file
-python confluence.py page update 123456 --body-file updated.md
+python scripts/confluence.pypage update 123456 --body-file updated.md
 ```
 
 ### space
@@ -214,19 +223,19 @@ Manage spaces.
 
 ```bash
 # List all spaces
-python confluence.py space list
+python scripts/confluence.pyspace list
 
 # List with limit
-python confluence.py space list --max-results 10
+python scripts/confluence.pyspace list --max-results 10
 
 # Filter by type
-python confluence.py space list --type global
+python scripts/confluence.pyspace list --type global
 
 # Get space details
-python confluence.py space get DEMO
+python scripts/confluence.pyspace get DEMO
 
 # JSON output
-python confluence.py space list --json
+python scripts/confluence.pyspace list --json
 ```
 
 **Arguments:**
@@ -237,7 +246,7 @@ python confluence.py space list --json
 - `get <space-key>`: Get space details
   - `--json`: Output as JSON
 
-For creating spaces, see [CREATING_CONTENT.md](CREATING_CONTENT.md).
+For creating spaces, see [references/creating-content.md](references/creating-content.md).
 
 ### config
 
@@ -245,10 +254,10 @@ Show configuration and defaults.
 
 ```bash
 # Show all configuration
-python confluence.py config show
+python scripts/confluence.pyconfig show
 
 # Show space-specific defaults
-python confluence.py config show --space DEMO
+python scripts/confluence.pyconfig show --space DEMO
 ```
 
 This displays:
@@ -262,36 +271,36 @@ This displays:
 
 ```bash
 # Find pages in a space
-python confluence.py search "type=page AND space = DEMO"
+python scripts/confluence.pysearch "type=page AND space = DEMO"
 
 # Search by title
-python confluence.py search "title~login"
+python scripts/confluence.pysearch "title~login"
 
 # Find recent pages
-python confluence.py search "type=page AND created >= now('-7d')"
+python scripts/confluence.pysearch "type=page AND created >= now('-7d')"
 ```
 
 ### View Page Content
 
 ```bash
 # View page as Markdown
-python confluence.py page get "My Page Title"
+python scripts/confluence.pypage get "My Page Title"
 
 # View page metadata only
-python confluence.py page get 123456 --no-body
+python scripts/confluence.pypage get 123456 --no-body
 
 # Export to file
-python confluence.py page get "My Page" > exported-page.md
+python scripts/confluence.pypage get "My Page" > exported-page.md
 ```
 
 ### List and Explore Spaces
 
 ```bash
 # List all spaces
-python confluence.py space list
+python scripts/confluence.pyspace list
 
 # Get details about a space
-python confluence.py space get DEMO
+python scripts/confluence.pyspace get DEMO
 ```
 
 ### Using Configuration Defaults
@@ -300,15 +309,15 @@ With defaults configured as shown in the [Configuration Defaults](#configuration
 
 ```bash
 # Search uses CQL scope automatically
-python confluence.py search "type=page"
+python scripts/confluence.pysearch "type=page"
 # Becomes: (space = DEMO) AND (type=page)
 
 # Search with automatic max_results from config
-python confluence.py search "status=current"
+python scripts/confluence.pysearch "status=current"
 # Uses configured max_results (25) automatically
 
 # Override defaults when needed
-python confluence.py search "type=page" --max-results 100
+python scripts/confluence.pysearch "type=page" --max-results 100
 # CLI argument overrides the configured default of 25
 ```
 
@@ -316,10 +325,10 @@ python confluence.py search "type=page" --max-results 100
 
 ```bash
 # Search and extract IDs
-python confluence.py search "space=DEMO" --json | jq -r '.[] | .id'
+python scripts/confluence.pysearch "space=DEMO" --json | jq -r '.[] | .id'
 
 # Count pages in a space
-python confluence.py search "type=page AND space=DEMO" --max-results 1000 --json | jq '. | length'
+python scripts/confluence.pysearch "type=page AND space=DEMO" --max-results 1000 --json | jq '. | length'
 ```
 
 ## CQL Reference
@@ -342,14 +351,14 @@ Common CQL (Confluence Query Language) queries:
 Combine with `AND`, `OR`, and use `ORDER BY` for sorting:
 
 ```bash
-python confluence.py search "type=page AND space=DEMO AND created >= now('-30d') ORDER BY created DESC"
+python scripts/confluence.pysearch "type=page AND space=DEMO AND created >= now('-30d') ORDER BY created DESC"
 ```
 
 ## Troubleshooting
 
 ### Check command fails
 
-Run `python confluence.py check` to diagnose issues. It will provide specific error messages and setup instructions.
+Run `python scripts/confluence.pycheck` to diagnose issues. It will provide specific error messages and setup instructions.
 
 ### Authentication failed
 
@@ -369,8 +378,8 @@ Test your CQL query in the Confluence web interface search before using it in th
 ### Page not found
 
 When searching by title, ensure the title is exact (case-sensitive). You can use:
-- Exact title: `python confluence.py page get "Exact Page Title"`
-- Page ID: `python confluence.py page get 123456`
+- Exact title: `python scripts/confluence.pypage get "Exact Page Title"`
+- Page ID: `python scripts/confluence.pypage get 123456`
 
 ### Import errors
 

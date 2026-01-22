@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 # Import from skills module
-from skills.jira.jira import (
+from skills.jira.scripts.jira import (
     APIError,
     Credentials,
     JiraDefaults,

@@ -51,29 +51,96 @@ def validate_skill(skill_dir: Path) -> list[ValidationError]:
     if not skill_md.exists():
         errors.append(ValidationError(str(skill_md), "SKILL.md not found"))
     else:
-        errors.extend(validate_skill_md(skill_md))
+        errors.extend(validate_skill_md(skill_md, skill_name))
 
-    # Check for skill script (skill_name.py)
-    skill_script = skill_dir / f"{skill_name}.py"
-    if not skill_script.exists():
-        errors.append(ValidationError(str(skill_script), f"{skill_name}.py not found"))
+    # Check for scripts/ directory
+    scripts_dir = skill_dir / "scripts"
+    if not scripts_dir.exists():
+        errors.append(ValidationError(str(scripts_dir), "scripts/ directory not found"))
+    elif not scripts_dir.is_dir():
+        errors.append(ValidationError(str(scripts_dir), "scripts/ is not a directory"))
     else:
-        errors.extend(validate_skill_script(skill_script))
+        # Check for skill script in scripts/ directory
+        skill_script = scripts_dir / f"{skill_name}.py"
+        if not skill_script.exists():
+            errors.append(ValidationError(str(skill_script), f"scripts/{skill_name}.py not found"))
+        else:
+            errors.extend(validate_skill_script(skill_script))
+
+    # Check for references/ directory (optional, but warn if missing)
+    references_dir = skill_dir / "references"
+    if not references_dir.exists():
+        errors.append(
+            ValidationError(
+                str(references_dir),
+                "references/ directory not found (optional, but recommended for additional docs)",
+                "warning"
+            )
+        )
 
     return errors
 
 
-def validate_skill_md(skill_md: Path) -> list[ValidationError]:
+def validate_skill_md(skill_md: Path, skill_name: str) -> list[ValidationError]:
     """Validate SKILL.md content.
 
     Args:
         skill_md: Path to SKILL.md file.
+        skill_name: Name of the skill.
 
     Returns:
         List of validation errors.
     """
     errors: list[ValidationError] = []
     content = skill_md.read_text()
+
+    # Check for YAML frontmatter
+    if not content.startswith("---\n"):
+        errors.append(ValidationError(str(skill_md), "Missing YAML frontmatter (must start with '---')"))
+    else:
+        # Parse frontmatter
+        try:
+            import yaml
+            # Find the end of frontmatter
+            end_marker = content.find("\n---\n", 4)
+            if end_marker == -1:
+                errors.append(ValidationError(str(skill_md), "Invalid YAML frontmatter (missing closing '---')"))
+            else:
+                frontmatter = content[4:end_marker]
+                try:
+                    metadata = yaml.safe_load(frontmatter)
+
+                    # Check required fields
+                    if not isinstance(metadata, dict):
+                        errors.append(ValidationError(str(skill_md), "Frontmatter must be a YAML dictionary"))
+                    else:
+                        # Check for required fields
+                        if "name" not in metadata:
+                            errors.append(ValidationError(str(skill_md), "Frontmatter missing required field: 'name'"))
+                        elif metadata["name"] != skill_name:
+                            errors.append(
+                                ValidationError(
+                                    str(skill_md),
+                                    f"Frontmatter 'name' ({metadata['name']}) doesn't match skill directory name ({skill_name})",
+                                    "warning"
+                                )
+                            )
+
+                        if "description" not in metadata:
+                            errors.append(ValidationError(str(skill_md), "Frontmatter missing required field: 'description'"))
+                        elif not metadata["description"] or not isinstance(metadata["description"], str):
+                            errors.append(ValidationError(str(skill_md), "Frontmatter 'description' must be a non-empty string"))
+
+                        # Check for recommended fields
+                        if "metadata" not in metadata:
+                            errors.append(ValidationError(str(skill_md), "Frontmatter missing recommended field: 'metadata'", "warning"))
+                        if "license" not in metadata:
+                            errors.append(ValidationError(str(skill_md), "Frontmatter missing recommended field: 'license'", "warning"))
+
+                except yaml.YAMLError as e:
+                    errors.append(ValidationError(str(skill_md), f"Invalid YAML in frontmatter: {e}"))
+        except ImportError:
+            errors.append(ValidationError(str(skill_md), "pyyaml not installed - cannot validate frontmatter", "warning"))
 
     # Check for required sections
     required_sections = ["# ", "## Authentication", "## Commands"]

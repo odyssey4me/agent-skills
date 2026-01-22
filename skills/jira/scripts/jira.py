@@ -1404,7 +1404,7 @@ def cmd_check() -> int:
                 print('     issue in subtasksOf("PROJ-123")')
                 print('     issue in commentedByUser("accountId")')
                 print()
-                print("   For complete guidance, see SCRIPTRUNNER.md")
+                print("   For complete guidance, see references/scriptrunner.md")
             else:
                 print("   Enhanced Search: Disabled")
         else:

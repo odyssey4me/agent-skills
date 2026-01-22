@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from skills.jira.jira import (
+from skills.jira.scripts.jira import (
     JiraDefaults,
     ProjectDefaults,
     merge_jql_with_scope,
