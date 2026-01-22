@@ -266,12 +266,11 @@ def validate_claude_md_content(content: str) -> list[str]:
         )
 
     # Check for expected patterns
-    if "## Running Scripts" in content:
-        if "Always run skill scripts directly:" not in content:
-            warnings.append(
-                "Running Scripts section exists but missing recommended guidance: "
-                "'Always run skill scripts directly:'"
-            )
+    if "## Running Scripts" in content and "Always run skill scripts directly:" not in content:
+        warnings.append(
+            "Running Scripts section exists but missing recommended guidance: "
+            "'Always run skill scripts directly:'"
+        )
 
     return warnings
 

@@ -81,7 +81,7 @@ class TestCredentials:
 class TestKeyringFunctions:
     """Tests for keyring functions."""
 
-    @patch("skills.jira.jira.keyring")
+    @patch("skills.jira.scripts.jira.keyring")
     def test_get_credential(self, mock_keyring):
         """Test getting credential from keyring."""
         mock_keyring.get_password.return_value = "secret"
@@ -89,13 +89,13 @@ class TestKeyringFunctions:
         assert result == "secret"
         mock_keyring.get_password.assert_called_once_with("agent-skills", "test-key")
 
-    @patch("skills.jira.jira.keyring")
+    @patch("skills.jira.scripts.jira.keyring")
     def test_set_credential(self, mock_keyring):
         """Test setting credential in keyring."""
         set_credential("test-key", "secret")
         mock_keyring.set_password.assert_called_once_with("agent-skills", "test-key", "secret")
 
-    @patch("skills.jira.jira.keyring")
+    @patch("skills.jira.scripts.jira.keyring")
     def test_delete_credential(self, mock_keyring):
         """Test deleting credential from keyring."""
         delete_credential("test-key")
@@ -107,14 +107,14 @@ class TestConfigManagement:
 
     def test_load_config_nonexistent(self, tmp_path, monkeypatch):
         """Test loading config when file doesn't exist."""
-        monkeypatch.setattr("skills.jira.jira.CONFIG_DIR", tmp_path / "nonexistent")
+        monkeypatch.setattr("skills.jira.scripts.jira.CONFIG_DIR", tmp_path / "nonexistent")
         config = load_config("jira")
         assert config is None
 
     def test_save_and_load_config(self, tmp_path, monkeypatch):
         """Test saving and loading config."""
         config_dir = tmp_path / "config"
-        monkeypatch.setattr("skills.jira.jira.CONFIG_DIR", config_dir)
+        monkeypatch.setattr("skills.jira.scripts.jira.CONFIG_DIR", config_dir)
 
         test_config = {
             "url": "https://example.atlassian.net",
@@ -131,8 +131,8 @@ class TestConfigManagement:
 class TestGetCredentials:
     """Tests for get_credentials function."""
 
-    @patch("skills.jira.jira.get_credential")
-    @patch("skills.jira.jira.load_config")
+    @patch("skills.jira.scripts.jira.get_credential")
+    @patch("skills.jira.scripts.jira.load_config")
     def test_get_credentials_from_keyring(self, mock_load_config, mock_get_credential):
         """Test getting credentials from keyring."""
         mock_get_credential.side_effect = lambda key: {
@@ -148,8 +148,8 @@ class TestGetCredentials:
         assert creds.email == "keyring@example.com"
         assert creds.token == "keyring-token"
 
-    @patch("skills.jira.jira.get_credential")
-    @patch("skills.jira.jira.load_config")
+    @patch("skills.jira.scripts.jira.get_credential")
+    @patch("skills.jira.scripts.jira.load_config")
     def test_get_credentials_from_env(self, mock_load_config, mock_get_credential, monkeypatch):
         """Test getting credentials from environment variables."""
         mock_get_credential.return_value = None
@@ -165,8 +165,8 @@ class TestGetCredentials:
         assert creds.email == "env@example.com"
         assert creds.token == "env-token"
 
-    @patch("skills.jira.jira.get_credential")
-    @patch("skills.jira.jira.load_config")
+    @patch("skills.jira.scripts.jira.get_credential")
+    @patch("skills.jira.scripts.jira.load_config")
     def test_get_credentials_from_config(self, mock_load_config, mock_get_credential, monkeypatch):
         """Test getting credentials from config file."""
         # Clear environment variables
@@ -195,7 +195,7 @@ class TestDefaultsManagement:
 
     def test_get_jira_defaults_no_config(self, monkeypatch):
         """Test getting defaults when no config exists."""
-        monkeypatch.setattr("skills.jira.jira.load_config", lambda _service: None)
+        monkeypatch.setattr("skills.jira.scripts.jira.load_config", lambda _service: None)
         defaults = get_jira_defaults()
 
         assert defaults.jql_scope is None
@@ -203,7 +203,7 @@ class TestDefaultsManagement:
         assert defaults.max_results is None
         assert defaults.fields is None
 
-    @patch("skills.jira.jira.load_config")
+    @patch("skills.jira.scripts.jira.load_config")
     def test_get_jira_defaults_with_config(self, mock_load_config):
         """Test getting defaults from config."""
         mock_load_config.return_value = {
@@ -222,7 +222,7 @@ class TestDefaultsManagement:
         assert defaults.max_results == 100
         assert defaults.fields == ["summary", "status"]
 
-    @patch("skills.jira.jira.load_config")
+    @patch("skills.jira.scripts.jira.load_config")
     def test_get_project_defaults(self, mock_load_config):
         """Test getting project-specific defaults."""
         mock_load_config.return_value = {
@@ -245,10 +245,10 @@ class TestDeploymentDetection:
 
     def test_detect_deployment_type_cloud(self):
         """Test detecting Cloud deployment."""
-        with patch("skills.jira.jira._make_detection_request") as mock_request:
+        with patch("skills.jira.scripts.jira._make_detection_request") as mock_request:
             mock_request.return_value = {"deploymentType": "Cloud"}
 
-            with patch("skills.jira.jira.get_credentials") as mock_creds:
+            with patch("skills.jira.scripts.jira.get_credentials") as mock_creds:
                 mock_creds.return_value = Credentials(
                     url="https://example.atlassian.net",
                     email="test@example.com",
@@ -266,10 +266,10 @@ class TestDeploymentDetection:
 
     def test_detect_deployment_type_server(self):
         """Test detecting Server deployment."""
-        with patch("skills.jira.jira._make_detection_request") as mock_request:
+        with patch("skills.jira.scripts.jira._make_detection_request") as mock_request:
             mock_request.return_value = {"deploymentType": "Server"}
 
-            with patch("skills.jira.jira.get_credentials") as mock_creds:
+            with patch("skills.jira.scripts.jira.get_credentials") as mock_creds:
                 mock_creds.return_value = Credentials(
                     url="https://jira.example.com",
                     username="user",
@@ -287,7 +287,7 @@ class TestDeploymentDetection:
 
     def test_detect_deployment_type_no_url(self):
         """Test detection fails when no URL configured."""
-        with patch("skills.jira.jira.get_credentials") as mock_creds:
+        with patch("skills.jira.scripts.jira.get_credentials") as mock_creds:
             mock_creds.return_value = Credentials()
 
             clear_cache()
@@ -297,10 +297,10 @@ class TestDeploymentDetection:
 
     def test_get_api_version_cloud(self):
         """Test getting API version for Cloud."""
-        with patch("skills.jira.jira.detect_deployment_type") as mock_detect:
+        with patch("skills.jira.scripts.jira.detect_deployment_type") as mock_detect:
             mock_detect.return_value = "Cloud"
 
-            with patch("skills.jira.jira.get_credentials") as mock_creds:
+            with patch("skills.jira.scripts.jira.get_credentials") as mock_creds:
                 mock_creds.return_value = Credentials(url="https://example.atlassian.net")
 
                 clear_cache()
@@ -314,7 +314,7 @@ class TestDeploymentDetection:
 
     def test_is_cloud(self):
         """Test is_cloud helper."""
-        with patch("skills.jira.jira.detect_deployment_type") as mock_detect:
+        with patch("skills.jira.scripts.jira.detect_deployment_type") as mock_detect:
             mock_detect.return_value = "Cloud"
             assert is_cloud() is True
 
@@ -334,14 +334,14 @@ class TestApiHelpers:
 
     def test_api_path(self):
         """Test API path construction."""
-        with patch("skills.jira.jira.get_api_version") as mock_version:
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
             mock_version.return_value = "3"
             assert api_path("search") == "rest/api/3/search"
             assert api_path("/issue/DEMO-123") == "rest/api/3/issue/DEMO-123"
 
     def test_format_rich_text_cloud(self):
         """Test formatting rich text for Cloud (ADF)."""
-        with patch("skills.jira.jira.get_api_version") as mock_version:
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
             mock_version.return_value = "3"
             result = format_rich_text("Hello world")
 
@@ -352,7 +352,7 @@ class TestApiHelpers:
 
     def test_format_rich_text_server(self):
         """Test formatting rich text for Server (plain text)."""
-        with patch("skills.jira.jira.get_api_version") as mock_version:
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
             mock_version.return_value = "2"
             result = format_rich_text("Hello world")
 
@@ -454,8 +454,8 @@ class TestFormatting:
 class TestApiOperations:
     """Tests for API operations."""
 
-    @patch("skills.jira.jira.get")
-    @patch("skills.jira.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
     def test_search_issues(self, mock_api_path, mock_get):
         """Test searching issues."""
         mock_api_path.return_value = "rest/api/3/search"
@@ -470,8 +470,8 @@ class TestApiOperations:
         assert len(result) == 1
         assert result[0]["key"] == "DEMO-1"
 
-    @patch("skills.jira.jira.get")
-    @patch("skills.jira.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
     def test_get_issue(self, mock_api_path, mock_get):
         """Test getting a single issue."""
         mock_api_path.return_value = "rest/api/3/issue/DEMO-123"
@@ -485,9 +485,9 @@ class TestApiOperations:
         assert result["key"] == "DEMO-123"
         assert result["fields"]["summary"] == "Test issue"
 
-    @patch("skills.jira.jira.post")
-    @patch("skills.jira.jira.api_path")
-    @patch("skills.jira.jira.format_rich_text")
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.format_rich_text")
     def test_create_issue(self, mock_format_text, mock_api_path, mock_post):
         """Test creating an issue."""
         mock_api_path.return_value = "rest/api/3/issue"
@@ -504,8 +504,8 @@ class TestApiOperations:
 
         assert result["key"] == "DEMO-123"
 
-    @patch("skills.jira.jira.put")
-    @patch("skills.jira.jira.api_path")
+    @patch("skills.jira.scripts.jira.put")
+    @patch("skills.jira.scripts.jira.api_path")
     def test_update_issue(self, mock_api_path, mock_put):
         """Test updating an issue."""
         mock_api_path.return_value = "rest/api/3/issue/DEMO-123"
@@ -515,9 +515,9 @@ class TestApiOperations:
 
         assert result == {}
 
-    @patch("skills.jira.jira.post")
-    @patch("skills.jira.jira.api_path")
-    @patch("skills.jira.jira.format_rich_text")
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.format_rich_text")
     def test_add_comment(self, mock_format_text, mock_api_path, mock_post):
         """Test adding a comment."""
         mock_api_path.return_value = "rest/api/3/issue/DEMO-123/comment"
@@ -528,8 +528,8 @@ class TestApiOperations:
 
         assert result["id"] == "12345"
 
-    @patch("skills.jira.jira.get")
-    @patch("skills.jira.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
     def test_get_transitions(self, mock_api_path, mock_get):
         """Test getting transitions."""
         mock_api_path.return_value = "rest/api/3/issue/DEMO-123/transitions"
@@ -544,9 +544,9 @@ class TestApiOperations:
         assert len(result) == 1
         assert result[0]["name"] == "In Progress"
 
-    @patch("skills.jira.jira.get_transitions")
-    @patch("skills.jira.jira.post")
-    @patch("skills.jira.jira.api_path")
+    @patch("skills.jira.scripts.jira.get_transitions")
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
     def test_do_transition(self, mock_api_path, mock_post, mock_get_transitions):
         """Test performing a transition."""
         mock_api_path.return_value = "rest/api/3/issue/DEMO-123/transitions"
@@ -560,7 +560,7 @@ class TestApiOperations:
 
         assert result == {}
 
-    @patch("skills.jira.jira.get_transitions")
+    @patch("skills.jira.scripts.jira.get_transitions")
     def test_do_transition_invalid(self, mock_get_transitions):
         """Test transition with invalid name."""
         mock_get_transitions.return_value = [
@@ -574,8 +574,8 @@ class TestApiOperations:
 class TestHttpRequests:
     """Tests for HTTP request functions."""
 
-    @patch("skills.jira.jira.requests.get")
-    @patch("skills.jira.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.requests.get")
+    @patch("skills.jira.scripts.jira.get_credentials")
     def test_make_detection_request_success(self, mock_creds, mock_get):
         """Test successful detection request."""
         mock_creds.return_value = Credentials(
@@ -597,8 +597,8 @@ class TestHttpRequests:
 
         assert result["deploymentType"] == "Cloud"
 
-    @patch("skills.jira.jira.requests.get")
-    @patch("skills.jira.jira.time.sleep")
+    @patch("skills.jira.scripts.jira.requests.get")
+    @patch("skills.jira.scripts.jira.time.sleep")
     def test_make_detection_request_rate_limit(self, mock_sleep, mock_get):
         """Test detection request with rate limiting."""
         # First two attempts return 429, third succeeds
@@ -622,8 +622,8 @@ class TestHttpRequests:
         assert result["deploymentType"] == "Cloud"
         assert mock_sleep.call_count == 2
 
-    @patch("skills.jira.jira.requests.get")
-    @patch("skills.jira.jira.time.sleep")
+    @patch("skills.jira.scripts.jira.requests.get")
+    @patch("skills.jira.scripts.jira.time.sleep")
     def test_make_detection_request_failure(self, _mock_sleep, mock_get):
         """Test detection request failure."""
         import requests
@@ -636,12 +636,12 @@ class TestHttpRequests:
                 "rest/api/2/serverInfo",
             )
 
-    @patch("skills.jira.jira.requests.request")
-    @patch("skills.jira.jira.get_credentials")
-    @patch("skills.jira.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.requests.request")
+    @patch("skills.jira.scripts.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.is_cloud")
     def test_make_request_cloud(self, mock_is_cloud, mock_creds, mock_request):
         """Test making a request to Cloud."""
-        from skills.jira.jira import make_request
+        from skills.jira.scripts.jira import make_request
 
         mock_is_cloud.return_value = True
         mock_creds.return_value = Credentials(
@@ -658,23 +658,23 @@ class TestHttpRequests:
 
         assert result["result"] == "success"
 
-    @patch("skills.jira.jira.requests.request")
-    @patch("skills.jira.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.requests.request")
+    @patch("skills.jira.scripts.jira.get_credentials")
     def test_make_request_invalid_credentials(self, mock_creds, _mock_request):
         """Test making a request with invalid credentials."""
-        from skills.jira.jira import make_request
+        from skills.jira.scripts.jira import make_request
 
         mock_creds.return_value = Credentials(url="https://example.com")
 
         with pytest.raises(APIError, match="No valid credentials"):
             make_request("jira", "GET", "rest/api/3/search")
 
-    @patch("skills.jira.jira.requests.request")
-    @patch("skills.jira.jira.get_credentials")
-    @patch("skills.jira.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.requests.request")
+    @patch("skills.jira.scripts.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.is_cloud")
     def test_make_request_error(self, mock_is_cloud, mock_creds, mock_request):
         """Test making a request that fails."""
-        from skills.jira.jira import make_request
+        from skills.jira.scripts.jira import make_request
 
         mock_is_cloud.return_value = False
         mock_creds.return_value = Credentials(
@@ -690,12 +690,12 @@ class TestHttpRequests:
         with pytest.raises(APIError, match="failed: 404 Not Found"):
             make_request("jira", "GET", "rest/api/2/issue/MISSING")
 
-    @patch("skills.jira.jira.requests.request")
-    @patch("skills.jira.jira.get_credentials")
-    @patch("skills.jira.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.requests.request")
+    @patch("skills.jira.scripts.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.is_cloud")
     def test_make_request_204_no_content(self, mock_is_cloud, mock_creds, mock_request):
         """Test making a request that returns 204 No Content."""
-        from skills.jira.jira import make_request
+        from skills.jira.scripts.jira import make_request
 
         mock_is_cloud.return_value = True
         mock_creds.return_value = Credentials(
@@ -712,10 +712,10 @@ class TestHttpRequests:
 
         assert result == {}
 
-    @patch("skills.jira.jira.make_request")
+    @patch("skills.jira.scripts.jira.make_request")
     def test_get_wrapper(self, mock_make_request):
         """Test get wrapper function."""
-        from skills.jira.jira import get
+        from skills.jira.scripts.jira import get
 
         mock_make_request.return_value = {"result": "success"}
 
@@ -724,10 +724,10 @@ class TestHttpRequests:
         assert result["result"] == "success"
         mock_make_request.assert_called_once_with("jira", "GET", "rest/api/3/search")
 
-    @patch("skills.jira.jira.make_request")
+    @patch("skills.jira.scripts.jira.make_request")
     def test_post_wrapper(self, mock_make_request):
         """Test post wrapper function."""
-        from skills.jira.jira import post
+        from skills.jira.scripts.jira import post
 
         mock_make_request.return_value = {"key": "DEMO-123"}
 
@@ -735,10 +735,10 @@ class TestHttpRequests:
 
         assert result["key"] == "DEMO-123"
 
-    @patch("skills.jira.jira.make_request")
+    @patch("skills.jira.scripts.jira.make_request")
     def test_put_wrapper(self, mock_make_request):
         """Test put wrapper function."""
-        from skills.jira.jira import put
+        from skills.jira.scripts.jira import put
 
         mock_make_request.return_value = {}
 
@@ -746,10 +746,10 @@ class TestHttpRequests:
 
         assert result == {}
 
-    @patch("skills.jira.jira.make_request")
+    @patch("skills.jira.scripts.jira.make_request")
     def test_delete_wrapper(self, mock_make_request):
         """Test delete wrapper function."""
-        from skills.jira.jira import delete
+        from skills.jira.scripts.jira import delete
 
         mock_make_request.return_value = {}
 
@@ -761,10 +761,10 @@ class TestHttpRequests:
 class TestCommandHandlers:
     """Tests for command handlers."""
 
-    @patch("skills.jira.jira.get_credentials")
-    @patch("skills.jira.jira.detect_deployment_type")
-    @patch("skills.jira.jira.get_api_version")
-    @patch("skills.jira.jira.get")
+    @patch("skills.jira.scripts.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.detect_deployment_type")
+    @patch("skills.jira.scripts.jira.get_api_version")
+    @patch("skills.jira.scripts.jira.get")
     def test_cmd_check_success(self, mock_get, mock_api_version, mock_detect, mock_creds, capsys):
         """Test check command success."""
         mock_creds.return_value = Credentials(
@@ -782,7 +782,7 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "All checks passed" in captured.out
 
-    @patch("skills.jira.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.get_credentials")
     def test_cmd_check_no_url(self, mock_creds, capsys):
         """Test check command with no URL."""
         mock_creds.return_value = Credentials()
@@ -793,10 +793,12 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "No Jira URL configured" in captured.out
 
-    @patch("skills.jira.jira.get_credentials")
-    def test_cmd_check_no_token(self, mock_creds, capsys):
+    @patch("skills.jira.scripts.jira.detect_deployment_type")
+    @patch("skills.jira.scripts.jira.get_credentials")
+    def test_cmd_check_no_token(self, mock_creds, mock_detect, capsys):
         """Test check command with no token."""
         mock_creds.return_value = Credentials(url="https://example.atlassian.net")
+        mock_detect.return_value = "Cloud"
 
         result = cmd_check()
 
@@ -804,8 +806,8 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "No API token configured" in captured.out
 
-    @patch("skills.jira.jira.get_credentials")
-    @patch("skills.jira.jira.detect_deployment_type")
+    @patch("skills.jira.scripts.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.detect_deployment_type")
     def test_cmd_check_connection_error(self, mock_detect, mock_creds, capsys):
         """Test check command with connection error."""
         mock_creds.return_value = Credentials(
@@ -820,10 +822,10 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "Connection failed" in captured.out
 
-    @patch("skills.jira.jira.get_credentials")
-    @patch("skills.jira.jira.detect_deployment_type")
-    @patch("skills.jira.jira.get_api_version")
-    @patch("skills.jira.jira.get")
+    @patch("skills.jira.scripts.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.detect_deployment_type")
+    @patch("skills.jira.scripts.jira.get_api_version")
+    @patch("skills.jira.scripts.jira.get")
     def test_cmd_check_api_error(self, mock_get, mock_api_version, mock_detect, mock_creds, capsys):
         """Test check command with API error."""
         mock_creds.return_value = Credentials(
@@ -840,9 +842,9 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "API call failed" in captured.out
 
-    @patch("skills.jira.jira.search_issues")
-    @patch("skills.jira.jira.get_jira_defaults")
-    @patch("skills.jira.jira.format_issues_list")
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.format_issues_list")
     def test_cmd_search(self, mock_format, mock_defaults, mock_search):
         """Test search command."""
         mock_defaults.return_value = JiraDefaults()
@@ -859,8 +861,8 @@ class TestCommandHandlers:
         result = cmd_search(args)
         assert result == 0
 
-    @patch("skills.jira.jira.get_issue")
-    @patch("skills.jira.jira.format_issue")
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.format_issue")
     def test_cmd_issue_get(self, mock_format, mock_get_issue):
         """Test issue get command."""
         mock_get_issue.return_value = {"key": "DEMO-123"}
@@ -875,8 +877,8 @@ class TestCommandHandlers:
         result = cmd_issue(args)
         assert result == 0
 
-    @patch("skills.jira.jira.create_issue")
-    @patch("skills.jira.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
     def test_cmd_issue_create(self, mock_defaults, mock_create):
         """Test issue create command."""
         mock_defaults.return_value = ProjectDefaults()
@@ -897,8 +899,8 @@ class TestCommandHandlers:
         result = cmd_issue(args)
         assert result == 0
 
-    @patch("skills.jira.jira.get_transitions")
-    @patch("skills.jira.jira.format_table")
+    @patch("skills.jira.scripts.jira.get_transitions")
+    @patch("skills.jira.scripts.jira.format_table")
     def test_cmd_transitions_list(self, mock_format, mock_get_transitions):
         """Test transitions list command."""
         mock_get_transitions.return_value = [
@@ -915,7 +917,7 @@ class TestCommandHandlers:
         result = cmd_transitions(args)
         assert result == 0
 
-    @patch("skills.jira.jira.load_config")
+    @patch("skills.jira.scripts.jira.load_config")
     def test_cmd_config_show_no_config(self, mock_load, capsys):
         """Test config show with no config file."""
         mock_load.return_value = None
@@ -931,7 +933,7 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "No configuration file found" in captured.out
 
-    @patch("skills.jira.jira.load_config")
+    @patch("skills.jira.scripts.jira.load_config")
     def test_cmd_config_show_with_config(self, mock_load, capsys):
         """Test config show with config file."""
         mock_load.return_value = {
@@ -955,7 +957,7 @@ class TestCommandHandlers:
         assert "https://example.atlassian.net" in captured.out
         assert "test@example.com" in captured.out
 
-    @patch("skills.jira.jira.update_issue")
+    @patch("skills.jira.scripts.jira.update_issue")
     def test_cmd_issue_update(self, mock_update, capsys):
         """Test issue update command."""
         mock_update.return_value = {}
@@ -976,8 +978,8 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "Updated issue: DEMO-123" in captured.out
 
-    @patch("skills.jira.jira.add_comment")
-    @patch("skills.jira.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.add_comment")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
     def test_cmd_issue_comment(self, mock_defaults, mock_add_comment, capsys):
         """Test issue comment command."""
         mock_defaults.return_value = JiraDefaults()
@@ -996,8 +998,8 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "Added comment to DEMO-123" in captured.out
 
-    @patch("skills.jira.jira.add_comment")
-    @patch("skills.jira.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.add_comment")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
     def test_cmd_issue_comment_with_security(self, mock_defaults, mock_add_comment, capsys):
         """Test issue comment with security level."""
         mock_defaults.return_value = JiraDefaults()
@@ -1017,8 +1019,8 @@ class TestCommandHandlers:
         assert "Added private comment to DEMO-123" in captured.out
         assert "Red Hat Internal" in captured.out
 
-    @patch("skills.jira.jira.do_transition")
-    @patch("skills.jira.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.do_transition")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
     def test_cmd_transitions_do(self, mock_defaults, mock_do_transition, capsys):
         """Test transitions do command."""
         mock_defaults.return_value = JiraDefaults()
@@ -1038,8 +1040,8 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "Transitioned DEMO-123 to 'In Progress'" in captured.out
 
-    @patch("skills.jira.jira.do_transition")
-    @patch("skills.jira.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.do_transition")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
     def test_cmd_transitions_do_with_comment(self, mock_defaults, mock_do_transition, capsys):
         """Test transitions do with comment."""
         mock_defaults.return_value = JiraDefaults()
@@ -1060,8 +1062,8 @@ class TestCommandHandlers:
         assert "Transitioned DEMO-123 to 'Done'" in captured.out
         assert "(with comment)" in captured.out
 
-    @patch("skills.jira.jira.search_issues")
-    @patch("skills.jira.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
     def test_cmd_search_error(self, mock_defaults, mock_search, capsys):
         """Test search command with error."""
         mock_defaults.return_value = JiraDefaults()
@@ -1080,8 +1082,8 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "Search failed" in captured.err
 
-    @patch("skills.jira.jira.create_issue")
-    @patch("skills.jira.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
     def test_cmd_issue_create_missing_type(self, mock_defaults, _mock_create, capsys):
         """Test issue create without type."""
         mock_defaults.return_value = ProjectDefaults()
@@ -1104,9 +1106,9 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "--type is required" in captured.err
 
-    @patch("skills.jira.jira.search_issues")
-    @patch("skills.jira.jira.get_jira_defaults")
-    @patch("skills.jira.jira.format_json")
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.format_json")
     def test_cmd_search_json_output(self, mock_format_json, mock_defaults, mock_search, capsys):
         """Test search command with JSON output."""
         mock_defaults.return_value = JiraDefaults()
@@ -1126,7 +1128,7 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert '[{"key": "DEMO-1"}]' in captured.out
 
-    @patch("skills.jira.jira.load_config")
+    @patch("skills.jira.scripts.jira.load_config")
     def test_cmd_config_show_with_project(self, mock_load, capsys):
         """Test config show with specific project."""
         mock_load.return_value = {
@@ -1152,9 +1154,9 @@ class TestCommandHandlers:
         assert "Task" in captured.out
         assert "High" in captured.out
 
-    @patch("skills.jira.jira.create_issue")
-    @patch("skills.jira.jira.get_project_defaults")
-    @patch("skills.jira.jira.format_json")
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.format_json")
     def test_cmd_issue_create_json_output(
         self, mock_format_json, mock_defaults, mock_create, capsys
     ):
@@ -1181,8 +1183,8 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert '{"key": "DEMO-123"}' in captured.out
 
-    @patch("skills.jira.jira.get_issue")
-    @patch("skills.jira.jira.format_json")
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.format_json")
     def test_cmd_issue_get_json_output(self, mock_format_json, mock_get_issue, capsys):
         """Test issue get with JSON output."""
         mock_get_issue.return_value = {"key": "DEMO-123"}
@@ -1200,8 +1202,8 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert '{"key": "DEMO-123"}' in captured.out
 
-    @patch("skills.jira.jira.get_transitions")
-    @patch("skills.jira.jira.format_json")
+    @patch("skills.jira.scripts.jira.get_transitions")
+    @patch("skills.jira.scripts.jira.format_json")
     def test_cmd_transitions_list_json_output(self, mock_format_json, mock_get_transitions, capsys):
         """Test transitions list with JSON output."""
         mock_get_transitions.return_value = [
@@ -1221,9 +1223,9 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert '[{"id": "11"}]' in captured.out
 
-    @patch("skills.jira.jira.search_issues")
-    @patch("skills.jira.jira.get_jira_defaults")
-    def test_cmd_search_with_fields(self, mock_defaults, mock_search, _capsys):
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_search_with_fields(self, mock_defaults, mock_search):
         """Test search with custom fields."""
         mock_defaults.return_value = JiraDefaults()
         mock_search.return_value = [{"key": "DEMO-1"}]
@@ -1243,8 +1245,8 @@ class TestCommandHandlers:
         call_args = mock_search.call_args
         assert call_args[0][2] == ["summary", "status", "assignee"]
 
-    @patch("skills.jira.jira.update_issue")
-    def test_cmd_issue_update_with_labels(self, mock_update, _capsys):
+    @patch("skills.jira.scripts.jira.update_issue")
+    def test_cmd_issue_update_with_labels(self, mock_update):
         """Test issue update with labels."""
         mock_update.return_value = {}
 
@@ -1265,8 +1267,8 @@ class TestCommandHandlers:
         call_args = mock_update.call_args
         assert call_args[1]["labels"] == ["test", "bug"]
 
-    @patch("skills.jira.jira.do_transition")
-    @patch("skills.jira.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.do_transition")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
     def test_cmd_transitions_do_with_security(self, mock_defaults, mock_do_transition, capsys):
         """Test transition with security level."""
         mock_defaults.return_value = JiraDefaults()
