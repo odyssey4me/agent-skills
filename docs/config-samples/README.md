@@ -10,9 +10,15 @@ This directory contains sample configuration files for Claude Code.
 - [`.claude/CLAUDE.md.sample`](.claude/CLAUDE.md.sample) - Global configuration file
 - **Install to**: `~/.claude/CLAUDE.md`
 
-## Manual Installation
+## When to Use This
 
-To install manually:
+After installing skills with `npx add-skill odyssey4me/agent-skills`, you may want to configure Claude Code to make skills easier to discover and use. The sample configuration:
+
+1. Documents which skills are available
+2. Shows how to invoke skills (via `/jira` commands or natural language)
+3. Provides example script commands
+
+## Installation
 
 1. Copy the sample file to its destination:
    ```bash
@@ -25,6 +31,6 @@ To install manually:
 
 ## Notes
 
-- The sample uses `~/.claude/skills` as the default skills directory
-- You can install skills to any location - just update the paths in CLAUDE.md
-- See [../installation.md](../installation.md) for complete installation instructions
+- The sample assumes skills were installed with `npx add-skill` to `~/.claude/skills`
+- If you installed to a custom location, update the paths in CLAUDE.md
+- See [../user-guide.md](../user-guide.md) for complete installation instructions

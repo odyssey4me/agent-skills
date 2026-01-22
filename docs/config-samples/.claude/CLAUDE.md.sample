@@ -1,19 +1,22 @@
 # Global Agent Skills
 
-Skills are available at ~/.local/share/agent-skills
+Skills are available at ~/.claude/skills
 
 ## Available Skills
 
-- **Jira**: Issue tracking - read ~/.local/share/agent-skills/skills/jira/SKILL.md
+- **Confluence**: Interact with Confluence for content search, viewing pages, and space management. - read ~/.claude/skills/confluence/SKILL.md
+- **Jira**: Interact with Jira for issue tracking, search, and workflow management. - read ~/.claude/skills/jira/SKILL.md
 
 ## Running Scripts
 
 ```bash
-python skills/jira/scripts/search.py "project = DEMO"
+python ~/.claude/skills/jira/scripts/jira.py search "project = DEMO"
+python ~/.claude/skills/confluence/scripts/confluence.py search "space = DEV"
 ```
 
 ## Skill Invocation
 
-Describe naturally:
+Use `/jira` or `/confluence` to invoke skills, or describe naturally:
 - "Search Jira for my open issues"
 - "Create a bug in PROJECT about login failures"
+- "Find Confluence pages about authentication"
