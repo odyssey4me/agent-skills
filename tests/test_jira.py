@@ -454,9 +454,10 @@ class TestFormatting:
 class TestApiOperations:
     """Tests for API operations."""
 
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues(self, mock_api_path, mock_get):
+    def test_search_issues(self, mock_api_path, mock_get, mock_scriptrunner):
         """Test searching issues."""
         mock_api_path.return_value = "rest/api/3/search"
         mock_get.return_value = {
@@ -464,6 +465,7 @@ class TestApiOperations:
                 {"key": "DEMO-1", "fields": {"summary": "Test"}},
             ]
         }
+        mock_scriptrunner.return_value = {"available": False}
 
         result = search_issues("project = DEMO", max_results=10)
 
