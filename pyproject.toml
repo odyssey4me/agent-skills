@@ -97,9 +97,10 @@ omit = [
 ]
 
 [tool.coverage.report]
-# Initial target: 50%. Goal: increase to 80% as more tests are added.
-fail_under = 50
+# Target: 80% coverage per file
+fail_under = 80
 show_missing = true
+skip_covered = false
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
@@ -107,4 +108,7 @@ exclude_lines = [
     "raise NotImplementedError",
     # Exclude CLI main functions
     "def main\\(",
+    # Exclude import error handlers (can't test missing dependencies)
+    "except ImportError:",
+    "print.*Install with:",
 ]
