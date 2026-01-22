@@ -142,37 +142,35 @@ class TestMergeJql:
     def test_merge_both_present(self):
         """Test merge with both scope and user JQL."""
         result = merge_jql_with_scope(
-            "status = Open",
-            "project = DEMO AND assignee = currentUser()"
+            "status = Open", "project = DEMO AND assignee = currentUser()"
         )
         expected = "(project = DEMO AND assignee = currentUser()) AND (status = Open)"
         assert result == expected
 
     def test_merge_preserves_or_precedence(self):
         """Test that parentheses preserve OR operator precedence."""
-        result = merge_jql_with_scope(
-            "status = Open OR status = 'In Progress'",
-            "project = DEMO"
-        )
+        result = merge_jql_with_scope("status = Open OR status = 'In Progress'", "project = DEMO")
         expected = "(project = DEMO) AND (status = Open OR status = 'In Progress')"
         assert result == expected
 
     def test_merge_complex_user_query(self):
         """Test with complex user query."""
         result = merge_jql_with_scope(
-            "priority = High AND (status = Open OR status = 'In Progress')",
-            "project = DEMO"
+            "priority = High AND (status = Open OR status = 'In Progress')", "project = DEMO"
         )
-        expected = "(project = DEMO) AND (priority = High AND (status = Open OR status = 'In Progress'))"
+        expected = (
+            "(project = DEMO) AND (priority = High AND (status = Open OR status = 'In Progress'))"
+        )
         assert result == expected
 
     def test_merge_complex_scope(self):
         """Test with complex scope."""
         result = merge_jql_with_scope(
-            "status = Open",
-            "project = DEMO AND assignee = currentUser() AND created >= -30d"
+            "status = Open", "project = DEMO AND assignee = currentUser() AND created >= -30d"
         )
-        expected = "(project = DEMO AND assignee = currentUser() AND created >= -30d) AND (status = Open)"
+        expected = (
+            "(project = DEMO AND assignee = currentUser() AND created >= -30d) AND (status = Open)"
+        )
         assert result == expected
 
     def test_merge_both_none(self):

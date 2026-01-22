@@ -34,19 +34,28 @@ from typing import Any
 try:
     import requests
 except ImportError:
-    print("Error: 'requests' library not found. Install with: pip install --user requests", file=sys.stderr)
+    print(
+        "Error: 'requests' library not found. Install with: pip install --user requests",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 try:
     import keyring
 except ImportError:
-    print("Error: 'keyring' library not found. Install with: pip install --user keyring", file=sys.stderr)
+    print(
+        "Error: 'keyring' library not found. Install with: pip install --user keyring",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 try:
     import yaml
 except ImportError:
-    print("Error: 'pyyaml' library not found. Install with: pip install --user pyyaml", file=sys.stderr)
+    print(
+        "Error: 'pyyaml' library not found. Install with: pip install --user pyyaml",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 
@@ -397,9 +406,7 @@ def _make_detection_request(
                     time.sleep(wait_time)
                     continue
                 else:
-                    raise JiraDetectionError(
-                        f"Rate limited after {MAX_RETRIES} attempts"
-                    )
+                    raise JiraDetectionError(f"Rate limited after {MAX_RETRIES} attempts")
 
             if not response.ok:
                 raise JiraDetectionError(
@@ -759,6 +766,7 @@ def validate_jql_for_scriptrunner(jql: str) -> dict[str, Any]:
 # HTTP/REST UTILITIES
 # ============================================================================
 
+
 class APIError(Exception):
     """Exception raised for API errors."""
 
@@ -824,9 +832,7 @@ def make_request(
     """
     creds = get_credentials(service)
     if not creds.is_valid():
-        raise APIError(
-            f"No valid credentials found for {service}. Run: python jira.py check"
-        )
+        raise APIError(f"No valid credentials found for {service}. Run: python jira.py check")
 
     url = f"{creds.url.rstrip('/')}/{endpoint.lstrip('/')}"
 
@@ -901,6 +907,7 @@ def delete(service: str, endpoint: str, **kwargs: Any) -> dict[str, Any] | list[
 # ============================================================================
 # OUTPUT FORMATTING
 # ============================================================================
+
 
 def format_json(data: Any, *, indent: int = 2) -> str:
     """Format data as JSON string.
@@ -1101,6 +1108,7 @@ def search_issues(
 # ISSUE MANAGEMENT
 # ============================================================================
 
+
 def get_issue(issue_key: str) -> dict[str, Any]:
     """Get an issue by key.
 
@@ -1225,10 +1233,7 @@ def add_comment(issue_key: str, body: str, security_level: str | None = None) ->
     comment_body: dict[str, Any] = {"body": format_rich_text(body)}
 
     if security_level:
-        comment_body["visibility"] = {
-            "type": "group",
-            "value": security_level
-        }
+        comment_body["visibility"] = {"type": "group", "value": security_level}
 
     response = post("jira", api_path(f"issue/{issue_key}/comment"), comment_body)
     if isinstance(response, dict):
@@ -1239,6 +1244,7 @@ def add_comment(issue_key: str, body: str, security_level: str | None = None) ->
 # ============================================================================
 # TRANSITION MANAGEMENT
 # ============================================================================
+
 
 def get_transitions(issue_key: str) -> list[dict[str, Any]]:
     """Get available transitions for an issue.
@@ -1293,17 +1299,8 @@ def do_transition(
     if comment:
         comment_data: dict[str, Any] = {"body": format_rich_text(comment)}
         if security_level:
-            comment_data["visibility"] = {
-                "type": "group",
-                "value": security_level
-            }
-        data["update"] = {
-            "comment": [
-                {
-                    "add": comment_data
-                }
-            ]
-        }
+            comment_data["visibility"] = {"type": "group", "value": security_level}
+        data["update"] = {"comment": [{"add": comment_data}]}
 
     response = post("jira", api_path(f"issue/{issue_key}/transitions"), data)
     if isinstance(response, dict):
@@ -1314,6 +1311,7 @@ def do_transition(
 # ============================================================================
 # CHECK COMMAND - Validates configuration and connectivity
 # ============================================================================
+
 
 def cmd_check() -> int:
     """Validate Jira configuration and connectivity.
@@ -1416,7 +1414,7 @@ def cmd_check() -> int:
     print()
     print("All checks passed!")
     print("\nYou can now use commands like:")
-    print("  python jira.py search \"project = YOUR_PROJECT\"")
+    print('  python jira.py search "project = YOUR_PROJECT"')
     print("  python jira.py issue get DEMO-123")
     print("  python jira.py transitions list DEMO-123")
 
@@ -1426,6 +1424,7 @@ def cmd_check() -> int:
 # ============================================================================
 # COMMAND HANDLERS
 # ============================================================================
+
 
 def cmd_search(args: argparse.Namespace) -> int:
     """Handle search command."""
@@ -1437,8 +1436,8 @@ def cmd_search(args: argparse.Namespace) -> int:
         jql = merge_jql_with_scope(args.jql, defaults.jql_scope)
 
         # Apply max_results (detect if user explicitly provided it)
-        max_results = args.max_results if args.max_results is not None else (
-            defaults.max_results or 50
+        max_results = (
+            args.max_results if args.max_results is not None else (defaults.max_results or 50)
         )
 
         # Apply fields
@@ -1517,7 +1516,9 @@ def cmd_issue(args: argparse.Namespace) -> int:
             security_level = args.security_level or defaults.security_level
             add_comment(args.issue_key, args.body, security_level=security_level)
             if security_level:
-                print(f"Added private comment to {args.issue_key} (security level: {security_level})")
+                print(
+                    f"Added private comment to {args.issue_key} (security level: {security_level})"
+                )
             else:
                 print(f"Added comment to {args.issue_key}")
 
@@ -1551,7 +1552,9 @@ def cmd_transitions(args: argparse.Namespace) -> int:
 
         elif args.transition_command == "do":
             defaults = get_jira_defaults()
-            security_level = args.security_level or (defaults.security_level if args.comment else None)
+            security_level = args.security_level or (
+                defaults.security_level if args.comment else None
+            )
             do_transition(args.issue_key, args.transition, args.comment, security_level)
             msg = f"Transitioned {args.issue_key} to '{args.transition}'"
             if args.comment and security_level:
@@ -1591,7 +1594,9 @@ def cmd_config(args: argparse.Namespace) -> int:
             print(f"  JQL Scope: {defaults.jql_scope or 'Not configured'}")
             print(f"  Security Level: {defaults.security_level or 'Not configured'}")
             print(f"  Max Results: {defaults.max_results or 'Not configured (default: 50)'}")
-            print(f"  Fields: {', '.join(defaults.fields) if defaults.fields else 'Not configured'}")
+            print(
+                f"  Fields: {', '.join(defaults.fields) if defaults.fields else 'Not configured'}"
+            )
             print()
 
             # Show project defaults
@@ -1621,6 +1626,7 @@ def cmd_config(args: argparse.Namespace) -> int:
 # ============================================================================
 # MAIN CLI
 # ============================================================================
+
 
 def main() -> int:
     """Main entry point."""
@@ -1679,7 +1685,9 @@ def main() -> int:
     # Create subcommand
     create_parser = issue_subparsers.add_parser("create", help="Create new issue")
     create_parser.add_argument("--project", required=True, help="Project key")
-    create_parser.add_argument("--type", dest="issue_type", help="Issue type (required unless project default configured)")
+    create_parser.add_argument(
+        "--type", dest="issue_type", help="Issue type (required unless project default configured)"
+    )
     create_parser.add_argument("--summary", required=True, help="Issue summary")
     create_parser.add_argument("--description", help="Issue description")
     create_parser.add_argument("--priority", help="Priority name")
@@ -1702,7 +1710,7 @@ def main() -> int:
     comment_parser.add_argument("body", help="Comment text")
     comment_parser.add_argument(
         "--security-level",
-        help="Security level for private comment (e.g., 'Red Hat Internal', 'Employees')"
+        help="Security level for private comment (e.g., 'Red Hat Internal', 'Employees')",
     )
 
     # ========================================================================
@@ -1712,7 +1720,9 @@ def main() -> int:
         "transitions",
         help="Manage issue transitions",
     )
-    transitions_subparsers = transitions_parser.add_subparsers(dest="transition_command", required=True)
+    transitions_subparsers = transitions_parser.add_subparsers(
+        dest="transition_command", required=True
+    )
 
     # List subcommand
     list_parser = transitions_subparsers.add_parser("list", help="List available transitions")
@@ -1726,7 +1736,7 @@ def main() -> int:
     do_parser.add_argument("--comment", help="Comment to add with transition")
     do_parser.add_argument(
         "--security-level",
-        help="Security level for private comment (e.g., 'Red Hat Internal', 'Employees')"
+        help="Security level for private comment (e.g., 'Red Hat Internal', 'Employees')",
     )
 
     # ========================================================================

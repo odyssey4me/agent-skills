@@ -36,19 +36,28 @@ from typing import Any
 try:
     import requests
 except ImportError:
-    print("Error: 'requests' library not found. Install with: pip install --user requests", file=sys.stderr)
+    print(
+        "Error: 'requests' library not found. Install with: pip install --user requests",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 try:
     import keyring
 except ImportError:
-    print("Error: 'keyring' library not found. Install with: pip install --user keyring", file=sys.stderr)
+    print(
+        "Error: 'keyring' library not found. Install with: pip install --user keyring",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 try:
     import yaml
 except ImportError:
-    print("Error: 'pyyaml' library not found. Install with: pip install --user pyyaml", file=sys.stderr)
+    print(
+        "Error: 'pyyaml' library not found. Install with: pip install --user pyyaml",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 
@@ -396,9 +405,7 @@ def _make_detection_request(
                     time.sleep(wait_time)
                     continue
                 else:
-                    raise ConfluenceDetectionError(
-                        f"Rate limited after {MAX_RETRIES} attempts"
-                    )
+                    raise ConfluenceDetectionError(f"Rate limited after {MAX_RETRIES} attempts")
 
             if not response.ok:
                 raise ConfluenceDetectionError(
@@ -548,6 +555,7 @@ def clear_cache() -> None:
 # MARKDOWN CONVERSION UTILITIES
 # ============================================================================
 
+
 def markdown_to_storage(markdown: str) -> str:
     """Convert Markdown to Confluence storage format (XHTML).
 
@@ -594,11 +602,11 @@ def markdown_to_storage(markdown: str) -> str:
                     result.append(
                         f'<ac:structured-macro ac:name="code">'
                         f'<ac:parameter ac:name="language">{html.escape(code_lang)}</ac:parameter>'
-                        f'<ac:plain-text-body><![CDATA[{code_content}]]></ac:plain-text-body>'
-                        f'</ac:structured-macro>'
+                        f"<ac:plain-text-body><![CDATA[{code_content}]]></ac:plain-text-body>"
+                        f"</ac:structured-macro>"
                     )
                 else:
-                    result.append(f'<pre><code>{code_content}</code></pre>')
+                    result.append(f"<pre><code>{code_content}</code></pre>")
             continue
 
         if in_code_block:
@@ -612,18 +620,18 @@ def markdown_to_storage(markdown: str) -> str:
             list_items = []
             in_list = False
 
-        if in_ordered_list and not re.match(r'^\d+\.\s', line.strip()):
+        if in_ordered_list and not re.match(r"^\d+\.\s", line.strip()):
             list_html = "<ol>" + "".join(f"<li>{item}</li>" for item in list_items) + "</ol>"
             result.append(list_html)
             list_items = []
             in_ordered_list = False
 
         # Headers
-        header_match = re.match(r'^(#{1,6})\s+(.+)$', line)
+        header_match = re.match(r"^(#{1,6})\s+(.+)$", line)
         if header_match:
             level = len(header_match.group(1))
             text = _inline_markdown_to_html(header_match.group(2))
-            result.append(f'<h{level}>{text}</h{level}>')
+            result.append(f"<h{level}>{text}</h{level}>")
             continue
 
         # Unordered lists
@@ -634,7 +642,7 @@ def markdown_to_storage(markdown: str) -> str:
             continue
 
         # Ordered lists
-        ordered_match = re.match(r'^(\d+)\.\s+(.+)$', line.strip())
+        ordered_match = re.match(r"^(\d+)\.\s+(.+)$", line.strip())
         if ordered_match:
             in_ordered_list = True
             item_text = ordered_match.group(2)
@@ -648,7 +656,7 @@ def markdown_to_storage(markdown: str) -> str:
 
         # Paragraphs
         para_text = _inline_markdown_to_html(line)
-        result.append(f'<p>{para_text}</p>')
+        result.append(f"<p>{para_text}</p>")
 
     # Flush any remaining list
     if in_list:
@@ -670,18 +678,18 @@ def _inline_markdown_to_html(text: str) -> str:
     text = html.escape(text)
 
     # Bold: **text** or __text__
-    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-    text = re.sub(r'__(.+?)__', r'<strong>\1</strong>', text)
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"__(.+?)__", r"<strong>\1</strong>", text)
 
     # Italic: *text* or _text_ (not inside word boundaries)
-    text = re.sub(r'(?<!\w)\*(.+?)\*(?!\w)', r'<em>\1</em>', text)
-    text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'<em>\1</em>', text)
+    text = re.sub(r"(?<!\w)\*(.+?)\*(?!\w)", r"<em>\1</em>", text)
+    text = re.sub(r"(?<!\w)_(.+?)_(?!\w)", r"<em>\1</em>", text)
 
     # Inline code: `code`
-    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
+    text = re.sub(r"`(.+?)`", r"<code>\1</code>", text)
 
     # Links: [text](url)
-    text = re.sub(r'\[([^\]]+)\]\(([^\)]+)\)', r'<a href="\2">\1</a>', text)
+    text = re.sub(r"\[([^\]]+)\]\(([^\)]+)\)", r'<a href="\2">\1</a>', text)
 
     return text
 
@@ -704,7 +712,7 @@ def storage_to_markdown(storage: str) -> str:
         lang = match.group(1) if match.group(1) else ""
         code = match.group(2)
         # Unescape CDATA content
-        code = code.replace('<![CDATA[', '').replace(']]>', '')
+        code = code.replace("<![CDATA[", "").replace("]]>", "")
         code = html.unescape(code)
         return f"```{lang}\n{code}\n```"
 
@@ -712,25 +720,40 @@ def storage_to_markdown(storage: str) -> str:
         r'<ac:structured-macro ac:name="code">.*?<ac:parameter ac:name="language">([^<]*)</ac:parameter>.*?<ac:plain-text-body>(.*?)</ac:plain-text-body>.*?</ac:structured-macro>',
         replace_code_macro,
         text,
-        flags=re.DOTALL
+        flags=re.DOTALL,
     )
 
     # Simple code blocks
-    text = re.sub(r'<pre><code>(.*?)</code></pre>', lambda m: f"```\n{html.unescape(m.group(1))}\n```", text, flags=re.DOTALL)
+    text = re.sub(
+        r"<pre><code>(.*?)</code></pre>",
+        lambda m: f"```\n{html.unescape(m.group(1))}\n```",
+        text,
+        flags=re.DOTALL,
+    )
 
     # Headers
     for i in range(6, 0, -1):
-        text = re.sub(f'<h{i}>(.*?)</h{i}>', lambda m, level=i: f"{'#' * level} {_html_to_markdown(m.group(1))}\n", text)
+        text = re.sub(
+            f"<h{i}>(.*?)</h{i}>",
+            lambda m, level=i: f"{'#' * level} {_html_to_markdown(m.group(1))}\n",
+            text,
+        )
 
     # Lists
-    text = re.sub(r'<ul>(.*?)</ul>', lambda m: _convert_list(m.group(1), ordered=False), text, flags=re.DOTALL)
-    text = re.sub(r'<ol>(.*?)</ol>', lambda m: _convert_list(m.group(1), ordered=True), text, flags=re.DOTALL)
+    text = re.sub(
+        r"<ul>(.*?)</ul>", lambda m: _convert_list(m.group(1), ordered=False), text, flags=re.DOTALL
+    )
+    text = re.sub(
+        r"<ol>(.*?)</ol>", lambda m: _convert_list(m.group(1), ordered=True), text, flags=re.DOTALL
+    )
 
     # Paragraphs
-    text = re.sub(r'<p>(.*?)</p>', lambda m: _html_to_markdown(m.group(1)) + '\n', text, flags=re.DOTALL)
+    text = re.sub(
+        r"<p>(.*?)</p>", lambda m: _html_to_markdown(m.group(1)) + "\n", text, flags=re.DOTALL
+    )
 
     # Clean up extra newlines
-    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
 
@@ -740,18 +763,18 @@ def _html_to_markdown(html_text: str) -> str:
     text = html_text
 
     # Bold
-    text = re.sub(r'<strong>(.*?)</strong>', r'**\1**', text)
-    text = re.sub(r'<b>(.*?)</b>', r'**\1**', text)
+    text = re.sub(r"<strong>(.*?)</strong>", r"**\1**", text)
+    text = re.sub(r"<b>(.*?)</b>", r"**\1**", text)
 
     # Italic
-    text = re.sub(r'<em>(.*?)</em>', r'*\1*', text)
-    text = re.sub(r'<i>(.*?)</i>', r'*\1*', text)
+    text = re.sub(r"<em>(.*?)</em>", r"*\1*", text)
+    text = re.sub(r"<i>(.*?)</i>", r"*\1*", text)
 
     # Code
-    text = re.sub(r'<code>(.*?)</code>', r'`\1`', text)
+    text = re.sub(r"<code>(.*?)</code>", r"`\1`", text)
 
     # Links
-    text = re.sub(r'<a href="([^"]+)">([^<]+)</a>', r'[\2](\1)', text)
+    text = re.sub(r'<a href="([^"]+)">([^<]+)</a>', r"[\2](\1)", text)
 
     # Unescape HTML entities
     text = html.unescape(text)
@@ -761,7 +784,7 @@ def _html_to_markdown(html_text: str) -> str:
 
 def _convert_list(list_content: str, ordered: bool = False) -> str:
     """Convert HTML list items to Markdown."""
-    items = re.findall(r'<li>(.*?)</li>', list_content, flags=re.DOTALL)
+    items = re.findall(r"<li>(.*?)</li>", list_content, flags=re.DOTALL)
     result = []
     for idx, item in enumerate(items, 1):
         item_text = _html_to_markdown(item.strip())
@@ -799,7 +822,7 @@ def markdown_to_adf(markdown: str) -> dict[str, Any]:
                 code_content = "\n".join(code_block_lines)
                 code_node = {
                     "type": "codeBlock",
-                    "content": [{"type": "text", "text": code_content}]
+                    "content": [{"type": "text", "text": code_content}],
                 }
                 if code_lang:
                     code_node["attrs"] = {"language": code_lang}
@@ -811,15 +834,11 @@ def markdown_to_adf(markdown: str) -> dict[str, Any]:
             continue
 
         # Headers
-        header_match = re.match(r'^(#{1,6})\s+(.+)$', line)
+        header_match = re.match(r"^(#{1,6})\s+(.+)$", line)
         if header_match:
             level = len(header_match.group(1))
             text_content = _inline_markdown_to_adf(header_match.group(2))
-            content.append({
-                "type": "heading",
-                "attrs": {"level": level},
-                "content": text_content
-            })
+            content.append({"type": "heading", "attrs": {"level": level}, "content": text_content})
             continue
 
         # Unordered lists
@@ -827,33 +846,35 @@ def markdown_to_adf(markdown: str) -> dict[str, Any]:
             # Simple list item
             item_text = line.strip()[2:]
             list_content = _inline_markdown_to_adf(item_text)
-            content.append({
-                "type": "bulletList",
-                "content": [{
-                    "type": "listItem",
-                    "content": [{
-                        "type": "paragraph",
-                        "content": list_content
-                    }]
-                }]
-            })
+            content.append(
+                {
+                    "type": "bulletList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [{"type": "paragraph", "content": list_content}],
+                        }
+                    ],
+                }
+            )
             continue
 
         # Ordered lists
-        ordered_match = re.match(r'^(\d+)\.\s+(.+)$', line.strip())
+        ordered_match = re.match(r"^(\d+)\.\s+(.+)$", line.strip())
         if ordered_match:
             item_text = ordered_match.group(2)
             list_content = _inline_markdown_to_adf(item_text)
-            content.append({
-                "type": "orderedList",
-                "content": [{
-                    "type": "listItem",
-                    "content": [{
-                        "type": "paragraph",
-                        "content": list_content
-                    }]
-                }]
-            })
+            content.append(
+                {
+                    "type": "orderedList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [{"type": "paragraph", "content": list_content}],
+                        }
+                    ],
+                }
+            )
             continue
 
         # Empty lines
@@ -863,16 +884,9 @@ def markdown_to_adf(markdown: str) -> dict[str, Any]:
         # Paragraphs
         para_content = _inline_markdown_to_adf(line)
         if para_content:
-            content.append({
-                "type": "paragraph",
-                "content": para_content
-            })
+            content.append({"type": "paragraph", "content": para_content})
 
-    return {
-        "version": 1,
-        "type": "doc",
-        "content": content
-    }
+    return {"version": 1, "type": "doc", "content": content}
 
 
 def _inline_markdown_to_adf(text: str) -> list[dict[str, Any]]:
@@ -886,25 +900,25 @@ def _inline_markdown_to_adf(text: str) -> list[dict[str, Any]]:
 
     while i < len(text):
         # Bold: **text**
-        if text[i:i+2] == "**":
+        if text[i : i + 2] == "**":
             if current_text:
                 result.append({"type": "text", "text": current_text})
                 current_text = ""
             end = text.find("**", i + 2)
             if end != -1:
-                bold_text = text[i+2:end]
+                bold_text = text[i + 2 : end]
                 result.append({"type": "text", "text": bold_text, "marks": [{"type": "strong"}]})
                 i = end + 2
                 continue
 
         # Italic: *text*
-        if text[i] == "*" and (i == 0 or not text[i-1].isalnum()) and text[i:i+2] != "**":
+        if text[i] == "*" and (i == 0 or not text[i - 1].isalnum()) and text[i : i + 2] != "**":
             if current_text:
                 result.append({"type": "text", "text": current_text})
                 current_text = ""
             end = text.find("*", i + 1)
-            if end != -1 and (end == len(text)-1 or not text[end+1].isalnum()):
-                italic_text = text[i+1:end]
+            if end != -1 and (end == len(text) - 1 or not text[end + 1].isalnum()):
+                italic_text = text[i + 1 : end]
                 result.append({"type": "text", "text": italic_text, "marks": [{"type": "em"}]})
                 i = end + 1
                 continue
@@ -916,25 +930,27 @@ def _inline_markdown_to_adf(text: str) -> list[dict[str, Any]]:
                 current_text = ""
             end = text.find("`", i + 1)
             if end != -1:
-                code_text = text[i+1:end]
+                code_text = text[i + 1 : end]
                 result.append({"type": "text", "text": code_text, "marks": [{"type": "code"}]})
                 i = end + 1
                 continue
 
         # Links: [text](url)
         if text[i] == "[":
-            link_match = re.match(r'\[([^\]]+)\]\(([^\)]+)\)', text[i:])
+            link_match = re.match(r"\[([^\]]+)\]\(([^\)]+)\)", text[i:])
             if link_match:
                 if current_text:
                     result.append({"type": "text", "text": current_text})
                     current_text = ""
                 link_text = link_match.group(1)
                 link_url = link_match.group(2)
-                result.append({
-                    "type": "text",
-                    "text": link_text,
-                    "marks": [{"type": "link", "attrs": {"href": link_url}}]
-                })
+                result.append(
+                    {
+                        "type": "text",
+                        "text": link_text,
+                        "marks": [{"type": "link", "attrs": {"href": link_url}}],
+                    }
+                )
                 i += len(link_match.group(0))
                 continue
 
@@ -1028,9 +1044,7 @@ def _adf_content_to_text(content: list[dict[str, Any]]) -> str:
 
 
 def format_content(
-    content: str,
-    input_format: str = "markdown",
-    output_format: str = "auto"
+    content: str, input_format: str = "markdown", output_format: str = "auto"
 ) -> dict[str, Any] | str:
     """Main content formatting function.
 
@@ -1079,6 +1093,7 @@ def format_content(
 # HTTP/REST UTILITIES
 # ============================================================================
 
+
 class APIError(Exception):
     """Exception raised for API errors."""
 
@@ -1088,7 +1103,9 @@ class APIError(Exception):
         self.response = response
 
 
-def _get_confluence_auth_method(creds: Credentials) -> tuple[tuple[str, str] | None, dict[str, str]]:
+def _get_confluence_auth_method(
+    creds: Credentials,
+) -> tuple[tuple[str, str] | None, dict[str, str]]:
     """Determine the appropriate Confluence authentication method.
 
     Cloud uses email + API token as basic auth.
@@ -1146,9 +1163,7 @@ def make_request(
     """
     creds = get_credentials(service)
     if not creds.is_valid():
-        raise APIError(
-            f"No valid credentials found for {service}. Run: python confluence.py check"
-        )
+        raise APIError(f"No valid credentials found for {service}. Run: python confluence.py check")
 
     url = f"{creds.url.rstrip('/')}/{endpoint.lstrip('/')}"
 
@@ -1224,6 +1239,7 @@ def delete(service: str, endpoint: str, **kwargs: Any) -> dict[str, Any] | list[
 # OUTPUT FORMATTING
 # ============================================================================
 
+
 def format_json(data: Any, *, indent: int = 2) -> str:
     """Format data as JSON string.
 
@@ -1296,7 +1312,9 @@ def _truncate(text: str, max_length: int) -> str:
     return text[: max_length - 3] + "..."
 
 
-def format_page(page: dict[str, Any], *, include_body: bool = False, as_markdown: bool = True) -> str:
+def format_page(
+    page: dict[str, Any], *, include_body: bool = False, as_markdown: bool = True
+) -> str:
     """Format a Confluence page for display.
 
     Args:
@@ -1443,6 +1461,7 @@ def search_content(
 # PAGE MANAGEMENT
 # ============================================================================
 
+
 def get_page(
     page_identifier: str,
     *,
@@ -1555,9 +1574,7 @@ def create_page(
         page_data["ancestors"] = [{"id": parent_id}]
 
     if labels:
-        page_data["metadata"] = {
-            "labels": [{"name": label} for label in labels]
-        }
+        page_data["metadata"] = {"labels": [{"name": label} for label in labels]}
 
     response = post("confluence", api_path("content"), page_data)
     if isinstance(response, dict):
@@ -1642,6 +1659,7 @@ def update_page(
 # ============================================================================
 # SPACE MANAGEMENT
 # ============================================================================
+
 
 def list_spaces(
     *,
@@ -1736,6 +1754,7 @@ def create_space(
 # CHECK COMMAND - Validates configuration and connectivity
 # ============================================================================
 
+
 def cmd_check() -> int:
     """Validate Confluence configuration and connectivity.
 
@@ -1824,6 +1843,7 @@ def cmd_check() -> int:
 # COMMAND HANDLERS
 # ============================================================================
 
+
 def cmd_search(args: argparse.Namespace) -> int:
     """Handle search command."""
     try:
@@ -1834,8 +1854,8 @@ def cmd_search(args: argparse.Namespace) -> int:
         cql = merge_cql_with_scope(args.cql, defaults.cql_scope)
 
         # Apply max_results
-        max_results = args.max_results if args.max_results is not None else (
-            defaults.max_results or 50
+        max_results = (
+            args.max_results if args.max_results is not None else (defaults.max_results or 50)
         )
 
         # Apply space filter
@@ -1956,17 +1976,21 @@ def cmd_space(args: argparse.Namespace) -> int:
 
                 rows = []
                 for space in spaces:
-                    rows.append({
-                        "key": space.get("key", "N/A"),
-                        "name": space.get("name", "No name"),
-                        "type": space.get("type", "global"),
-                    })
+                    rows.append(
+                        {
+                            "key": space.get("key", "N/A"),
+                            "name": space.get("name", "No name"),
+                            "type": space.get("type", "global"),
+                        }
+                    )
 
-                print(format_table(
-                    rows,
-                    ["key", "name", "type"],
-                    headers={"key": "Key", "name": "Name", "type": "Type"},
-                ))
+                print(
+                    format_table(
+                        rows,
+                        ["key", "name", "type"],
+                        headers={"key": "Key", "name": "Name", "type": "Type"},
+                    )
+                )
 
         elif args.space_command == "get":
             expand = args.expand.split(",") if args.expand else None
@@ -2046,8 +2070,10 @@ def cmd_config(args: argparse.Namespace) -> int:
                     print("Space-Specific Defaults:")
                     for space, settings in spaces.items():
                         print(f"  {space}:")
-                        print(f"    Default Parent: {settings.get('default_parent', 'Not configured')}")
-                        if settings.get('default_labels'):
+                        print(
+                            f"    Default Parent: {settings.get('default_parent', 'Not configured')}"
+                        )
+                        if settings.get("default_labels"):
                             print(f"    Default Labels: {', '.join(settings['default_labels'])}")
                 else:
                     print("No space-specific defaults configured")
@@ -2062,6 +2088,7 @@ def cmd_config(args: argparse.Namespace) -> int:
 # ============================================================================
 # MAIN CLI
 # ============================================================================
+
 
 def main() -> int:
     """Main entry point."""
@@ -2120,7 +2147,9 @@ def main() -> int:
     get_parser = page_subparsers.add_parser("get", help="Get page details")
     get_parser.add_argument("page_identifier", help="Page ID or title")
     get_parser.add_argument("--json", action="store_true", help="Output as JSON")
-    get_parser.add_argument("--markdown", action="store_true", help="Output body as Markdown (default)")
+    get_parser.add_argument(
+        "--markdown", action="store_true", help="Output body as Markdown (default)"
+    )
     get_parser.add_argument("--raw", action="store_true", help="Output in original format")
     get_parser.add_argument("--no-body", action="store_true", help="Don't include body content")
     get_parser.add_argument("--expand", help="Fields to expand (comma-separated)")
@@ -2131,8 +2160,12 @@ def main() -> int:
     create_parser.add_argument("--title", required=True, help="Page title")
     create_parser.add_argument("--body", help="Page content (Markdown by default)")
     create_parser.add_argument("--body-file", help="Read content from file (Markdown)")
-    create_parser.add_argument("--format", default="markdown", choices=["markdown", "storage", "editor"],
-                               help="Input format (default: markdown)")
+    create_parser.add_argument(
+        "--format",
+        default="markdown",
+        choices=["markdown", "storage", "editor"],
+        help="Input format (default: markdown)",
+    )
     create_parser.add_argument("--parent", help="Parent page ID")
     create_parser.add_argument("--labels", help="Comma-separated labels")
     create_parser.add_argument("--json", action="store_true", help="Output as JSON")
@@ -2143,9 +2176,15 @@ def main() -> int:
     update_parser.add_argument("--title", help="New title")
     update_parser.add_argument("--body", help="New content (Markdown by default)")
     update_parser.add_argument("--body-file", help="Read content from file (Markdown)")
-    update_parser.add_argument("--format", default="markdown", choices=["markdown", "storage", "editor"],
-                               help="Input format (default: markdown)")
-    update_parser.add_argument("--version", type=int, help="Current version (auto-detect if not provided)")
+    update_parser.add_argument(
+        "--format",
+        default="markdown",
+        choices=["markdown", "storage", "editor"],
+        help="Input format (default: markdown)",
+    )
+    update_parser.add_argument(
+        "--version", type=int, help="Current version (auto-detect if not provided)"
+    )
     update_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # ========================================================================
@@ -2174,7 +2213,9 @@ def main() -> int:
     space_create_parser.add_argument("--key", required=True, help="Space key")
     space_create_parser.add_argument("--name", required=True, help="Space name")
     space_create_parser.add_argument("--description", help="Space description")
-    space_create_parser.add_argument("--type", choices=["global", "personal"], help="Space type (default: global)")
+    space_create_parser.add_argument(
+        "--type", choices=["global", "personal"], help="Space type (default: global)"
+    )
     space_create_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # ========================================================================

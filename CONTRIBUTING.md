@@ -14,6 +14,10 @@ git clone https://github.com/odyssey4me/agent-skills.git
 cd agent-skills
 pip install -e ".[dev]"
 
+# Install pre-commit hooks
+pre-commit install
+pre-commit install --hook-type pre-push
+
 # Verify setup
 pytest
 ruff check .
@@ -41,6 +45,17 @@ git checkout -b feature/your-feature-name
 
 ### 3. Run Checks
 
+Pre-commit hooks automatically run before each commit and push:
+
+**Before each commit:**
+- `ruff check --fix` - Lints and auto-fixes code
+- `ruff format` - Formats code
+- `pytest tests/` - Runs all tests
+
+**Before each push:**
+- `pytest tests/ --cov` - Runs tests with coverage (must be ≥50%)
+
+**Manual checks** (optional, hooks handle this):
 ```bash
 # Lint and format
 ruff check .

@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from scripts.setup_helper import (
     ClaudeMdConfig,
     SkillInfo,
@@ -491,7 +487,7 @@ class TestGenerateClaudeMdContent:
 
         # Check that skills appear in alphabetical order
         lines = content.split("\n")
-        skill_lines = [l for l in lines if l.strip().startswith("- **")]
+        skill_lines = [line for line in lines if line.strip().startswith("- **")]
 
         assert len(skill_lines) == 3
         assert "**Confluence**" in skill_lines[0]

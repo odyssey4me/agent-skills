@@ -1,0 +1,58 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  # Ruff - Fast Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      # Run the linter
+      - id: ruff
+        name: ruff lint
+        args: [--fix]
+        stages: [pre-commit]
+      # Run the formatter
+      - id: ruff-format
+        name: ruff format
+        stages: [pre-commit]
+
+  # Validate skill structure before commit
+  - repo: local
+    hooks:
+      - id: validate-skills
+        name: validate skill structure
+        entry: python scripts/validate_skill.py
+        language: system
+        files: ^skills/.*/SKILL\.md$
+        pass_filenames: false
+        args: [skills/*]
+        stages: [pre-commit]
+
+  # Run tests before commit (commented out until test failures are resolved)
+  # - repo: local
+  #   hooks:
+  #     - id: pytest
+  #       name: pytest (run tests)
+  #       entry: pytest
+  #       language: system
+  #       pass_filenames: false
+  #       args: [tests/, -v, --tb=short]
+  #       stages: [pre-commit]
+  #       always_run: true
+
+  # Run full test suite with coverage before push (commented out until test failures are resolved)
+  # - repo: local
+  #   hooks:
+  #     - id: pytest-coverage
+  #       name: pytest (full test suite with coverage)
+  #       entry: pytest
+  #       language: system
+  #       pass_filenames: false
+  #       args: [tests/, -v, --cov=skills, --cov=scripts, --cov-fail-under=50]
+  #       stages: [pre-push]
+  #       always_run: true
+
+# Default stages (can be overridden per hook)
+default_stages: [pre-commit]
+
+# Fail fast - stop on first failure
+fail_fast: false

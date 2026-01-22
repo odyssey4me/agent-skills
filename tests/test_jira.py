@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import json
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -45,7 +43,6 @@ from skills.jira.scripts.jira import (
     get_transitions,
     is_cloud,
     load_config,
-    merge_jql_with_scope,
     save_config,
     search_issues,
     set_credential,
@@ -96,17 +93,13 @@ class TestKeyringFunctions:
     def test_set_credential(self, mock_keyring):
         """Test setting credential in keyring."""
         set_credential("test-key", "secret")
-        mock_keyring.set_password.assert_called_once_with(
-            "agent-skills", "test-key", "secret"
-        )
+        mock_keyring.set_password.assert_called_once_with("agent-skills", "test-key", "secret")
 
     @patch("skills.jira.jira.keyring")
     def test_delete_credential(self, mock_keyring):
         """Test deleting credential from keyring."""
         delete_credential("test-key")
-        mock_keyring.delete_password.assert_called_once_with(
-            "agent-skills", "test-key"
-        )
+        mock_keyring.delete_password.assert_called_once_with("agent-skills", "test-key")
 
 
 class TestConfigManagement:
@@ -114,9 +107,7 @@ class TestConfigManagement:
 
     def test_load_config_nonexistent(self, tmp_path, monkeypatch):
         """Test loading config when file doesn't exist."""
-        monkeypatch.setattr(
-            "skills.jira.jira.CONFIG_DIR", tmp_path / "nonexistent"
-        )
+        monkeypatch.setattr("skills.jira.jira.CONFIG_DIR", tmp_path / "nonexistent")
         config = load_config("jira")
         assert config is None
 
@@ -159,9 +150,7 @@ class TestGetCredentials:
 
     @patch("skills.jira.jira.get_credential")
     @patch("skills.jira.jira.load_config")
-    def test_get_credentials_from_env(
-        self, mock_load_config, mock_get_credential, monkeypatch
-    ):
+    def test_get_credentials_from_env(self, mock_load_config, mock_get_credential, monkeypatch):
         """Test getting credentials from environment variables."""
         mock_get_credential.return_value = None
         mock_load_config.return_value = None
@@ -206,9 +195,7 @@ class TestDefaultsManagement:
 
     def test_get_jira_defaults_no_config(self, monkeypatch):
         """Test getting defaults when no config exists."""
-        monkeypatch.setattr(
-            "skills.jira.jira.load_config", lambda service: None
-        )
+        monkeypatch.setattr("skills.jira.jira.load_config", lambda _service: None)
         defaults = get_jira_defaults()
 
         assert defaults.jql_scope is None
@@ -637,7 +624,7 @@ class TestHttpRequests:
 
     @patch("skills.jira.jira.requests.get")
     @patch("skills.jira.jira.time.sleep")
-    def test_make_detection_request_failure(self, mock_sleep, mock_get):
+    def test_make_detection_request_failure(self, _mock_sleep, mock_get):
         """Test detection request failure."""
         import requests
 
@@ -673,7 +660,7 @@ class TestHttpRequests:
 
     @patch("skills.jira.jira.requests.request")
     @patch("skills.jira.jira.get_credentials")
-    def test_make_request_invalid_credentials(self, mock_creds, mock_request):
+    def test_make_request_invalid_credentials(self, mock_creds, _mock_request):
         """Test making a request with invalid credentials."""
         from skills.jira.jira import make_request
 
@@ -1095,7 +1082,7 @@ class TestCommandHandlers:
 
     @patch("skills.jira.jira.create_issue")
     @patch("skills.jira.jira.get_project_defaults")
-    def test_cmd_issue_create_missing_type(self, mock_defaults, mock_create, capsys):
+    def test_cmd_issue_create_missing_type(self, mock_defaults, _mock_create, capsys):
         """Test issue create without type."""
         mock_defaults.return_value = ProjectDefaults()
 
@@ -1168,7 +1155,9 @@ class TestCommandHandlers:
     @patch("skills.jira.jira.create_issue")
     @patch("skills.jira.jira.get_project_defaults")
     @patch("skills.jira.jira.format_json")
-    def test_cmd_issue_create_json_output(self, mock_format_json, mock_defaults, mock_create, capsys):
+    def test_cmd_issue_create_json_output(
+        self, mock_format_json, mock_defaults, mock_create, capsys
+    ):
         """Test issue create with JSON output."""
         mock_defaults.return_value = ProjectDefaults()
         mock_create.return_value = {"key": "DEMO-123", "id": "10001"}
@@ -1234,7 +1223,7 @@ class TestCommandHandlers:
 
     @patch("skills.jira.jira.search_issues")
     @patch("skills.jira.jira.get_jira_defaults")
-    def test_cmd_search_with_fields(self, mock_defaults, mock_search, capsys):
+    def test_cmd_search_with_fields(self, mock_defaults, mock_search, _capsys):
         """Test search with custom fields."""
         mock_defaults.return_value = JiraDefaults()
         mock_search.return_value = [{"key": "DEMO-1"}]
@@ -1255,7 +1244,7 @@ class TestCommandHandlers:
         assert call_args[0][2] == ["summary", "status", "assignee"]
 
     @patch("skills.jira.jira.update_issue")
-    def test_cmd_issue_update_with_labels(self, mock_update, capsys):
+    def test_cmd_issue_update_with_labels(self, mock_update, _capsys):
         """Test issue update with labels."""
         mock_update.return_value = {}
 

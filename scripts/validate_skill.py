@@ -74,7 +74,7 @@ def validate_skill(skill_dir: Path) -> list[ValidationError]:
             ValidationError(
                 str(references_dir),
                 "references/ directory not found (optional, but recommended for additional docs)",
-                "warning"
+                "warning",
             )
         )
 
@@ -96,15 +96,22 @@ def validate_skill_md(skill_md: Path, skill_name: str) -> list[ValidationError]:
 
     # Check for YAML frontmatter
     if not content.startswith("---\n"):
-        errors.append(ValidationError(str(skill_md), "Missing YAML frontmatter (must start with '---')"))
+        errors.append(
+            ValidationError(str(skill_md), "Missing YAML frontmatter (must start with '---')")
+        )
     else:
         # Parse frontmatter
         try:
             import yaml
+
             # Find the end of frontmatter
             end_marker = content.find("\n---\n", 4)
             if end_marker == -1:
-                errors.append(ValidationError(str(skill_md), "Invalid YAML frontmatter (missing closing '---')"))
+                errors.append(
+                    ValidationError(
+                        str(skill_md), "Invalid YAML frontmatter (missing closing '---')"
+                    )
+                )
             else:
                 frontmatter = content[4:end_marker]
                 try:
@@ -112,35 +119,71 @@ def validate_skill_md(skill_md: Path, skill_name: str) -> list[ValidationError]:
 
                     # Check required fields
                     if not isinstance(metadata, dict):
-                        errors.append(ValidationError(str(skill_md), "Frontmatter must be a YAML dictionary"))
+                        errors.append(
+                            ValidationError(str(skill_md), "Frontmatter must be a YAML dictionary")
+                        )
                     else:
                         # Check for required fields
                         if "name" not in metadata:
-                            errors.append(ValidationError(str(skill_md), "Frontmatter missing required field: 'name'"))
+                            errors.append(
+                                ValidationError(
+                                    str(skill_md), "Frontmatter missing required field: 'name'"
+                                )
+                            )
                         elif metadata["name"] != skill_name:
                             errors.append(
                                 ValidationError(
                                     str(skill_md),
                                     f"Frontmatter 'name' ({metadata['name']}) doesn't match skill directory name ({skill_name})",
-                                    "warning"
+                                    "warning",
                                 )
                             )
 
                         if "description" not in metadata:
-                            errors.append(ValidationError(str(skill_md), "Frontmatter missing required field: 'description'"))
-                        elif not metadata["description"] or not isinstance(metadata["description"], str):
-                            errors.append(ValidationError(str(skill_md), "Frontmatter 'description' must be a non-empty string"))
+                            errors.append(
+                                ValidationError(
+                                    str(skill_md),
+                                    "Frontmatter missing required field: 'description'",
+                                )
+                            )
+                        elif not metadata["description"] or not isinstance(
+                            metadata["description"], str
+                        ):
+                            errors.append(
+                                ValidationError(
+                                    str(skill_md),
+                                    "Frontmatter 'description' must be a non-empty string",
+                                )
+                            )
 
                         # Check for recommended fields
                         if "metadata" not in metadata:
-                            errors.append(ValidationError(str(skill_md), "Frontmatter missing recommended field: 'metadata'", "warning"))
+                            errors.append(
+                                ValidationError(
+                                    str(skill_md),
+                                    "Frontmatter missing recommended field: 'metadata'",
+                                    "warning",
+                                )
+                            )
                         if "license" not in metadata:
-                            errors.append(ValidationError(str(skill_md), "Frontmatter missing recommended field: 'license'", "warning"))
+                            errors.append(
+                                ValidationError(
+                                    str(skill_md),
+                                    "Frontmatter missing recommended field: 'license'",
+                                    "warning",
+                                )
+                            )
 
                 except yaml.YAMLError as e:
-                    errors.append(ValidationError(str(skill_md), f"Invalid YAML in frontmatter: {e}"))
+                    errors.append(
+                        ValidationError(str(skill_md), f"Invalid YAML in frontmatter: {e}")
+                    )
         except ImportError:
-            errors.append(ValidationError(str(skill_md), "pyyaml not installed - cannot validate frontmatter", "warning"))
+            errors.append(
+                ValidationError(
+                    str(skill_md), "pyyaml not installed - cannot validate frontmatter", "warning"
+                )
+            )
 
     # Check for required sections
     required_sections = ["# ", "## Authentication", "## Commands"]
@@ -155,7 +198,11 @@ def validate_skill_md(skill_md: Path, skill_name: str) -> list[ValidationError]:
     # Check for Setup Verification section documenting check command (warning only)
     if "## Setup Verification" not in content and "check" not in content.lower():
         errors.append(
-            ValidationError(str(skill_md), "Missing ## Setup Verification section or check command documentation", "warning")
+            ValidationError(
+                str(skill_md),
+                "Missing ## Setup Verification section or check command documentation",
+                "warning",
+            )
         )
 
     return errors
@@ -211,7 +258,9 @@ def validate_skill_script(skill_script: Path) -> list[ValidationError]:
     if "subparsers" not in content and "add_subparsers" not in content:
         errors.append(
             ValidationError(
-                str(skill_script), "Should use argparse with subcommands (add_subparsers)", "warning"
+                str(skill_script),
+                "Should use argparse with subcommands (add_subparsers)",
+                "warning",
             )
         )
 
