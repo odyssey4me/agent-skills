@@ -47,15 +47,17 @@ This document tracks planned skills and features for the agent-skills repository
   - Topics
   - Review comments
 
-## Multi-Agent Support
+## Multi-Agent Testing & Verification
 
-Currently focusing on Claude Code only. Other AI agents will be supported later:
+Skills currently work with [multiple AI agents](https://github.com/vercel-labs/add-skill#supported-agents) via `npx add-skill` and the Agent Skills specification. Future work focuses on agent-specific testing:
 
-- [ ] **OpenAI Codex** - VS Code integration
-- [ ] **Gemini CLI** - Google's AI assistant
-- [ ] **Cursor** - AI-first code editor
-- [ ] **Continue.dev** - Open-source AI coding assistant
-- [ ] **GitHub Copilot** - GitHub's AI pair programmer
+- [ ] **Cursor** - Verify skill discovery and invocation patterns
+- [ ] **Continue.dev** - Test natural language integration
+- [ ] **GitHub Copilot** - Validate skill execution
+- [ ] **Gemini CLI** - Test compatibility and workflows
+- [ ] **OpenCode** - Verify functionality
+
+Note: Basic multi-agent support is complete via the Agent Skills specification. This section tracks verification and agent-specific optimization.
 
 ## Infrastructure Improvements
 

@@ -2,7 +2,7 @@
 
 This directory contains sample configuration files for Claude Code.
 
-> **Note**: Currently focused on Claude Code only. Support for other AI agents (Cursor, Continue.dev, etc.) is planned for future releases. See [../../TODO.md](../../TODO.md) for roadmap.
+> **Note**: These samples are for Claude Code. Skills work with [multiple AI agents](https://github.com/vercel-labs/add-skill#supported-agents) via the Agent Skills specification. See [../user-guide.md](../user-guide.md) for multi-agent installation.
 
 ## Available Samples
 
@@ -12,7 +12,7 @@ This directory contains sample configuration files for Claude Code.
 
 ## When to Use This
 
-After installing skills with `npx add-skill odyssey4me/agent-skills`, you may want to configure Claude Code to make skills easier to discover and use. The sample configuration:
+After installing skills with `npx add-skill odyssey4me/agent-skills`, you may want to configure Claude Code to make skills easier to discover and use. (These config samples are Claude Code-specific, but skills work with multiple AI agents.) The sample configuration:
 
 1. Documents which skills are available
 2. Shows how to invoke skills (via `/jira` commands or natural language)

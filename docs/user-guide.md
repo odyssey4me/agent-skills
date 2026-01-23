@@ -16,6 +16,25 @@ Skills implement the **progressive disclosure** principle:
 
 Learn more: [Progressive Disclosure in the Agent Skills Spec](https://agentskills.io/specification#progressive-disclosure)
 
+### Multi-Agent Compatibility
+
+Agent skills work with [multiple AI coding assistants](https://github.com/vercel-labs/add-skill#supported-agents) through the [Agent Skills specification](https://agentskills.io/specification). When you install skills using `npx add-skill`, they're automatically configured for your AI agent:
+
+**Supported AI Agents:**
+- Claude Code, Cursor, Continue.dev, GitHub Copilot, OpenCode, Gemini CLI, Command Code, and [more](https://github.com/vercel-labs/add-skill#supported-agents)
+
+**Agent-Specific Installation:**
+```bash
+# Install for specific agent (optional, auto-detects by default)
+npx add-skill odyssey4me/agent-skills --skill jira -a cursor
+npx add-skill odyssey4me/agent-skills --skill jira -a continue
+
+# Install for multiple agents
+npx add-skill odyssey4me/agent-skills --skill jira -a claude-code -a cursor
+```
+
+The examples in this guide use Claude Code, but the same natural language patterns and commands work across all supported AI agents.
+
 ## Installation
 
 ### Option 1: Using npx add-skill (Recommended)
@@ -36,7 +55,7 @@ npx add-skill odyssey4me/agent-skills --skill jira --skill confluence
 This will:
 - Download the skills from GitHub
 - Install them to `~/.claude/skills/`
-- Make them available to Claude Code automatically
+- Make them available to your AI coding assistant automatically
 
 Learn more: [add-skill CLI documentation](https://github.com/vercel-labs/add-skill)
 
@@ -154,9 +173,11 @@ The check command will:
 - Test connectivity to the service
 - Provide specific instructions if anything is missing
 
-## Using Skills with Claude Code
+## Using Skills
 
-Once installed and configured, skills are automatically available to Claude Code.
+Once installed and configured, skills are automatically available to your AI coding assistant.
+
+Skills work with [multiple AI coding assistants](https://github.com/vercel-labs/add-skill#supported-agents). The examples below use Claude Code, but the same patterns apply to other agents like Cursor, Continue.dev, and GitHub Copilot.
 
 ### Natural Language Invocation
 
@@ -229,9 +250,9 @@ pip install --user requests keyring pyyaml
 2. Contact your Jira/Confluence administrator if needed
 3. Check that the project key or space key is correct
 
-### Skills Not Appearing in Claude Code
+### Skills Not Appearing
 
-1. Verify skills are in the correct location:
+1. Verify skills are in the correct location (or your agent's skill directory if using a different AI assistant):
    ```bash
    ls ~/.claude/skills/
    ```

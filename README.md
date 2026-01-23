@@ -1,16 +1,14 @@
 # Agent Skills
 
-Portable skills for Claude Code providing integrations with Jira, Confluence, and other development tools.
+Portable skills for AI coding assistants providing integrations with Jira, Confluence, and other development tools.
 
 ## Features
 
 - **Self-Contained**: Each skill is a single Python script - no framework dependencies
-- **Claude Code Native**: Designed specifically for [Claude Code](https://claude.com/claude-code)
+- **Multi-Agent Compatible**: Works with [multiple AI coding assistants](https://github.com/vercel-labs/add-skill#supported-agents) including [Claude Code](https://claude.com/claude-code), Cursor, Continue.dev, and more
 - **Simple Installation**: Just Python + 3 packages (`requests`, `keyring`, `pyyaml`)
 - **Built-in Validation**: Each skill includes a `check` command for setup verification
 - **Secure Authentication**: Supports system keyring, environment variables, and config files
-
-> **Note**: Currently focused on Claude Code. Support for other AI agents (Cursor, Continue.dev, etc.) is planned for future releases. See [TODO.md](TODO.md) for roadmap.
 
 ## Quick Start
 
@@ -71,9 +69,21 @@ Skills provide a simple, transparent approach to extending Claude Code:
 - **Simple**: No server process or protocol configuration required
 - **Transparent**: Self-contained Python scripts you can read and modify
 - **Self-Validating**: Built-in `check` command diagnoses setup issues
-- **Portable**: Compatible with the [Agent Skills specification](https://agentskills.io/specification)
+- **Portable**: Follows the [Agent Skills specification](https://agentskills.io/specification) for cross-agent compatibility
 
 This repository follows the Agent Skills spec, ensuring compatibility with `npx add-skill` and other standard tooling.
+
+## Supported AI Agents
+
+These skills work with [multiple AI coding assistants](https://github.com/vercel-labs/add-skill#supported-agents) through the [Agent Skills specification](https://agentskills.io/specification), including:
+
+- **Claude Code** - Anthropic's official CLI
+- **Cursor** - AI-first code editor
+- **Continue.dev** - Open-source AI coding assistant
+- **GitHub Copilot** - GitHub's AI pair programmer
+- **OpenCode**, **Gemini CLI**, **Command Code**, and more
+
+See the [full list of supported agents](https://github.com/vercel-labs/add-skill#supported-agents). Installation via `npx add-skill` automatically configures skills for your AI agent.
 
 ## Contributing
 
