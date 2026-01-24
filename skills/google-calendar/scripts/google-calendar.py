@@ -37,42 +37,62 @@ try:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
+
+    GOOGLE_AUTH_AVAILABLE = True
 except ImportError:
-    print(
-        "Error: Google auth libraries not found. Install with: "
-        "pip install --user google-auth google-auth-oauthlib",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    GOOGLE_AUTH_AVAILABLE = False
+    # Don't exit here - only exit when script is run directly
+    if __name__ == "__main__":
+        print(
+            "Error: Google auth libraries not found. Install with: "
+            "pip install --user google-auth google-auth-oauthlib",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 try:
     from googleapiclient.discovery import build
     from googleapiclient.errors import HttpError
+
+    GOOGLE_API_CLIENT_AVAILABLE = True
 except ImportError:
-    print(
-        "Error: 'google-api-python-client' not found. Install with: "
-        "pip install --user google-api-python-client",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    GOOGLE_API_CLIENT_AVAILABLE = False
+    # Don't exit here - only exit when script is run directly
+    if __name__ == "__main__":
+        print(
+            "Error: 'google-api-python-client' not found. Install with: "
+            "pip install --user google-api-python-client",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 try:
     import keyring
+
+    KEYRING_AVAILABLE = True
 except ImportError:
-    print(
-        "Error: 'keyring' library not found. Install with: pip install --user keyring",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    KEYRING_AVAILABLE = False
+    # Don't exit here - only exit when script is run directly
+    if __name__ == "__main__":
+        print(
+            "Error: 'keyring' library not found. Install with: pip install --user keyring",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 try:
     import yaml
+
+    YAML_AVAILABLE = True
 except ImportError:
-    print(
-        "Error: 'pyyaml' library not found. Install with: pip install --user pyyaml",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    YAML_AVAILABLE = False
+    # Don't exit here - only exit when script is run directly
+    if __name__ == "__main__":
+        print(
+            "Error: 'pyyaml' library not found. Install with: pip install --user pyyaml",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 # ============================================================================

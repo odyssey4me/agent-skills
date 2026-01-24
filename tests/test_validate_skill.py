@@ -45,7 +45,8 @@ class TestValidateSkill:
         errors = validate_skill(skill_dir)
 
         assert any("SKILL.md not found" in e.message for e in errors)
-        assert any("scripts/ directory not found" in e.message for e in errors)
+        # scripts/ directory is now optional for documentation-only skills
+        # assert any("scripts/ directory not found" in e.message for e in errors)
 
     def test_validate_skill_valid(self, tmp_path):
         """Test validation of valid skill."""
