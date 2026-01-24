@@ -33,6 +33,17 @@ When working on this repository:
    - SKILL.md format is defined by the spec
    - Directory structure (scripts/, references/) is defined by the spec
 
+4. **Prefer official CLIs over custom scripts**:
+   - When an official command-line tool exists, use it instead of implementing custom API wrappers
+   - Official CLIs are maintained by the service provider and guaranteed to work with API changes
+   - Official CLIs often have richer functionality than we would implement
+   - Skills can be documentation-only when the official CLI covers all use cases
+   - Examples:
+     - ✅ GitHub skill uses `gh` CLI with documentation
+     - ❌ Don't create custom GitHub API wrapper when `gh` exists
+     - ✅ Jira skill uses custom script (no official CLI with full API coverage)
+     - ✅ Google skills use custom scripts (gcloud is infrastructure-focused, not API-focused)
+
 ## Quick Reference
 
 **For users**: See [docs/user-guide.md](docs/user-guide.md)
