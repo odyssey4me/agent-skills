@@ -94,6 +94,8 @@ docs(readme): update installation instructions
 
 ## Creating a New Skill
 
+**Important**: Before creating a new skill, check if an official CLI tool exists for the service. See [AGENTS.md - Development Principles](AGENTS.md#development-principles) for guidance on preferring official CLIs over custom scripts.
+
 See the [Developer Guide - Creating New Skills](docs/developer-guide.md#creating-new-skills) for complete instructions, structure requirements, and design guidelines.
 
 **Quick commands**:
