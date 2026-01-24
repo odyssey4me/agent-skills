@@ -54,18 +54,20 @@ def validate_skill(skill_dir: Path) -> list[ValidationError]:
         errors.extend(validate_skill_md(skill_md, skill_name))
 
     # Check for scripts/ directory
+    # Documentation-only skills (like github, gitlab) that wrap official CLIs don't need scripts
     scripts_dir = skill_dir / "scripts"
-    if not scripts_dir.exists():
-        errors.append(ValidationError(str(scripts_dir), "scripts/ directory not found"))
-    elif not scripts_dir.is_dir():
-        errors.append(ValidationError(str(scripts_dir), "scripts/ is not a directory"))
-    else:
-        # Check for skill script in scripts/ directory
-        skill_script = scripts_dir / f"{skill_name}.py"
-        if not skill_script.exists():
-            errors.append(ValidationError(str(skill_script), f"scripts/{skill_name}.py not found"))
+    if scripts_dir.exists():
+        if not scripts_dir.is_dir():
+            errors.append(ValidationError(str(scripts_dir), "scripts/ is not a directory"))
         else:
-            errors.extend(validate_skill_script(skill_script))
+            # Check for skill script in scripts/ directory
+            skill_script = scripts_dir / f"{skill_name}.py"
+            if not skill_script.exists():
+                errors.append(
+                    ValidationError(str(skill_script), f"scripts/{skill_name}.py not found")
+                )
+            else:
+                errors.extend(validate_skill_script(skill_script))
 
     # Check for references/ directory (optional, but warn if missing)
     references_dir = skill_dir / "references"

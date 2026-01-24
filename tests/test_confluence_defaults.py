@@ -225,7 +225,7 @@ class TestMergeCql:
             "space=DEMO AND creator=currentUser() AND created >= now('-30d')",
         )
         expected = (
-            "(space=DEMO AND creator=currentUser() AND created >= now('-30d')) " "AND (type=page)"
+            "(space=DEMO AND creator=currentUser() AND created >= now('-30d')) AND (type=page)"
         )
         assert result == expected
 
