@@ -24,12 +24,16 @@ This document tracks planned skills and features for the agent-skills repository
   - Self-contained Python script with keyring storage
   - Built-in check command for setup verification
 
-- [ ] **google-calendar** - Calendar management
-  - List events
-  - Create events
-  - Update events
-  - Check availability
-  - Scheduling
+- [x] **google-calendar** - Calendar management
+  - List and manage calendars
+  - Create, update, delete events
+  - Search events with time ranges and queries
+  - Check free/busy availability
+  - RFC3339 timestamp support with timezone handling
+  - All-day and timed events
+  - Hybrid authentication (gcloud ADC, custom OAuth 2.0)
+  - Self-contained Python script with keyring storage
+  - Built-in check command for setup verification
 
 ### Phase 3: Code Hosting
 
@@ -95,6 +99,17 @@ Note: Basic multi-agent support is complete via the Agent Skills specification. 
   - Send emails (to, cc, bcc)
   - Draft management (create, list, send)
   - Label operations (list, create, modify on messages)
+  - Hybrid authentication (gcloud ADC, custom OAuth 2.0)
+  - Self-contained Python script with keyring storage
+  - Built-in check command for setup verification
+
+- [x] **google-calendar** - Calendar management (Phase 2)
+  - List and manage calendars
+  - Create, update, delete events
+  - Search events with time ranges and queries
+  - Check free/busy availability
+  - RFC3339 timestamp support with timezone handling
+  - All-day and timed events
   - Hybrid authentication (gcloud ADC, custom OAuth 2.0)
   - Self-contained Python script with keyring storage
   - Built-in check command for setup verification

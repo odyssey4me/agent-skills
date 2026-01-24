@@ -25,9 +25,10 @@ npx add-skill odyssey4me/agent-skills --skill jira
 npx add-skill odyssey4me/agent-skills --skill confluence
 npx add-skill odyssey4me/agent-skills --skill gmail
 npx add-skill odyssey4me/agent-skills --skill google-drive
+npx add-skill odyssey4me/agent-skills --skill google-calendar
 
 # Or install multiple specific skills
-npx add-skill odyssey4me/agent-skills --skill jira --skill confluence --skill gmail --skill google-drive
+npx add-skill odyssey4me/agent-skills --skill jira --skill confluence --skill gmail --skill google-drive --skill google-calendar
 ```
 
 This automatically:
@@ -44,6 +45,7 @@ After installation:
    - [Confluence SKILL.md](skills/confluence/SKILL.md) - Confluence authentication and usage
    - [Gmail SKILL.md](skills/gmail/SKILL.md) - Gmail authentication and usage
    - [Google Drive SKILL.md](skills/google-drive/SKILL.md) - Google Drive authentication and usage
+   - [Google Calendar SKILL.md](skills/google-calendar/SKILL.md) - Google Calendar authentication and usage
 
 2. **Verify setup** - Each skill includes a `check` command to validate configuration
 
@@ -63,6 +65,7 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 | [Confluence](skills/confluence/SKILL.md) | Content management, page CRUD with Markdown support, CQL search |
 | [Gmail](skills/gmail/SKILL.md) | Email management, send/receive messages, drafts, labels |
 | [Google Drive](skills/google-drive/SKILL.md) | File management, list/search/upload/download files, folder management, sharing |
+| [Google Calendar](skills/google-calendar/SKILL.md) | Calendar management, event CRUD, availability checking, scheduling |
 
 See [TODO.md](TODO.md) for planned skills.
 
@@ -104,6 +107,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this pr
   - [Confluence SKILL.md](skills/confluence/SKILL.md)
   - [Gmail SKILL.md](skills/gmail/SKILL.md)
   - [Google Drive SKILL.md](skills/google-drive/SKILL.md)
+  - [Google Calendar SKILL.md](skills/google-calendar/SKILL.md)
 
 ### For Developers
 - **[Developer Guide](docs/developer-guide.md)** - Architecture, creating skills, testing, and contributing
