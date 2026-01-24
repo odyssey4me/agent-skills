@@ -253,9 +253,8 @@ def get_google_credentials(service: str, scopes: list[str]) -> Credentials:
     """Get Google credentials for human-in-the-loop use cases.
 
     Priority:
-    1. Application Default Credentials (gcloud) - if configured with user OAuth
-    2. Saved OAuth tokens from keyring - from previous custom OAuth flow
-    3. Custom OAuth 2.0 flow - opens browser for user consent
+    1. Saved OAuth tokens from keyring - from previous OAuth flow
+    2. OAuth 2.0 flow - opens browser for user consent
 
     Note: Service account authentication is NOT supported - this is
     designed for interactive human use cases only.
@@ -270,19 +269,7 @@ def get_google_credentials(service: str, scopes: list[str]) -> Credentials:
     Raises:
         AuthenticationError: If authentication fails.
     """
-    # 1. Try gcloud Application Default Credentials (user OAuth only)
-    try:
-        from google.auth import default
-
-        creds, _ = default(scopes=scopes)
-        # Verify these are user credentials (have refresh_token), not service account
-        if creds and creds.valid and hasattr(creds, "refresh_token"):
-            return creds
-    except Exception:
-        # ADC not available or not user credentials
-        pass
-
-    # 2. Try keyring-stored OAuth token from previous flow
+    # 1. Try keyring-stored OAuth token from previous flow
     token_json = get_credential(f"{service}-token-json")
     if token_json:
         try:
@@ -299,7 +286,7 @@ def get_google_credentials(service: str, scopes: list[str]) -> Credentials:
             # Invalid or corrupted token, fall through to OAuth flow
             pass
 
-    # 3. Initiate custom OAuth flow - human interaction required
+    # 2. Initiate OAuth flow - human interaction required
     try:
         client_config = get_oauth_client_config(service)
         flow = InstalledAppFlow.from_client_config(client_config, scopes)
@@ -367,10 +354,11 @@ def handle_api_error(error: HttpError) -> None:
     if status_code == 403 and "insufficient" in message.lower():
         scope_help = (
             "\n\nInsufficient OAuth scope. This operation requires additional permissions.\n"
-            "To grant full access, re-authenticate with all scopes:\n\n"
-            "  gcloud auth application-default login \\\n"
-            "    --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/drive.file,https://www.googleapis.com/auth/drive.metadata.readonly\n\n"
-            "Or for custom OAuth, see: skills/google-drive/references/oauth-setup.md\n"
+            "To grant full access, revoke your current token and re-authenticate:\n\n"
+            "  1. Revoke: Go to https://myaccount.google.com/permissions and remove 'Agent Skills'\n"
+            "  2. Clear token: keyring del agent-skills google-drive-token-json\n"
+            "  3. Re-run: python scripts/google-drive.py check\n\n"
+            "For setup help, see: docs/google-oauth-setup.md\n"
         )
         message = f"{message}{scope_help}"
 
@@ -883,53 +871,34 @@ def cmd_check(_args):
             )
 
             if not all_granted:
-                print("\n  Not all scopes are granted. Some operations may fail.")
-                print("   To grant full access, re-authenticate with:")
+                print("\n⚠️  Not all scopes are granted. Some operations may fail.")
+                print("   To grant full access, revoke and re-authenticate:")
                 print()
-                print("   gcloud auth application-default login \\")
-                print("     --scopes=https://www.googleapis.com/auth/cloud-platform,\\")
-                print("https://www.googleapis.com/auth/drive.readonly,\\")
-                print("https://www.googleapis.com/auth/drive.file,\\")
-                print("https://www.googleapis.com/auth/drive.metadata.readonly")
+                print("   1. Revoke: https://myaccount.google.com/permissions")
+                print("   2. Clear token: keyring del agent-skills google-drive-token-json")
+                print("   3. Re-run: python scripts/google-drive.py check")
                 print()
-                print("   Or see: skills/google-drive/references/oauth-setup.md")
+                print("   See: docs/google-oauth-setup.md")
         return 0
     else:
-        print(f"Authentication failed: {result['error']}")
+        print(f"✗ Authentication failed: {result['error']}")
         print()
-
-        # Check if gcloud is available
-        import shutil
-
-        gcloud_available = shutil.which("gcloud") is not None
-
-        if gcloud_available:
-            print("Setup instructions (gcloud CLI detected - RECOMMENDED):")
-            print("  1. Authenticate with gcloud:")
-            print("     gcloud auth application-default login \\")
-            print("       --scopes=https://www.googleapis.com/auth/cloud-platform,\\")
-            print("https://www.googleapis.com/auth/drive.readonly,\\")
-            print("https://www.googleapis.com/auth/drive.file,\\")
-            print("https://www.googleapis.com/auth/drive.metadata.readonly")
-            print()
-            print("  2. Run check again:")
-            print("     python scripts/google-drive.py check")
-        else:
-            print("Setup instructions:")
-            print("  Method 1 (Recommended): Install and use gcloud CLI")
-            print("    - Install from: https://cloud.google.com/sdk/docs/install")
-            print("    - Then run: gcloud auth application-default login --scopes=...")
-            print()
-            print("  Method 2: Custom OAuth 2.0 credentials")
-            print("    1. Create OAuth credentials in Google Cloud Console")
-            print("    2. Store credentials:")
-            print(
-                "       python scripts/google-drive.py auth setup --client-id YOUR_ID --client-secret YOUR_SECRET"
-            )
-            print("    3. Run any command to trigger OAuth flow")
-
+        print("Setup instructions:")
         print()
-        print("For detailed setup instructions, see: skills/google-drive/references/oauth-setup.md")
+        print("  1. Set up a GCP project with OAuth credentials:")
+        print("     See: docs/gcp-project-setup.md")
+        print()
+        print("  2. Configure your credentials:")
+        print("     Create ~/.config/agent-skills/google.yaml:")
+        print()
+        print("     oauth_client:")
+        print("       client_id: YOUR_CLIENT_ID.apps.googleusercontent.com")
+        print("       client_secret: YOUR_CLIENT_SECRET")
+        print()
+        print("  3. Run check again to trigger OAuth flow:")
+        print("     python scripts/google-drive.py check")
+        print()
+        print("For detailed setup instructions, see: docs/google-oauth-setup.md")
         return 1
 
 

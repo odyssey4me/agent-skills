@@ -37,69 +37,39 @@ If anything is missing, the check command will provide setup instructions.
 
 ## Authentication
 
-Google Drive uses OAuth 2.0 for authentication with granular scopes. You can start with read-only access and expand as needed.
+Google Drive uses OAuth 2.0 for authentication. For complete setup instructions, see:
+
+1. [GCP Project Setup Guide](../../docs/gcp-project-setup.md) - Create project, enable Drive API
+2. [Google OAuth Setup Guide](../../docs/google-oauth-setup.md) - Configure credentials
+
+### Quick Start
+
+1. Create `~/.config/agent-skills/google.yaml`:
+   ```yaml
+   oauth_client:
+     client_id: your-client-id.apps.googleusercontent.com
+     client_secret: your-client-secret
+   ```
+
+2. Run `python scripts/google-drive.py check` to trigger OAuth flow and verify setup.
 
 ### OAuth Scopes
 
-The skill supports granular scopes for different operations:
+The skill requests granular scopes for different operations:
 
-- **`drive.readonly`** - Read files and metadata (required for list/search/download)
-- **`drive.file`** - Create, modify, and delete files created by the app
-- **`drive.metadata.readonly`** - View file metadata
-
-**Read-only mode** (default): Only `drive.readonly` is required to list, search, and download files.
-
-**Full access**: All scopes enable complete functionality including upload and sharing.
-
-### Setup with gcloud CLI (Recommended)
-
-**Read-only mode:**
-```bash
-gcloud auth application-default login \
-  --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive.readonly
-```
-
-**Full access (recommended):**
-```bash
-gcloud auth application-default login \
-  --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/drive.file,https://www.googleapis.com/auth/drive.metadata.readonly
-```
-
-**Verify authentication and check granted scopes:**
-```bash
-python scripts/google-drive.py check
-```
-
-The `check` command displays which scopes are available and warns if operations may fail due to missing permissions.
+| Scope | Permission | Used For |
+|-------|-----------|----------|
+| `drive.readonly` | Read files and metadata | list, search, download |
+| `drive.file` | Create/edit files created by app | upload, create folders, share |
+| `drive.metadata.readonly` | View file metadata only | get file info |
 
 ### Scope Errors
 
-If you encounter "insufficient scope" errors, the skill will provide clear instructions to re-authenticate with additional scopes.
+If you encounter "insufficient scope" errors, revoke your token and re-authenticate:
 
-### Alternative: Custom OAuth 2.0
-
-If you prefer not to use gcloud CLI, you can set up custom OAuth 2.0 credentials:
-
-1. **Set up a GCP project** - Follow the [GCP Project Setup Guide](../../docs/gcp-project-setup.md)
-2. **Configure OAuth credentials** - See the [Google OAuth Setup Guide](../../docs/google-oauth-setup.md)
-
-### Shared Google OAuth Credentials
-
-If you use multiple Google skills (Gmail, Google Drive, Google Calendar), you can share OAuth client credentials. Create `~/.config/agent-skills/google.yaml`:
-
-```yaml
-oauth_client:
-  client_id: your-client-id.apps.googleusercontent.com
-  client_secret: your-client-secret
-```
-
-Or set environment variables:
-```bash
-export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export GOOGLE_CLIENT_SECRET="your-client-secret"
-```
-
-Service-specific credentials (if configured) take priority over shared credentials.
+1. Revoke at https://myaccount.google.com/permissions
+2. Clear token: `keyring del agent-skills google-drive-token-json`
+3. Re-run: `python scripts/google-drive.py check`
 
 ## Commands
 
@@ -451,21 +421,16 @@ Run `python scripts/google-drive.py check` to diagnose issues. It will provide s
 
 ### Authentication failed
 
-1. **Using gcloud**: Ensure you've run `gcloud auth application-default login` with the correct scopes
-2. **Using custom OAuth**: Verify your client ID and client secret are correct
-3. **Token expired**: Delete old tokens and re-authenticate:
+1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/google.yaml`
+2. Token expired or corrupted - clear and re-authenticate:
    ```bash
-   # Using gcloud
-   gcloud auth application-default revoke
-   gcloud auth application-default login --scopes=...
-
-   # Using custom OAuth - tokens auto-refresh, but you can clear with:
-   # (requires keyring CLI or manual deletion)
+   keyring del agent-skills google-drive-token-json
+   python scripts/google-drive.py check
    ```
 
 ### Permission denied
 
-Your OAuth client may not have the necessary scopes. Re-run the OAuth flow to grant additional permissions.
+Your OAuth token may not have the necessary scopes. Revoke access at https://myaccount.google.com/permissions, clear your token, and re-authenticate.
 
 ### Cannot download Google Docs
 

@@ -250,29 +250,10 @@ class TestOAuthClientConfig:
 class TestGoogleCredentials:
     """Tests for Google credentials acquisition."""
 
-    @patch("google.auth.default")
-    def test_get_google_credentials_from_gcloud(self, mock_default):
-        """Test getting credentials from gcloud ADC."""
-        mock_creds = Mock()
-        mock_creds.valid = True
-        mock_creds.refresh_token = "refresh-token"
-        mock_default.return_value = (mock_creds, None)
-
-        creds = get_google_credentials("google-drive", ["scope1", "scope2"])
-
-        assert creds == mock_creds
-        mock_default.assert_called_once_with(scopes=["scope1", "scope2"])
-
-    @patch("google.auth.default")
     @patch.object(google_drive, "get_credential")
     @patch("google.oauth2.credentials.Credentials.from_authorized_user_info")
-    def test_get_google_credentials_from_keyring(
-        self, mock_from_user_info, mock_get_credential, mock_default
-    ):
+    def test_get_google_credentials_from_keyring(self, mock_from_user_info, mock_get_credential):
         """Test getting credentials from keyring."""
-        # ADC fails
-        mock_default.side_effect = Exception("No ADC")
-
         # Keyring has token
         token_data = {"token": "access-token", "refresh_token": "refresh-token"}
         mock_get_credential.return_value = json.dumps(token_data)
@@ -287,7 +268,6 @@ class TestGoogleCredentials:
         assert creds == mock_creds
         mock_get_credential.assert_called_with("google-drive-token-json")
 
-    @patch("google.auth.default")
     @patch.object(google_drive, "get_credential")
     @patch("google.oauth2.credentials.Credentials.from_authorized_user_info")
     @patch("google.auth.transport.requests.Request")
@@ -298,12 +278,8 @@ class TestGoogleCredentials:
         _mock_request,
         mock_from_user_info,
         mock_get_credential,
-        mock_default,
     ):
         """Test refreshing expired credentials."""
-        # ADC fails
-        mock_default.side_effect = Exception("No ADC")
-
         # Keyring has expired token
         token_data = {"token": "access-token", "refresh_token": "refresh-token"}
         mock_get_credential.return_value = json.dumps(token_data)
@@ -323,16 +299,10 @@ class TestGoogleCredentials:
         # Should save refreshed token
         mock_set_credential.assert_called_once()
 
-    @patch("google.auth.default")
     @patch.object(google_drive, "get_credential")
     @patch.object(google_drive, "get_oauth_client_config")
-    def test_get_google_credentials_auth_error(
-        self, mock_get_oauth_config, mock_get_credential, mock_default
-    ):
+    def test_get_google_credentials_auth_error(self, mock_get_oauth_config, mock_get_credential):
         """Test authentication error when no credentials available."""
-        # ADC fails
-        mock_default.side_effect = Exception("No ADC")
-
         # No keyring token
         mock_get_credential.return_value = None
 

@@ -27,12 +27,11 @@ This document tracks planned skills and features for the agent-skills repository
   - ✅ Updated Gmail, Google Drive, and Google Calendar oauth-setup.md to reference the guide
   - ✅ Updated user-guide.md with consolidated Google skills authentication section
 
-- [ ] Simplify Google skills authentication to OAuth-only
-  - Remove gcloud CLI auth fallback from Gmail, Google Drive, Google Calendar skills
-  - OAuth is the recommended approach with better security (granular scopes)
-  - gcloud auth is confusing for users and has broader permissions than needed
-  - Update SKILL.md files to focus solely on OAuth flow
-  - Remove gcloud-related code paths from skill scripts
+- [x] Simplify Google skills authentication to OAuth-only
+  - ✅ Removed gcloud CLI auth fallback from Gmail, Google Drive, Google Calendar scripts
+  - ✅ Updated all three SKILL.md files to focus solely on OAuth flow
+  - ✅ Simplified authentication sections with Quick Start guide and OAuth scope tables
+  - ✅ Updated troubleshooting sections to reference OAuth-only workflow
 
 ### Google Workspace
 
