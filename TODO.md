@@ -13,11 +13,11 @@ This document tracks planned skills and features for the agent-skills repository
   - Pipelines
   - ✅ Uses official GitLab CLI (glab)
 
-- [ ] **gerrit** - Gerrit code review
+- [x] **gerrit** - Gerrit code review
   - Changes (create, review, submit)
   - Topics
   - Review comments
-  - Check for official Gerrit CLI first
+  - ✅ Uses git-review CLI (official OpenStack/OpenDev tool)
 
 ## Documentation Improvements
 
