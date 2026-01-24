@@ -1,6 +1,6 @@
 # Agent Skills
 
-Portable skills for AI coding assistants providing integrations with Jira, Confluence, Gmail, and other development tools.
+Portable skills for AI coding assistants providing integrations with Jira, Confluence, Gmail, GitHub, GitLab, Gerrit, and other development tools.
 
 ## Features
 
@@ -26,9 +26,12 @@ npx add-skill odyssey4me/agent-skills --skill confluence
 npx add-skill odyssey4me/agent-skills --skill gmail
 npx add-skill odyssey4me/agent-skills --skill google-drive
 npx add-skill odyssey4me/agent-skills --skill google-calendar
+npx add-skill odyssey4me/agent-skills --skill github
+npx add-skill odyssey4me/agent-skills --skill gitlab
+npx add-skill odyssey4me/agent-skills --skill gerrit
 
 # Or install multiple specific skills
-npx add-skill odyssey4me/agent-skills --skill jira --skill confluence --skill gmail --skill google-drive --skill google-calendar
+npx add-skill odyssey4me/agent-skills --skill jira --skill confluence
 ```
 
 This automatically:
@@ -40,12 +43,7 @@ This automatically:
 
 After installation:
 
-1. **Configure authentication** - See skill documentation for setup:
-   - [Jira SKILL.md](skills/jira/SKILL.md) - Jira authentication and usage
-   - [Confluence SKILL.md](skills/confluence/SKILL.md) - Confluence authentication and usage
-   - [Gmail SKILL.md](skills/gmail/SKILL.md) - Gmail authentication and usage
-   - [Google Drive SKILL.md](skills/google-drive/SKILL.md) - Google Drive authentication and usage
-   - [Google Calendar SKILL.md](skills/google-calendar/SKILL.md) - Google Calendar authentication and usage
+1. **Configure authentication** - See skill documentation for setup (links in [Available Skills](#available-skills) table below)
 
 2. **Verify setup** - Each skill includes a `check` command to validate configuration
 
@@ -66,6 +64,9 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 | [Gmail](skills/gmail/SKILL.md) | Email management, send/receive messages, drafts, labels |
 | [Google Drive](skills/google-drive/SKILL.md) | File management, list/search/upload/download files, folder management, sharing |
 | [Google Calendar](skills/google-calendar/SKILL.md) | Calendar management, event CRUD, availability checking, scheduling |
+| [GitHub](skills/github/SKILL.md) | Issues, pull requests, workflows, and repositories via `gh` CLI |
+| [GitLab](skills/gitlab/SKILL.md) | Issues, merge requests, pipelines, and repositories via `glab` CLI |
+| [Gerrit](skills/gerrit/SKILL.md) | Code review, submit changes, download patches via `git-review` CLI |
 
 See [TODO.md](TODO.md) for planned skills.
 
@@ -102,20 +103,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this pr
 
 ### For Users
 - **[User Guide](docs/user-guide.md)** - Installation, setup, usage, and troubleshooting
-- Individual skill documentation:
-  - [Jira SKILL.md](skills/jira/SKILL.md)
-  - [Confluence SKILL.md](skills/confluence/SKILL.md)
-  - [Gmail SKILL.md](skills/gmail/SKILL.md)
-  - [Google Drive SKILL.md](skills/google-drive/SKILL.md)
-  - [Google Calendar SKILL.md](skills/google-calendar/SKILL.md)
+- Individual skill documentation - see links in [Available Skills](#available-skills) table
 
 ### For Developers
 - **[Developer Guide](docs/developer-guide.md)** - Architecture, creating skills, testing, and contributing
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and code standards
 - [AGENTS.md](AGENTS.md) - Instructions for AI coding assistants working with this repo
-
-### Migration
-- **[Migration Guide](docs/migration.md)** - Upgrade guide from v0.1.x to v0.2.0
 
 ## License
 

@@ -142,8 +142,7 @@ agent-skills/
 │   └── test_gmail.py
 ├── docs/                      # Documentation
 │   ├── user-guide.md          # User installation and setup guide
-│   ├── developer-guide.md (this file)
-│   └── migration.md           # Migration guide for version upgrades
+│   └── developer-guide.md (this file)
 ├── AGENTS.md                  # Instructions for AI coding assistants
 ├── CONTRIBUTING.md            # Contribution guidelines
 └── README.md                  # Project overview
