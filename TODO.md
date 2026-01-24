@@ -6,12 +6,12 @@ This document tracks planned skills and features for the agent-skills repository
 
 ### Code Hosting
 
-- [ ] **gitlab** - GitLab operations
+- [x] **gitlab** - GitLab operations
   - Issues
   - Merge requests
   - Repository operations
   - Pipelines
-  - Check for official GitLab CLI first
+  - ✅ Uses official GitLab CLI (glab)
 
 - [ ] **gerrit** - Gerrit code review
   - Changes (create, review, submit)

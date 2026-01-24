@@ -84,6 +84,23 @@ See [templates/api-skill/README.md](templates/api-skill/README.md) for complete 
 
 For detailed development guidelines, see [docs/developer-guide.md](docs/developer-guide.md).
 
+### Documentation-Only Skills
+
+Skills that wrap official CLI tools (like `gh` for GitHub or `glab` for GitLab) are documentation-only and don't require a `scripts/` directory or Python implementation. These skills:
+
+- Provide comprehensive documentation in SKILL.md
+- Guide users to use the official CLI directly
+- Include practical examples in references/common-workflows.md
+- Don't need custom Python scripts or a scripts/ directory
+
+**Examples**: `github`, `gitlab`
+
+**When to use this approach**:
+- An official CLI exists that covers all needed functionality
+- The CLI is well-maintained by the service provider
+- The CLI handles authentication, API changes, and edge cases
+- Users benefit more from learning the official tool than a custom wrapper
+
 ## Repository Structure
 
 For the complete project structure, see [docs/developer-guide.md](docs/developer-guide.md#repository-structure).
