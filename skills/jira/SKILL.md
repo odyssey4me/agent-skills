@@ -65,6 +65,36 @@ token: your-token
 - **Email**: Your Atlassian account email
 - **API Token**: Create at https://id.atlassian.com/manage-profile/security/api-tokens
 
+## Rate Limits
+
+Atlassian Jira Cloud enforces rate limits to ensure fair usage and system stability. The specific limits vary based on your Jira instance type and plan:
+
+- **Jira Cloud**: Rate limits vary by endpoint and are enforced per-user and per-app
+- **Jira Data Center/Server**: Rate limits are typically configured by administrators
+
+### Automatic Rate Limit Handling
+
+This skill automatically handles temporary rate limit errors (429 Too Many Requests) by:
+- Detecting rate limit responses from the Jira API
+- Waiting for the time specified in the `Retry-After` header
+- Retrying failed requests up to 3 times with exponential backoff (1s, 2s, 4s)
+- Providing clear error messages if rate limits persist after all retry attempts
+
+**You don't need to manually handle rate limiting** - the skill manages this automatically. If you encounter persistent rate limit errors, consider:
+- Reducing the frequency of API calls
+- Using `--max-results` to limit the number of items returned
+- Spreading bulk operations over a longer time period
+- Contacting your Jira administrator if limits seem too restrictive
+
+### Best Practices for AI Agents
+
+When using this skill for bulk operations or automated workflows:
+1. Use specific JQL queries to minimize the number of API calls needed
+2. Leverage configuration defaults and JQL scope to avoid redundant filters
+3. Use `--max-results` appropriately - don't fetch more data than needed
+4. For large datasets, consider paginating manually with multiple smaller queries
+5. Be aware that search operations may be more heavily rate-limited than direct issue access
+
 ## Configuration Defaults
 
 Optionally configure defaults in `~/.config/agent-skills/jira.yaml` to reduce repetitive typing:
