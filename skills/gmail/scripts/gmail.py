@@ -41,14 +41,6 @@ try:
     GOOGLE_AUTH_AVAILABLE = True
 except ImportError:
     GOOGLE_AUTH_AVAILABLE = False
-    # Don't exit here - only exit when script is run directly
-    if __name__ == "__main__":
-        print(
-            "Error: Google auth libraries not found. Install with: "
-            "pip install --user google-auth google-auth-oauthlib",
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
 try:
     from googleapiclient.discovery import build
@@ -57,14 +49,6 @@ try:
     GOOGLE_API_CLIENT_AVAILABLE = True
 except ImportError:
     GOOGLE_API_CLIENT_AVAILABLE = False
-    # Don't exit here - only exit when script is run directly
-    if __name__ == "__main__":
-        print(
-            "Error: 'google-api-python-client' not found. Install with: "
-            "pip install --user google-api-python-client",
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
 try:
     import keyring
@@ -72,13 +56,6 @@ try:
     KEYRING_AVAILABLE = True
 except ImportError:
     KEYRING_AVAILABLE = False
-    # Don't exit here - only exit when script is run directly
-    if __name__ == "__main__":
-        print(
-            "Error: 'keyring' library not found. Install with: pip install --user keyring",
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
 try:
     import yaml
@@ -86,13 +63,6 @@ try:
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
-    # Don't exit here - only exit when script is run directly
-    if __name__ == "__main__":
-        print(
-            "Error: 'pyyaml' library not found. Install with: pip install --user pyyaml",
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
 
 # ============================================================================
@@ -1113,8 +1083,40 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main():
     """Main entry point."""
+    # Check dependencies first (allows --help to work even if deps missing)
     parser = build_parser()
     args = parser.parse_args()
+
+    # Now check dependencies if not just showing help
+    if not GOOGLE_AUTH_AVAILABLE:
+        print(
+            "Error: Google auth libraries not found. Install with: "
+            "pip install --user google-auth google-auth-oauthlib",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not GOOGLE_API_CLIENT_AVAILABLE:
+        print(
+            "Error: 'google-api-python-client' not found. Install with: "
+            "pip install --user google-api-python-client",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not KEYRING_AVAILABLE:
+        print(
+            "Error: 'keyring' library not found. Install with: pip install --user keyring",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not YAML_AVAILABLE:
+        print(
+            "Error: 'pyyaml' library not found. Install with: pip install --user pyyaml",
+            file=sys.stderr,
+        )
+        return 1
 
     if not args.command:
         parser.print_help()

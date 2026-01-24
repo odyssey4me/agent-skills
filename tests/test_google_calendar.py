@@ -976,7 +976,7 @@ class TestEdgeCases:
 
     @patch.object(google_calendar, "build_calendar_service")
     @patch.object(google_calendar, "create_event")
-    def test_cmd_events_create_with_attendees(self, mock_create, _mock_service, _capsys):
+    def test_cmd_events_create_with_attendees(self, mock_create, _mock_service):
         """Test events create with attendees."""
         mock_create.return_value = {
             "id": "new-event",
