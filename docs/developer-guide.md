@@ -102,7 +102,7 @@ While many examples use Bash (see [Vercel's agent-skills](https://github.com/ver
 - OAuth/authentication flows
 - Multi-step workflows
 
-Our skills (Jira, Confluence) are API-heavy, making Python the right choice.
+Our skills (Jira, Confluence, Gmail) are API-heavy, making Python the right choice.
 
 ## Repository Structure
 
@@ -115,12 +115,19 @@ agent-skills/
 │   │   │   └── jira.py       # Self-contained Python script
 │   │   └── references/       # Additional documentation (spec-optional)
 │   │       └── scriptrunner.md
-│   └── confluence/
+│   ├── confluence/
+│   │   ├── SKILL.md
+│   │   ├── scripts/
+│   │   │   └── confluence.py
+│   │   └── references/
+│   │       └── creating-content.md
+│   └── gmail/
 │       ├── SKILL.md
 │       ├── scripts/
-│       │   └── confluence.py
+│       │   └── gmail.py
 │       └── references/
-│           └── creating-content.md
+│           ├── oauth-setup.md
+│           └── gmail-queries.md
 ├── templates/                 # Templates for new skills
 │   └── api-skill/
 │       ├── SKILL.md.template
@@ -131,7 +138,8 @@ agent-skills/
 │   └── setup_helper.py       # Setup and configuration helpers
 ├── tests/                     # Test suite
 │   ├── test_jira.py
-│   └── test_confluence.py
+│   ├── test_confluence.py
+│   └── test_gmail.py
 ├── docs/                      # Documentation
 │   ├── user-guide.md          # User installation and setup guide
 │   ├── developer-guide.md (this file)
@@ -599,7 +607,7 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for:
 ## Next Steps
 
 - Read the [Agent Skills specification](https://agentskills.io/specification)
-- Review existing skills ([Jira](../skills/jira/SKILL.md), [Confluence](../skills/confluence/SKILL.md))
+- Review existing skills ([Jira](../skills/jira/SKILL.md), [Confluence](../skills/confluence/SKILL.md), [Gmail](../skills/gmail/SKILL.md))
 - Copy the template and start building
 - Test with `npx add-skill` for compatibility
 - Submit a pull request

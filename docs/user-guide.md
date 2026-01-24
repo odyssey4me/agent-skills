@@ -48,8 +48,11 @@ npx add-skill odyssey4me/agent-skills --skill jira
 # Install Confluence skill
 npx add-skill odyssey4me/agent-skills --skill confluence
 
-# Install both skills
-npx add-skill odyssey4me/agent-skills --skill jira --skill confluence
+# Install Gmail skill
+npx add-skill odyssey4me/agent-skills --skill gmail
+
+# Install multiple skills
+npx add-skill odyssey4me/agent-skills --skill jira --skill confluence --skill gmail
 ```
 
 This will:
@@ -155,6 +158,30 @@ email: you@example.com
 token: your-token
 ```
 
+### Gmail Authentication
+
+Gmail uses OAuth 2.0 for authentication. The recommended method is using gcloud CLI.
+
+**Option 1: gcloud CLI (Recommended)**
+
+```bash
+# Install Google Cloud SDK if not already installed
+# See: https://cloud.google.com/sdk/docs/install
+
+# Authenticate with Application Default Credentials
+gcloud auth application-default login \
+  --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.modify,https://www.googleapis.com/auth/gmail.labels
+
+# Verify authentication
+python ~/.claude/skills/gmail/scripts/gmail.py check
+```
+
+This provides zero-configuration authentication and automatic token refresh.
+
+**Option 2: Custom OAuth 2.0**
+
+If you cannot use gcloud CLI, you can set up custom OAuth 2.0 credentials. See [Gmail OAuth Setup Guide](../skills/gmail/references/oauth-setup.md) for detailed instructions.
+
 ### Verify Authentication
 
 Each skill includes a `check` command to verify setup:
@@ -165,6 +192,9 @@ python ~/.claude/skills/jira/scripts/jira.py check
 
 # Check Confluence configuration
 python ~/.claude/skills/confluence/scripts/confluence.py check
+
+# Check Gmail configuration
+python ~/.claude/skills/gmail/scripts/gmail.py check
 ```
 
 The check command will:
@@ -188,6 +218,8 @@ Simply describe what you want in natural language:
 "Create a bug in PROJECT about login failures"
 "Find Confluence pages about authentication"
 "Show me the Confluence page titled 'API Documentation'"
+"List my unread emails from the last week"
+"Send an email to user@example.com about the meeting"
 ```
 
 Claude Code will automatically use the appropriate skill to fulfill your request.
@@ -198,6 +230,7 @@ You can also invoke skills directly with specific commands. See individual skill
 
 - [Jira Skill Documentation](../skills/jira/SKILL.md)
 - [Confluence Skill Documentation](../skills/confluence/SKILL.md)
+- [Gmail Skill Documentation](../skills/gmail/SKILL.md)
 
 ## Troubleshooting
 
@@ -322,8 +355,11 @@ python ~/.claude/skills/confluence/scripts/confluence.py search --help
 
 - **Jira**: See [skills/jira/SKILL.md](../skills/jira/SKILL.md)
 - **Confluence**: See [skills/confluence/SKILL.md](../skills/confluence/SKILL.md)
+- **Gmail**: See [skills/gmail/SKILL.md](../skills/gmail/SKILL.md)
 - **ScriptRunner (Jira)**: See [skills/jira/references/scriptrunner.md](../skills/jira/references/scriptrunner.md)
 - **Content Creation (Confluence)**: See [skills/confluence/references/creating-content.md](../skills/confluence/references/creating-content.md)
+- **Gmail OAuth Setup**: See [skills/gmail/references/oauth-setup.md](../skills/gmail/references/oauth-setup.md)
+- **Gmail Search Queries**: See [skills/gmail/references/gmail-queries.md](../skills/gmail/references/gmail-queries.md)
 
 ### Reporting Issues
 
