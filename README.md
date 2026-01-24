@@ -24,9 +24,10 @@ npx add-skill odyssey4me/agent-skills
 npx add-skill odyssey4me/agent-skills --skill jira
 npx add-skill odyssey4me/agent-skills --skill confluence
 npx add-skill odyssey4me/agent-skills --skill gmail
+npx add-skill odyssey4me/agent-skills --skill google-drive
 
 # Or install multiple specific skills
-npx add-skill odyssey4me/agent-skills --skill jira --skill confluence --skill gmail
+npx add-skill odyssey4me/agent-skills --skill jira --skill confluence --skill gmail --skill google-drive
 ```
 
 This automatically:
@@ -42,6 +43,7 @@ After installation:
    - [Jira SKILL.md](skills/jira/SKILL.md) - Jira authentication and usage
    - [Confluence SKILL.md](skills/confluence/SKILL.md) - Confluence authentication and usage
    - [Gmail SKILL.md](skills/gmail/SKILL.md) - Gmail authentication and usage
+   - [Google Drive SKILL.md](skills/google-drive/SKILL.md) - Google Drive authentication and usage
 
 2. **Verify setup** - Each skill includes a `check` command to validate configuration
 
@@ -60,6 +62,7 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 | [Jira](skills/jira/SKILL.md) | Issue tracking, search, create/update, transitions |
 | [Confluence](skills/confluence/SKILL.md) | Content management, page CRUD with Markdown support, CQL search |
 | [Gmail](skills/gmail/SKILL.md) | Email management, send/receive messages, drafts, labels |
+| [Google Drive](skills/google-drive/SKILL.md) | File management, list/search/upload/download files, folder management, sharing |
 
 See [TODO.md](TODO.md) for planned skills.
 
@@ -100,6 +103,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this pr
   - [Jira SKILL.md](skills/jira/SKILL.md)
   - [Confluence SKILL.md](skills/confluence/SKILL.md)
   - [Gmail SKILL.md](skills/gmail/SKILL.md)
+  - [Google Drive SKILL.md](skills/google-drive/SKILL.md)
 
 ### For Developers
 - **[Developer Guide](docs/developer-guide.md)** - Architecture, creating skills, testing, and contributing

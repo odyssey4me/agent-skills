@@ -13,12 +13,16 @@ This document tracks planned skills and features for the agent-skills repository
   - Label management
   - Draft management
 
-- [ ] **google-drive** - File management
-  - List files
-  - Search files
-  - Read file content
+- [x] **google-drive** - File management
+  - List and search files
+  - Get file metadata
+  - Download files
   - Upload files
-  - Share files
+  - Folder management (create, list contents)
+  - Sharing (share file, list/delete permissions)
+  - Hybrid authentication (gcloud ADC, custom OAuth 2.0)
+  - Self-contained Python script with keyring storage
+  - Built-in check command for setup verification
 
 - [ ] **google-calendar** - Calendar management
   - List events

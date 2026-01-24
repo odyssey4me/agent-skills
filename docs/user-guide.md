@@ -182,6 +182,30 @@ This provides zero-configuration authentication and automatic token refresh.
 
 If you cannot use gcloud CLI, you can set up custom OAuth 2.0 credentials. See [Gmail OAuth Setup Guide](../skills/gmail/references/oauth-setup.md) for detailed instructions.
 
+### Google Drive Authentication
+
+Google Drive uses OAuth 2.0 for authentication, similar to Gmail.
+
+**Option 1: gcloud CLI (Recommended)**
+
+```bash
+# Install Google Cloud SDK if not already installed
+# See: https://cloud.google.com/sdk/docs/install
+
+# Authenticate with Application Default Credentials
+gcloud auth application-default login \
+  --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/drive.file,https://www.googleapis.com/auth/drive.metadata.readonly
+
+# Verify authentication
+python ~/.claude/skills/google-drive/scripts/google-drive.py check
+```
+
+This provides zero-configuration authentication and automatic token refresh.
+
+**Option 2: Custom OAuth 2.0**
+
+If you cannot use gcloud CLI, you can set up custom OAuth 2.0 credentials. See [Google Drive OAuth Setup Guide](../skills/google-drive/references/oauth-setup.md) for detailed instructions.
+
 ### Verify Authentication
 
 Each skill includes a `check` command to verify setup:
@@ -195,6 +219,9 @@ python ~/.claude/skills/confluence/scripts/confluence.py check
 
 # Check Gmail configuration
 python ~/.claude/skills/gmail/scripts/gmail.py check
+
+# Check Google Drive configuration
+python ~/.claude/skills/google-drive/scripts/google-drive.py check
 ```
 
 The check command will:
@@ -220,6 +247,9 @@ Simply describe what you want in natural language:
 "Show me the Confluence page titled 'API Documentation'"
 "List my unread emails from the last week"
 "Send an email to user@example.com about the meeting"
+"List my recent Google Drive files"
+"Upload this file to Google Drive"
+"Share the document with colleague@example.com"
 ```
 
 Claude Code will automatically use the appropriate skill to fulfill your request.
@@ -231,6 +261,7 @@ You can also invoke skills directly with specific commands. See individual skill
 - [Jira Skill Documentation](../skills/jira/SKILL.md)
 - [Confluence Skill Documentation](../skills/confluence/SKILL.md)
 - [Gmail Skill Documentation](../skills/gmail/SKILL.md)
+- [Google Drive Skill Documentation](../skills/google-drive/SKILL.md)
 
 ## Troubleshooting
 
@@ -349,6 +380,10 @@ python ~/.claude/skills/jira/scripts/jira.py search --help
 # Confluence help
 python ~/.claude/skills/confluence/scripts/confluence.py --help
 python ~/.claude/skills/confluence/scripts/confluence.py search --help
+
+# Google Drive help
+python ~/.claude/skills/google-drive/scripts/google-drive.py --help
+python ~/.claude/skills/google-drive/scripts/google-drive.py files --help
 ```
 
 ### Documentation
@@ -356,10 +391,13 @@ python ~/.claude/skills/confluence/scripts/confluence.py search --help
 - **Jira**: See [skills/jira/SKILL.md](../skills/jira/SKILL.md)
 - **Confluence**: See [skills/confluence/SKILL.md](../skills/confluence/SKILL.md)
 - **Gmail**: See [skills/gmail/SKILL.md](../skills/gmail/SKILL.md)
+- **Google Drive**: See [skills/google-drive/SKILL.md](../skills/google-drive/SKILL.md)
 - **ScriptRunner (Jira)**: See [skills/jira/references/scriptrunner.md](../skills/jira/references/scriptrunner.md)
 - **Content Creation (Confluence)**: See [skills/confluence/references/creating-content.md](../skills/confluence/references/creating-content.md)
 - **Gmail OAuth Setup**: See [skills/gmail/references/oauth-setup.md](../skills/gmail/references/oauth-setup.md)
 - **Gmail Search Queries**: See [skills/gmail/references/gmail-queries.md](../skills/gmail/references/gmail-queries.md)
+- **Google Drive OAuth Setup**: See [skills/google-drive/references/oauth-setup.md](../skills/google-drive/references/oauth-setup.md)
+- **Google Drive Search Queries**: See [skills/google-drive/references/drive-queries.md](../skills/google-drive/references/drive-queries.md)
 
 ### Reporting Issues
 
