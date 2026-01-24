@@ -137,6 +137,40 @@ oauth_client:
   client_secret: "your-client-secret"
 ```
 
+## Shared Credentials for Multiple Google Skills
+
+If you use multiple Google skills (Gmail, Google Drive, Google Calendar), you can share OAuth client credentials instead of configuring each skill separately.
+
+### Shared Config File
+
+Create `~/.config/agent-skills/google.yaml`:
+
+```yaml
+oauth_client:
+  client_id: your-client-id.apps.googleusercontent.com
+  client_secret: your-client-secret
+```
+
+### Shared Environment Variables
+
+```bash
+export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export GOOGLE_CLIENT_SECRET="your-client-secret"
+```
+
+### Priority Order
+
+OAuth credentials are resolved in this order:
+
+1. **Service-specific config file** (e.g., `google-drive.yaml`)
+2. **Service-specific environment variables** (e.g., `GOOGLE_DRIVE_CLIENT_ID`)
+3. **Shared config file** (`google.yaml`)
+4. **Shared environment variables** (`GOOGLE_CLIENT_ID`)
+
+This allows you to use shared credentials for most skills while overriding for specific skills if needed.
+
+**Note**: OAuth tokens are still stored separately per skill, as each skill may request different scopes.
+
 ### Step 6: First Run
 
 On your first command, a browser window will open asking you to authorize the application:

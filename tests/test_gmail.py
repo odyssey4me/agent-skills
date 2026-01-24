@@ -132,8 +132,8 @@ class TestOAuthClientConfig:
     """Tests for OAuth client configuration."""
 
     @patch("skills.gmail.scripts.gmail.load_config")
-    def test_get_oauth_client_config_from_file(self, mock_load_config):
-        """Test getting OAuth config from file."""
+    def test_get_oauth_client_config_from_service_file(self, mock_load_config):
+        """Test getting OAuth config from service-specific file."""
         mock_load_config.return_value = {
             "oauth_client": {
                 "client_id": "file-client-id",
@@ -147,8 +147,8 @@ class TestOAuthClientConfig:
         assert config["installed"]["client_secret"] == "file-client-secret"
 
     @patch("skills.gmail.scripts.gmail.load_config")
-    def test_get_oauth_client_config_from_env(self, mock_load_config, monkeypatch):
-        """Test getting OAuth config from environment."""
+    def test_get_oauth_client_config_from_service_env(self, mock_load_config, monkeypatch):
+        """Test getting OAuth config from service-specific environment."""
         mock_load_config.return_value = None
         monkeypatch.setenv("GMAIL_CLIENT_ID", "env-client-id")
         monkeypatch.setenv("GMAIL_CLIENT_SECRET", "env-client-secret")
@@ -159,11 +159,69 @@ class TestOAuthClientConfig:
         assert config["installed"]["client_secret"] == "env-client-secret"
 
     @patch("skills.gmail.scripts.gmail.load_config")
+    def test_get_oauth_client_config_from_shared_file(self, mock_load_config, monkeypatch):
+        """Test getting OAuth config from shared google.yaml file."""
+        # No service-specific config or env vars
+        monkeypatch.delenv("GMAIL_CLIENT_ID", raising=False)
+        monkeypatch.delenv("GMAIL_CLIENT_SECRET", raising=False)
+
+        def side_effect(service):
+            if service == "google":
+                return {
+                    "oauth_client": {
+                        "client_id": "shared-file-client-id",
+                        "client_secret": "shared-file-client-secret",
+                    }
+                }
+            return None
+
+        mock_load_config.side_effect = side_effect
+
+        config = get_oauth_client_config("gmail")
+
+        assert config["installed"]["client_id"] == "shared-file-client-id"
+        assert config["installed"]["client_secret"] == "shared-file-client-secret"
+
+    @patch("skills.gmail.scripts.gmail.load_config")
+    def test_get_oauth_client_config_from_shared_env(self, mock_load_config, monkeypatch):
+        """Test getting OAuth config from shared environment variables."""
+        mock_load_config.return_value = None
+        monkeypatch.delenv("GMAIL_CLIENT_ID", raising=False)
+        monkeypatch.delenv("GMAIL_CLIENT_SECRET", raising=False)
+        monkeypatch.setenv("GOOGLE_CLIENT_ID", "shared-env-client-id")
+        monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "shared-env-client-secret")
+
+        config = get_oauth_client_config("gmail")
+
+        assert config["installed"]["client_id"] == "shared-env-client-id"
+        assert config["installed"]["client_secret"] == "shared-env-client-secret"
+
+    @patch("skills.gmail.scripts.gmail.load_config")
+    def test_get_oauth_client_config_priority_service_over_shared(
+        self, mock_load_config, monkeypatch
+    ):
+        """Test service-specific config takes priority over shared."""
+        # Set both service-specific and shared env vars
+        monkeypatch.setenv("GMAIL_CLIENT_ID", "service-env-id")
+        monkeypatch.setenv("GMAIL_CLIENT_SECRET", "service-env-secret")
+        monkeypatch.setenv("GOOGLE_CLIENT_ID", "shared-env-id")
+        monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "shared-env-secret")
+        mock_load_config.return_value = None
+
+        config = get_oauth_client_config("gmail")
+
+        # Service-specific should take priority
+        assert config["installed"]["client_id"] == "service-env-id"
+        assert config["installed"]["client_secret"] == "service-env-secret"
+
+    @patch("skills.gmail.scripts.gmail.load_config")
     def test_get_oauth_client_config_not_found(self, mock_load_config, monkeypatch):
         """Test OAuth config not found raises error."""
         mock_load_config.return_value = None
         monkeypatch.delenv("GMAIL_CLIENT_ID", raising=False)
         monkeypatch.delenv("GMAIL_CLIENT_SECRET", raising=False)
+        monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
+        monkeypatch.delenv("GOOGLE_CLIENT_SECRET", raising=False)
 
         with pytest.raises(AuthenticationError, match="OAuth client credentials not found"):
             get_oauth_client_config("gmail")

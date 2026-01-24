@@ -80,6 +80,24 @@ If you encounter "insufficient scope" errors, the skill will provide clear instr
 
 If you cannot use gcloud CLI, you can set up custom OAuth 2.0 credentials. See [oauth-setup.md](references/oauth-setup.md) for detailed instructions.
 
+### Shared Google OAuth Credentials
+
+If you use multiple Google skills (Gmail, Google Drive, Google Calendar), you can share OAuth client credentials. Create `~/.config/agent-skills/google.yaml`:
+
+```yaml
+oauth_client:
+  client_id: your-client-id.apps.googleusercontent.com
+  client_secret: your-client-secret
+```
+
+Or set environment variables:
+```bash
+export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export GOOGLE_CLIENT_SECRET="your-client-secret"
+```
+
+Service-specific credentials (if configured) take priority over shared credentials.
+
 ## Commands
 
 ### check

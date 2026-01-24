@@ -181,12 +181,35 @@ class AuthenticationError(Exception):
     pass
 
 
+def _build_oauth_config(client_id: str, client_secret: str) -> dict[str, Any]:
+    """Build OAuth client configuration dict.
+
+    Args:
+        client_id: OAuth client ID.
+        client_secret: OAuth client secret.
+
+    Returns:
+        OAuth client configuration dict.
+    """
+    return {
+        "installed": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": ["http://localhost"],
+        }
+    }
+
+
 def get_oauth_client_config(service: str) -> dict[str, Any]:
     """Get OAuth 2.0 client configuration from config file or environment.
 
     Priority:
-    1. Config file
-    2. Environment variables
+    1. Service-specific config file (~/.config/agent-skills/{service}.yaml)
+    2. Service-specific environment variables ({SERVICE}_CLIENT_ID, {SERVICE}_CLIENT_SECRET)
+    3. Shared Google config file (~/.config/agent-skills/google.yaml)
+    4. Shared environment variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
 
     Args:
         service: Service name (e.g., "google-drive").
@@ -197,40 +220,42 @@ def get_oauth_client_config(service: str) -> dict[str, Any]:
     Raises:
         AuthenticationError: If client configuration is not found.
     """
-    # Try config file first
+    # 1. Try service-specific config file first
     config = load_config(service)
     if config and "oauth_client" in config:
         client_id = config["oauth_client"].get("client_id")
         client_secret = config["oauth_client"].get("client_secret")
         if client_id and client_secret:
-            return {
-                "installed": {
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": ["http://localhost"],
-                }
-            }
+            return _build_oauth_config(client_id, client_secret)
 
-    # Try environment variables
+    # 2. Try service-specific environment variables
     prefix = service.upper().replace("-", "_")
     client_id = os.environ.get(f"{prefix}_CLIENT_ID")
     client_secret = os.environ.get(f"{prefix}_CLIENT_SECRET")
     if client_id and client_secret:
-        return {
-            "installed": {
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": ["http://localhost"],
-            }
-        }
+        return _build_oauth_config(client_id, client_secret)
+
+    # 3. Try shared Google config file
+    shared_config = load_config("google")
+    if shared_config and "oauth_client" in shared_config:
+        client_id = shared_config["oauth_client"].get("client_id")
+        client_secret = shared_config["oauth_client"].get("client_secret")
+        if client_id and client_secret:
+            return _build_oauth_config(client_id, client_secret)
+
+    # 4. Try shared environment variables
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    if client_id and client_secret:
+        return _build_oauth_config(client_id, client_secret)
 
     raise AuthenticationError(
         f"OAuth client credentials not found for {service}. "
-        f"Run: python google-drive.py auth setup --client-id YOUR_ID --client-secret YOUR_SECRET"
+        f"Options:\n"
+        f"  1. Service config: Run python google-drive.py auth setup --client-id YOUR_ID --client-secret YOUR_SECRET\n"
+        f"  2. Service env vars: Set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET\n"
+        f"  3. Shared config: Create ~/.config/agent-skills/google.yaml with oauth_client credentials\n"
+        f"  4. Shared env vars: Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET"
     )
 
 

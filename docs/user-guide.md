@@ -206,6 +206,39 @@ This provides zero-configuration authentication and automatic token refresh.
 
 If you cannot use gcloud CLI, you can set up custom OAuth 2.0 credentials. See [Google Drive OAuth Setup Guide](../skills/google-drive/references/oauth-setup.md) for detailed instructions.
 
+### Shared Google OAuth Credentials
+
+If you use multiple Google skills (Gmail, Google Drive, Google Calendar), you can share OAuth credentials instead of configuring each skill separately.
+
+**Option 1: Shared Config File**
+
+Create `~/.config/agent-skills/google.yaml`:
+
+```yaml
+oauth_client:
+  client_id: your-client-id.apps.googleusercontent.com
+  client_secret: your-client-secret
+```
+
+**Option 2: Shared Environment Variables**
+
+```bash
+export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export GOOGLE_CLIENT_SECRET="your-client-secret"
+```
+
+**Priority Order**
+
+OAuth credentials are resolved in this order:
+1. Service-specific config file (e.g., `gmail.yaml`, `google-drive.yaml`)
+2. Service-specific environment variables (e.g., `GMAIL_CLIENT_ID`)
+3. Shared config file (`google.yaml`)
+4. Shared environment variables (`GOOGLE_CLIENT_ID`)
+
+This allows you to use shared credentials for most skills while overriding for specific skills if needed.
+
+**Note**: OAuth tokens are still stored separately per skill, as each skill may request different scopes.
+
 ### Verify Authentication
 
 Each skill includes a `check` command to verify setup:
