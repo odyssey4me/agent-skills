@@ -158,86 +158,26 @@ email: you@example.com
 token: your-token
 ```
 
-### Gmail Authentication
+### Google Skills Authentication (Gmail, Google Drive, Google Calendar)
 
-Gmail uses OAuth 2.0 for authentication. The recommended method is using gcloud CLI.
+Google skills use OAuth 2.0 for authentication. A single Google Cloud Platform (GCP) project can be shared across all Google skills.
 
-**Option 1: gcloud CLI (Recommended)**
+For complete setup instructions, see:
+1. [GCP Project Setup Guide](gcp-project-setup.md) - Create project, enable APIs, configure OAuth consent screen
+2. [Google OAuth Setup Guide](google-oauth-setup.md) - Configure credentials, authenticate, troubleshoot
 
-```bash
-# Install Google Cloud SDK if not already installed
-# See: https://cloud.google.com/sdk/docs/install
+**Quick Start:**
 
-# Authenticate with Application Default Credentials
-gcloud auth application-default login \
-  --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.modify,https://www.googleapis.com/auth/gmail.labels
+1. Set up a GCP project following the [GCP Project Setup Guide](gcp-project-setup.md)
+2. Create `~/.config/agent-skills/google.yaml` with your OAuth credentials:
+   ```yaml
+   oauth_client:
+     client_id: your-client-id.apps.googleusercontent.com
+     client_secret: your-client-secret
+   ```
+3. Verify with `python ~/.claude/skills/gmail/scripts/gmail.py check`
 
-# Verify authentication
-python ~/.claude/skills/gmail/scripts/gmail.py check
-```
-
-This provides zero-configuration authentication and automatic token refresh.
-
-**Option 2: Custom OAuth 2.0**
-
-If you cannot use gcloud CLI, you can set up custom OAuth 2.0 credentials. See [Gmail OAuth Setup Guide](../skills/gmail/references/oauth-setup.md) for detailed instructions.
-
-### Google Drive Authentication
-
-Google Drive uses OAuth 2.0 for authentication, similar to Gmail.
-
-**Option 1: gcloud CLI (Recommended)**
-
-```bash
-# Install Google Cloud SDK if not already installed
-# See: https://cloud.google.com/sdk/docs/install
-
-# Authenticate with Application Default Credentials
-gcloud auth application-default login \
-  --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/drive.file,https://www.googleapis.com/auth/drive.metadata.readonly
-
-# Verify authentication
-python ~/.claude/skills/google-drive/scripts/google-drive.py check
-```
-
-This provides zero-configuration authentication and automatic token refresh.
-
-**Option 2: Custom OAuth 2.0**
-
-If you cannot use gcloud CLI, you can set up custom OAuth 2.0 credentials. See [Google Drive OAuth Setup Guide](../skills/google-drive/references/oauth-setup.md) for detailed instructions.
-
-### Shared Google OAuth Credentials
-
-If you use multiple Google skills (Gmail, Google Drive, Google Calendar), you can share OAuth credentials instead of configuring each skill separately.
-
-**Option 1: Shared Config File**
-
-Create `~/.config/agent-skills/google.yaml`:
-
-```yaml
-oauth_client:
-  client_id: your-client-id.apps.googleusercontent.com
-  client_secret: your-client-secret
-```
-
-**Option 2: Shared Environment Variables**
-
-```bash
-export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export GOOGLE_CLIENT_SECRET="your-client-secret"
-```
-
-**Priority Order**
-
-OAuth credentials are resolved in this order:
-1. Service-specific config file (e.g., `gmail.yaml`, `google-drive.yaml`)
-2. Service-specific environment variables (e.g., `GMAIL_CLIENT_ID`)
-3. Shared config file (`google.yaml`)
-4. Shared environment variables (`GOOGLE_CLIENT_ID`)
-
-This allows you to use shared credentials for most skills while overriding for specific skills if needed.
-
-**Note**: OAuth tokens are still stored separately per skill, as each skill may request different scopes.
+On first run, your browser opens for OAuth authorization. After granting access, tokens are stored securely in your system keyring.
 
 ### Verify Authentication
 
@@ -421,15 +361,21 @@ python ~/.claude/skills/google-drive/scripts/google-drive.py files --help
 
 ### Documentation
 
+**Skill Documentation:**
 - **Jira**: See [skills/jira/SKILL.md](../skills/jira/SKILL.md)
 - **Confluence**: See [skills/confluence/SKILL.md](../skills/confluence/SKILL.md)
 - **Gmail**: See [skills/gmail/SKILL.md](../skills/gmail/SKILL.md)
 - **Google Drive**: See [skills/google-drive/SKILL.md](../skills/google-drive/SKILL.md)
+- **Google Calendar**: See [skills/google-calendar/SKILL.md](../skills/google-calendar/SKILL.md)
+
+**Setup Guides:**
+- **GCP Project Setup**: See [gcp-project-setup.md](gcp-project-setup.md) - Create GCP project for Google skills
+- **Google OAuth Setup**: See [google-oauth-setup.md](google-oauth-setup.md) - Configure OAuth for all Google skills
+
+**Reference Guides:**
 - **ScriptRunner (Jira)**: See [skills/jira/references/scriptrunner.md](../skills/jira/references/scriptrunner.md)
 - **Content Creation (Confluence)**: See [skills/confluence/references/creating-content.md](../skills/confluence/references/creating-content.md)
-- **Gmail OAuth Setup**: See [skills/gmail/references/oauth-setup.md](../skills/gmail/references/oauth-setup.md)
 - **Gmail Search Queries**: See [skills/gmail/references/gmail-queries.md](../skills/gmail/references/gmail-queries.md)
-- **Google Drive OAuth Setup**: See [skills/google-drive/references/oauth-setup.md](../skills/google-drive/references/oauth-setup.md)
 - **Google Drive Search Queries**: See [skills/google-drive/references/drive-queries.md](../skills/google-drive/references/drive-queries.md)
 
 ### Reporting Issues

@@ -21,11 +21,11 @@ This document tracks planned skills and features for the agent-skills repository
 
 ## Documentation Improvements
 
-- [ ] Document GCP project setup for Google OAuth skills
-  - Add section to user guide showing how to setup GCP project using gcloud CLI
-  - Cover: creating project, enabling APIs, creating OAuth credentials, setting redirect URIs
-  - Link from Gmail, Google Drive, and Google Calendar SKILL.md files
-  - Consolidate setup instructions in one place to follow DRY principle
+- [x] Document GCP project setup for Google OAuth skills
+  - ✅ Created [docs/gcp-project-setup.md](docs/gcp-project-setup.md) with complete CLI-based setup
+  - ✅ Covers: creating project, enabling APIs, billing options, OAuth consent screen, credentials
+  - ✅ Updated Gmail, Google Drive, and Google Calendar oauth-setup.md to reference the guide
+  - ✅ Updated user-guide.md with consolidated Google skills authentication section
 
 - [ ] Simplify Google skills authentication to OAuth-only
   - Remove gcloud CLI auth fallback from Gmail, Google Drive, Google Calendar skills

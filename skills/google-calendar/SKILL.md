@@ -77,7 +77,10 @@ If you encounter "insufficient scope" errors, the skill will provide clear instr
 
 ### Alternative: Custom OAuth 2.0
 
-If you cannot use gcloud CLI, you can set up custom OAuth 2.0 credentials. See [oauth-setup.md](references/oauth-setup.md) for detailed instructions.
+If you prefer not to use gcloud CLI, you can set up custom OAuth 2.0 credentials:
+
+1. **Set up a GCP project** - Follow the [GCP Project Setup Guide](../../docs/gcp-project-setup.md)
+2. **Configure OAuth credentials** - See the [Google OAuth Setup Guide](../../docs/google-oauth-setup.md)
 
 ### Shared Google OAuth Credentials
 
