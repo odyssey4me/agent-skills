@@ -34,6 +34,32 @@ This document tracks planned skills and features for the agent-skills repository
   - Update SKILL.md files to focus solely on OAuth flow
   - Remove gcloud-related code paths from skill scripts
 
+### Google Workspace
+
+- [ ] **google-docs** - Google Docs document management
+  - Create and modify Google Docs documents
+  - Read document content and structure
+  - Manage document formatting, paragraphs, and styles
+  - Uses Google Docs API (separate from Drive API)
+  - Share OAuth credentials with other Google skills
+  - Note: google-drive skill only handles file metadata, not document content
+
+- [ ] **google-sheets** - Google Sheets spreadsheet management
+  - Create and modify spreadsheets
+  - Read/write cell values and ranges
+  - Manage sheets, formatting, and formulas
+  - Uses Google Sheets API (separate from Drive API)
+  - Share OAuth credentials with other Google skills
+  - Note: google-drive skill only handles file metadata, not spreadsheet content
+
+- [ ] **google-slides** - Google Slides presentation management
+  - Create and modify presentations
+  - Manage slides, layouts, and content
+  - Add text, shapes, and images
+  - Uses Google Slides API (separate from Drive API)
+  - Share OAuth credentials with other Google skills
+  - Note: google-drive skill only handles file metadata, not presentation content
+
 ## Infrastructure Improvements
 
 - [ ] Consider migrating Jira skill to use official Atlassian CLI (ACLI)
