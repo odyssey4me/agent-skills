@@ -37,12 +37,11 @@ This document tracks planned skills and features for the agent-skills repository
 
 ### Phase 3: Code Hosting
 
-- [ ] **github** - GitHub operations
-  - Issues (create, update, search, close)
-  - Pull requests (create, review, merge)
-  - Repository operations
-  - Actions/workflows
-  - Releases
+- [x] **github** - GitHub operations (using official `gh` CLI)
+  - Documentation-only skill
+  - Leverages official GitHub CLI for all operations
+  - Issues, pull requests, workflows, repositories, search
+  - See skills/github/SKILL.md for quick reference
 
 - [ ] **gitlab** - GitLab operations
   - Issues
@@ -74,6 +73,12 @@ Note: Basic multi-agent support is complete via the Agent Skills specification. 
 - [ ] Add skill discovery/listing command
 - [ ] Add skill installation/update mechanism
 - [ ] Create comprehensive skill tests (test real API calls with mocking)
+- [ ] Consider migrating Jira skill to use official Atlassian CLI (ACLI)
+  - Official ACLI released May 2025 for Jira Cloud
+  - Covers issue management, JQL search, projects, transitions
+  - Would reduce maintenance burden (no custom API wrapper to maintain)
+  - Current custom script works well - no urgent need to migrate
+  - See: https://developer.atlassian.com/cloud/acli/guides/introduction/
 
 ## Completed
 
