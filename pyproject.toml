@@ -93,7 +93,6 @@ branch = true
 omit = [
     "*/__init__.py",
     "*/test_*.py",
-    "skills/confluence/*",  # TODO: Add Confluence tests
 ]
 
 [tool.coverage.report]
