@@ -827,7 +827,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "list_files")
     @patch("builtins.print")
-    def test_cmd_files_list_text(self, _mock_print, mock_list_files, _mock_build_service):
+    def test_cmd_files_list_text(self, _mock_print, mock_list_files, __mock_build_service):
         """Test files list command with text output."""
         mock_list_files.return_value = [
             {"id": "file1", "name": "Test.pdf", "mimeType": "application/pdf"}
@@ -846,7 +846,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "list_files")
     @patch("builtins.print")
-    def test_cmd_files_list_json(self, _mock_print, mock_list_files, _mock_build_service):
+    def test_cmd_files_list_json(self, _mock_print, mock_list_files, __mock_build_service):
         """Test files list command with JSON output."""
         mock_list_files.return_value = [{"id": "file1"}]
 
@@ -863,7 +863,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "list_files")
     @patch("builtins.print")
-    def test_cmd_files_list_empty(self, _mock_print, mock_list_files, _mock_build_service):
+    def test_cmd_files_list_empty(self, _mock_print, mock_list_files, __mock_build_service):
         """Test files list command with no files."""
         mock_list_files.return_value = []
 
@@ -880,7 +880,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "search_files")
     @patch("builtins.print")
-    def test_cmd_files_search(self, _mock_print, mock_search_files, _mock_build_service):
+    def test_cmd_files_search(self, _mock_print, mock_search_files, __mock_build_service):
         """Test files search command."""
         mock_search_files.return_value = [{"id": "file1", "name": "Report.pdf"}]
 
@@ -897,7 +897,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "get_file_metadata")
     @patch("builtins.print")
-    def test_cmd_files_get(self, _mock_print, mock_get_file, _mock_build_service):
+    def test_cmd_files_get(self, _mock_print, mock_get_file, __mock_build_service):
         """Test files get command."""
         mock_get_file.return_value = {"id": "file123", "name": "Test.pdf"}
 
@@ -914,7 +914,7 @@ class TestCLICommands:
     @patch.object(google_drive, "download_file")
     @patch("builtins.print")
     def test_cmd_files_download(
-        self, _mock_print, mock_download, mock_get_file, _mock_build_service
+        self, _mock_print, mock_download, mock_get_file, __mock_build_service
     ):
         """Test files download command."""
         mock_get_file.return_value = {
@@ -935,7 +935,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "get_file_metadata")
     @patch("builtins.print")
-    def test_cmd_files_download_google_doc(self, _mock_print, mock_get_file, _mock_build_service):
+    def test_cmd_files_download_google_doc(self, _mock_print, mock_get_file, __mock_build_service):
         """Test files download command fails for Google Docs."""
         mock_get_file.return_value = {
             "id": "file123",
@@ -954,7 +954,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "upload_file")
     @patch("builtins.print")
-    def test_cmd_files_upload(self, _mock_print, mock_upload, _mock_build_service):
+    def test_cmd_files_upload(self, _mock_print, mock_upload, __mock_build_service):
         """Test files upload command."""
         mock_upload.return_value = {
             "id": "newfile123",
@@ -976,7 +976,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "create_folder")
     @patch("builtins.print")
-    def test_cmd_folders_create(self, _mock_print, mock_create_folder, _mock_build_service):
+    def test_cmd_folders_create(self, _mock_print, mock_create_folder, __mock_build_service):
         """Test folders create command."""
         mock_create_folder.return_value = {
             "id": "folder123",
@@ -996,7 +996,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "list_folder_contents")
     @patch("builtins.print")
-    def test_cmd_folders_list(self, _mock_print, mock_list_folder, _mock_build_service):
+    def test_cmd_folders_list(self, _mock_print, mock_list_folder, __mock_build_service):
         """Test folders list command."""
         mock_list_folder.return_value = [{"id": "file1", "name": "Doc.pdf"}]
 
@@ -1012,7 +1012,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "share_file")
     @patch("builtins.print")
-    def test_cmd_share(self, _mock_print, mock_share, _mock_build_service):
+    def test_cmd_share(self, _mock_print, mock_share, __mock_build_service):
         """Test share command."""
         mock_share.return_value = {
             "emailAddress": "user@example.com",
@@ -1033,7 +1033,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "list_permissions")
     @patch("builtins.print")
-    def test_cmd_permissions_list(self, _mock_print, mock_list_perms, _mock_build_service):
+    def test_cmd_permissions_list(self, _mock_print, mock_list_perms, __mock_build_service):
         """Test permissions list command."""
         mock_list_perms.return_value = [{"id": "perm1", "role": "owner"}]
 
@@ -1048,7 +1048,7 @@ class TestCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "delete_permission")
     @patch("builtins.print")
-    def test_cmd_permissions_delete(self, _mock_print, mock_delete_perm, _mock_build_service):
+    def test_cmd_permissions_delete(self, _mock_print, mock_delete_perm, __mock_build_service):
         """Test permissions delete command."""
         args = Mock()
         args.file_id = "file123"
@@ -1256,7 +1256,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "search_files")
     @patch("builtins.print")
-    def test_cmd_files_search_json(self, _mock_print, mock_search, _mock_build_service):
+    def test_cmd_files_search_json(self, _mock_print, mock_search, __mock_build_service):
         """Test files search command with JSON output."""
         mock_search.return_value = []
 
@@ -1273,7 +1273,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "get_file_metadata")
     @patch("builtins.print")
-    def test_cmd_files_get_json(self, _mock_print, mock_get_file, _mock_build_service):
+    def test_cmd_files_get_json(self, _mock_print, mock_get_file, __mock_build_service):
         """Test files get command with JSON output."""
         mock_get_file.return_value = {"id": "file123"}
 
@@ -1288,7 +1288,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "upload_file")
     @patch("builtins.print")
-    def test_cmd_files_upload_json(self, _mock_print, mock_upload, _mock_build_service):
+    def test_cmd_files_upload_json(self, _mock_print, mock_upload, __mock_build_service):
         """Test files upload command with JSON output."""
         mock_upload.return_value = {"id": "newfile123"}
 
@@ -1306,7 +1306,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "create_folder")
     @patch("builtins.print")
-    def test_cmd_folders_create_json(self, _mock_print, mock_create, _mock_build_service):
+    def test_cmd_folders_create_json(self, _mock_print, mock_create, __mock_build_service):
         """Test folders create command with JSON output."""
         mock_create.return_value = {"id": "folder123"}
 
@@ -1322,7 +1322,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "list_folder_contents")
     @patch("builtins.print")
-    def test_cmd_folders_list_json(self, _mock_print, mock_list, _mock_build_service):
+    def test_cmd_folders_list_json(self, _mock_print, mock_list, __mock_build_service):
         """Test folders list command with JSON output."""
         mock_list.return_value = []
 
@@ -1338,7 +1338,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "list_folder_contents")
     @patch("builtins.print")
-    def test_cmd_folders_list_empty(self, _mock_print, mock_list, _mock_build_service):
+    def test_cmd_folders_list_empty(self, _mock_print, mock_list, __mock_build_service):
         """Test folders list command with empty folder."""
         mock_list.return_value = []
 
@@ -1354,7 +1354,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "share_file")
     @patch("builtins.print")
-    def test_cmd_share_json(self, _mock_print, mock_share, _mock_build_service):
+    def test_cmd_share_json(self, _mock_print, mock_share, __mock_build_service):
         """Test share command with JSON output."""
         mock_share.return_value = {"id": "perm123"}
 
@@ -1372,7 +1372,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "list_permissions")
     @patch("builtins.print")
-    def test_cmd_permissions_list_json(self, _mock_print, mock_list, _mock_build_service):
+    def test_cmd_permissions_list_json(self, _mock_print, mock_list, __mock_build_service):
         """Test permissions list command with JSON output."""
         mock_list.return_value = []
 
@@ -1387,7 +1387,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "list_permissions")
     @patch("builtins.print")
-    def test_cmd_permissions_list_empty(self, _mock_print, mock_list, _mock_build_service):
+    def test_cmd_permissions_list_empty(self, _mock_print, mock_list, __mock_build_service):
         """Test permissions list command with no permissions."""
         mock_list.return_value = []
 
@@ -1402,7 +1402,7 @@ class TestAdditionalCLICommands:
     @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "search_files")
     @patch("builtins.print")
-    def test_cmd_files_search_empty(self, _mock_print, mock_search, _mock_build_service):
+    def test_cmd_files_search_empty(self, _mock_print, mock_search, __mock_build_service):
         """Test files search command with no results."""
         mock_search.return_value = []
 

@@ -125,6 +125,27 @@ Each skill requests specific scopes. When you authenticate with a skill for the 
 | `calendar.readonly` | Read calendar events | Listing and viewing events, calendars, and availability |
 | `calendar.events` | Manage events | Creating, updating, and deleting events |
 
+### Google Docs Scopes
+
+| Scope | Permission | Used For |
+|-------|-----------|----------|
+| `documents.readonly` | Read documents | Reading document content and metadata |
+| `documents` | Manage documents | Creating, editing, and deleting documents |
+
+### Google Sheets Scopes
+
+| Scope | Permission | Used For |
+|-------|-----------|----------|
+| `spreadsheets.readonly` | Read spreadsheets | Reading cell values and metadata |
+| `spreadsheets` | Manage spreadsheets | Creating, editing spreadsheets, and managing sheets |
+
+### Google Slides Scopes
+
+| Scope | Permission | Used For |
+|-------|-----------|----------|
+| `presentations.readonly` | Read presentations | Reading presentation content and metadata |
+| `presentations` | Manage presentations | Creating, editing, and managing slides |
+
 **Note**: OAuth tokens are stored separately per skill, as each skill requests different scopes.
 
 ## Security Best Practices

@@ -51,8 +51,13 @@ npx add-skill odyssey4me/agent-skills --skill confluence
 # Install Gmail skill
 npx add-skill odyssey4me/agent-skills --skill gmail
 
+# Install Google Workspace skills
+npx add-skill odyssey4me/agent-skills --skill google-docs
+npx add-skill odyssey4me/agent-skills --skill google-sheets
+npx add-skill odyssey4me/agent-skills --skill google-slides
+
 # Install multiple skills
-npx add-skill odyssey4me/agent-skills --skill jira --skill confluence --skill gmail
+npx add-skill odyssey4me/agent-skills --skill jira --skill confluence --skill gmail --skill google-docs
 ```
 
 This will:
@@ -158,7 +163,7 @@ email: you@example.com
 token: your-token
 ```
 
-### Google Skills Authentication (Gmail, Google Drive, Google Calendar)
+### Google Skills Authentication (Gmail, Google Drive, Google Calendar, Google Docs, Google Sheets, Google Slides)
 
 Google skills use OAuth 2.0 for authentication. A single Google Cloud Platform (GCP) project can be shared across all Google skills.
 

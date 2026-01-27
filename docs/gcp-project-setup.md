@@ -114,17 +114,23 @@ Enable the APIs for the Google skills you plan to use:
 gcloud services enable \
   gmail.googleapis.com \
   drive.googleapis.com \
-  calendar-json.googleapis.com
+  calendar-json.googleapis.com \
+  docs.googleapis.com \
+  sheets.googleapis.com \
+  slides.googleapis.com
 
 # Or enable individually
 gcloud services enable gmail.googleapis.com      # For Gmail skill
 gcloud services enable drive.googleapis.com      # For Google Drive skill
 gcloud services enable calendar-json.googleapis.com  # For Google Calendar skill
+gcloud services enable docs.googleapis.com       # For Google Docs skill
+gcloud services enable sheets.googleapis.com     # For Google Sheets skill
+gcloud services enable slides.googleapis.com     # For Google Slides skill
 ```
 
 Verify APIs are enabled:
 ```bash
-gcloud services list --enabled --filter="name:(gmail OR drive OR calendar)"
+gcloud services list --enabled --filter="name:(gmail OR drive OR calendar OR docs OR sheets OR slides)"
 ```
 
 ## Step 4: Configure OAuth Consent Screen
@@ -329,7 +335,7 @@ gcloud billing accounts list
 gcloud services list --enabled
 
 # Enable missing APIs
-gcloud services enable gmail.googleapis.com drive.googleapis.com calendar-json.googleapis.com
+gcloud services enable gmail.googleapis.com drive.googleapis.com calendar-json.googleapis.com docs.googleapis.com sheets.googleapis.com slides.googleapis.com
 ```
 
 ### "Access blocked: This app's request is invalid"
@@ -366,6 +372,9 @@ gcloud services enable gmail.googleapis.com drive.googleapis.com calendar-json.g
 | Enable Gmail API | `gcloud services enable gmail.googleapis.com` |
 | Enable Drive API | `gcloud services enable drive.googleapis.com` |
 | Enable Calendar API | `gcloud services enable calendar-json.googleapis.com` |
+| Enable Docs API | `gcloud services enable docs.googleapis.com` |
+| Enable Sheets API | `gcloud services enable sheets.googleapis.com` |
+| Enable Slides API | `gcloud services enable slides.googleapis.com` |
 | List enabled APIs | `gcloud services list --enabled` |
 | View billing accounts | `gcloud billing accounts list` |
 | Link billing | `gcloud billing projects link PROJECT --billing-account=ID` |

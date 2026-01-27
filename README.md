@@ -1,6 +1,6 @@
 # Agent Skills
 
-Portable skills for AI coding assistants providing integrations with Jira, Confluence, Gmail, GitHub, GitLab, Gerrit, and other development tools.
+Portable skills for AI coding assistants providing integrations with Jira, Confluence, Gmail, Google Workspace (Docs, Sheets, Slides), GitHub, GitLab, Gerrit, and other development tools.
 
 ## Features
 
@@ -26,6 +26,9 @@ npx add-skill odyssey4me/agent-skills --skill confluence
 npx add-skill odyssey4me/agent-skills --skill gmail
 npx add-skill odyssey4me/agent-skills --skill google-drive
 npx add-skill odyssey4me/agent-skills --skill google-calendar
+npx add-skill odyssey4me/agent-skills --skill google-docs
+npx add-skill odyssey4me/agent-skills --skill google-sheets
+npx add-skill odyssey4me/agent-skills --skill google-slides
 npx add-skill odyssey4me/agent-skills --skill github
 npx add-skill odyssey4me/agent-skills --skill gitlab
 npx add-skill odyssey4me/agent-skills --skill gerrit
@@ -64,6 +67,9 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 | [Gmail](skills/gmail/SKILL.md) | Email management, send/receive messages, drafts, labels |
 | [Google Drive](skills/google-drive/SKILL.md) | File management, list/search/upload/download files, folder management, sharing |
 | [Google Calendar](skills/google-calendar/SKILL.md) | Calendar management, event CRUD, availability checking, scheduling |
+| [Google Docs](skills/google-docs/SKILL.md) | Document creation and editing, content management, formatting |
+| [Google Sheets](skills/google-sheets/SKILL.md) | Spreadsheet management, cell values, formulas, sheets |
+| [Google Slides](skills/google-slides/SKILL.md) | Presentation creation, slides, shapes, images, layouts |
 | [GitHub](skills/github/SKILL.md) | Issues, pull requests, workflows, and repositories via `gh` CLI |
 | [GitLab](skills/gitlab/SKILL.md) | Issues, merge requests, pipelines, and repositories via `glab` CLI |
 | [Gerrit](skills/gerrit/SKILL.md) | Code review, submit changes, download patches via `git-review` CLI |
