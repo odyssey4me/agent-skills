@@ -22,6 +22,8 @@ spec.loader.exec_module(google_sheets)
 # Now import from the loaded module
 AuthenticationError = google_sheets.AuthenticationError
 SheetsAPIError = google_sheets.SheetsAPIError
+SHEETS_SCOPES = google_sheets.SHEETS_SCOPES
+SHEETS_SCOPES_DEFAULT = google_sheets.SHEETS_SCOPES_DEFAULT
 append_values = google_sheets.append_values
 build_parser = google_sheets.build_parser
 build_sheets_service = google_sheets.build_sheets_service
@@ -768,3 +770,186 @@ class TestArgumentParser:
         parser = build_parser()
         args = parser.parse_args(["spreadsheets", "get", "ss-123", "--json"])
         assert args.json is True
+
+
+# ============================================================================
+# AUTHENTICATION FLOW TESTS
+# ============================================================================
+
+
+class TestAuthenticationFlow:
+    """Tests for authentication flow edge cases."""
+
+    @patch("google_sheets.InstalledAppFlow")
+    @patch("google_sheets.get_oauth_client_config")
+    @patch("google_sheets.set_credential")
+    @patch("google_sheets.get_credential")
+    def test_get_google_credentials_oauth_flow(
+        self, mock_get_cred, mock_set_cred, mock_get_config, mock_flow_class
+    ):
+        """Test OAuth flow when no token exists."""
+        mock_get_cred.return_value = None
+        mock_config = {"installed": {"client_id": "id", "client_secret": "secret"}}
+        mock_get_config.return_value = mock_config
+
+        mock_flow_instance = Mock()
+        mock_flow_class.from_client_config.return_value = mock_flow_instance
+        mock_creds = Mock()
+        mock_creds.to_json.return_value = '{"token": "new"}'
+        mock_flow_instance.run_local_server.return_value = mock_creds
+
+        result = get_google_credentials("google-sheets", ["https://scope"])
+
+        assert result == mock_creds
+        mock_set_cred.assert_called_once_with("google-sheets-token-json", '{"token": "new"}')
+
+    @patch("google_sheets.Request")
+    @patch("google_sheets.Credentials")
+    @patch("google_sheets.set_credential")
+    @patch("google_sheets.get_credential")
+    def test_get_google_credentials_refresh_token(
+        self, mock_get_cred, mock_set_cred, mock_creds_class, _mock_request_class
+    ):
+        """Test token refresh when expired."""
+        token_json = '{"token": "expired", "refresh_token": "refresh"}'
+        mock_get_cred.return_value = token_json
+
+        mock_creds = Mock()
+        mock_creds.valid = False
+        mock_creds.expired = True
+        mock_creds.refresh_token = "refresh"
+        mock_creds.to_json.return_value = '{"token": "refreshed"}'
+        mock_creds_class.from_authorized_user_info.return_value = mock_creds
+
+        result = get_google_credentials("google-sheets", ["https://scope"])
+
+        mock_creds.refresh.assert_called_once()
+        mock_set_cred.assert_called_once_with("google-sheets-token-json", '{"token": "refreshed"}')
+        assert result == mock_creds
+
+    @patch("google_sheets.InstalledAppFlow")
+    @patch("google_sheets.get_oauth_client_config")
+    @patch("google_sheets.Credentials")
+    @patch("google_sheets.get_credential")
+    def test_get_google_credentials_corrupted_token(
+        self, mock_get_cred, mock_creds_class, mock_get_config, _mock_flow_class
+    ):
+        """Test handling of corrupted token."""
+        mock_get_cred.return_value = "invalid json"
+        mock_creds_class.from_authorized_user_info.side_effect = Exception("Parse error")
+        mock_get_config.side_effect = AuthenticationError("No credentials")
+
+        with pytest.raises(AuthenticationError):
+            get_google_credentials("google-sheets", ["https://scope"])
+
+    @patch("google_sheets.InstalledAppFlow")
+    @patch("google_sheets.get_oauth_client_config")
+    @patch("google_sheets.get_credential")
+    def test_get_google_credentials_oauth_flow_failure(
+        self, mock_get_cred, mock_get_config, mock_flow_class
+    ):
+        """Test OAuth flow failure."""
+        mock_get_cred.return_value = None
+        mock_config = {"installed": {"client_id": "id", "client_secret": "secret"}}
+        mock_get_config.return_value = mock_config
+
+        mock_flow_instance = Mock()
+        mock_flow_class.from_client_config.return_value = mock_flow_instance
+        mock_flow_instance.run_local_server.side_effect = Exception("Flow failed")
+
+        with pytest.raises(AuthenticationError, match="OAuth flow failed"):
+            get_google_credentials("google-sheets", ["https://scope"])
+
+
+# ============================================================================
+# API ERROR HANDLING TESTS
+# ============================================================================
+
+
+class TestAPIErrorHandling:
+    """Tests for API error handling."""
+
+    def test_handle_api_error_basic(self):
+        """Test basic API error handling."""
+        from googleapiclient.errors import HttpError
+
+        error = Mock(spec=HttpError)
+        error.resp = Mock()
+        error.resp.status = 404
+        error.resp.reason = "Not found"
+        error.content = b'{"error": {"message": "Spreadsheet not found"}}'
+
+        with pytest.raises(SheetsAPIError, match="Spreadsheet not found.*404"):
+            handle_api_error(error)
+
+    def test_handle_api_error_insufficient_scope(self):
+        """Test insufficient scope error with helpful message."""
+        from googleapiclient.errors import HttpError
+
+        error = Mock(spec=HttpError)
+        error.resp = Mock()
+        error.resp.status = 403
+        error.resp.reason = "Forbidden"
+        error.content = b'{"error": {"message": "Insufficient permissions"}}'
+
+        with pytest.raises(SheetsAPIError, match="Insufficient OAuth scope"):
+            handle_api_error(error)
+
+    def test_handle_api_error_malformed_response(self):
+        """Test error with malformed JSON response."""
+        from googleapiclient.errors import HttpError
+
+        error = Mock(spec=HttpError)
+        error.resp = Mock()
+        error.resp.status = 500
+        error.resp.reason = "Internal Server Error"
+        error.content = b"not json"
+
+        with pytest.raises(SheetsAPIError, match="Internal Server Error.*500"):
+            handle_api_error(error)
+
+    def test_sheets_api_error_attributes(self):
+        """Test SheetsAPIError attributes."""
+        error = SheetsAPIError("Test error", status_code=404, details={"key": "value"})
+        assert str(error) == "Test error"
+        assert error.status_code == 404
+        assert error.details == {"key": "value"}
+
+
+# ============================================================================
+# BUILD SERVICE TESTS
+# ============================================================================
+
+
+class TestBuildService:
+    """Tests for build_sheets_service function."""
+
+    @patch("google_sheets.get_google_credentials")
+    @patch("google_sheets.build")
+    def test_build_sheets_service_default_scopes(self, mock_build, mock_get_creds):
+        """Test building service with default scopes."""
+        mock_creds = Mock()
+        mock_get_creds.return_value = mock_creds
+        mock_service = Mock()
+        mock_build.return_value = mock_service
+
+        result = build_sheets_service()
+
+        mock_get_creds.assert_called_once_with("google-sheets", SHEETS_SCOPES_DEFAULT)
+        mock_build.assert_called_once_with("sheets", "v4", credentials=mock_creds)
+        assert result == mock_service
+
+    @patch("google_sheets.get_google_credentials")
+    @patch("google_sheets.build")
+    def test_build_sheets_service_custom_scopes(self, mock_build, mock_get_creds):
+        """Test building service with custom scopes."""
+        mock_creds = Mock()
+        mock_get_creds.return_value = mock_creds
+        mock_service = Mock()
+        mock_build.return_value = mock_service
+
+        custom_scopes = ["https://custom.scope"]
+        result = build_sheets_service(custom_scopes)
+
+        mock_get_creds.assert_called_once_with("google-sheets", custom_scopes)
+        assert result == mock_service

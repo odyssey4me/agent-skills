@@ -22,6 +22,8 @@ spec.loader.exec_module(google_docs)
 # Now import from the loaded module
 AuthenticationError = google_docs.AuthenticationError
 DocsAPIError = google_docs.DocsAPIError
+DOCS_SCOPES = google_docs.DOCS_SCOPES
+DOCS_SCOPES_DEFAULT = google_docs.DOCS_SCOPES_DEFAULT
 apply_formatting = google_docs.apply_formatting
 append_text = google_docs.append_text
 build_docs_service = google_docs.build_docs_service
@@ -533,3 +535,259 @@ class TestArgumentParser:
         assert args.bold is True
         assert args.italic is True
         assert args.font_size == 14
+
+
+# ============================================================================
+# AUTHENTICATION FLOW TESTS
+# ============================================================================
+
+
+class TestAuthenticationFlow:
+    """Tests for authentication flow edge cases."""
+
+    @patch("google_docs.InstalledAppFlow")
+    @patch("google_docs.get_oauth_client_config")
+    @patch("google_docs.set_credential")
+    @patch("google_docs.get_credential")
+    def test_get_google_credentials_oauth_flow(
+        self, mock_get_cred, mock_set_cred, mock_get_config, mock_flow_class
+    ):
+        """Test OAuth flow when no token exists."""
+        mock_get_cred.return_value = None
+        mock_config = {"installed": {"client_id": "id", "client_secret": "secret"}}
+        mock_get_config.return_value = mock_config
+
+        mock_flow_instance = Mock()
+        mock_flow_class.from_client_config.return_value = mock_flow_instance
+        mock_creds = Mock()
+        mock_creds.to_json.return_value = '{"token": "new"}'
+        mock_flow_instance.run_local_server.return_value = mock_creds
+
+        result = get_google_credentials("google-docs", ["https://scope"])
+
+        assert result == mock_creds
+        mock_set_cred.assert_called_once_with("google-docs-token-json", '{"token": "new"}')
+
+    @patch("google_docs.Request")
+    @patch("google_docs.Credentials")
+    @patch("google_docs.set_credential")
+    @patch("google_docs.get_credential")
+    def test_get_google_credentials_refresh_token(
+        self, mock_get_cred, mock_set_cred, mock_creds_class, _mock_request_class
+    ):
+        """Test token refresh when expired."""
+        token_json = '{"token": "expired", "refresh_token": "refresh"}'
+        mock_get_cred.return_value = token_json
+
+        mock_creds = Mock()
+        mock_creds.valid = False
+        mock_creds.expired = True
+        mock_creds.refresh_token = "refresh"
+        mock_creds.to_json.return_value = '{"token": "refreshed"}'
+        mock_creds_class.from_authorized_user_info.return_value = mock_creds
+
+        result = get_google_credentials("google-docs", ["https://scope"])
+
+        mock_creds.refresh.assert_called_once()
+        mock_set_cred.assert_called_once_with("google-docs-token-json", '{"token": "refreshed"}')
+        assert result == mock_creds
+
+    @patch("google_docs.InstalledAppFlow")
+    @patch("google_docs.get_oauth_client_config")
+    @patch("google_docs.Credentials")
+    @patch("google_docs.get_credential")
+    def test_get_google_credentials_corrupted_token(
+        self, mock_get_cred, mock_creds_class, mock_get_config, _mock_flow_class
+    ):
+        """Test handling of corrupted token."""
+        mock_get_cred.return_value = "invalid json"
+        mock_creds_class.from_authorized_user_info.side_effect = Exception("Parse error")
+
+        # Mock OAuth flow to raise error
+        mock_get_config.side_effect = AuthenticationError("No credentials")
+
+        # Should fall through to OAuth flow, which will fail
+        with pytest.raises(AuthenticationError):
+            get_google_credentials("google-docs", ["https://scope"])
+
+    @patch("google_docs.InstalledAppFlow")
+    @patch("google_docs.get_oauth_client_config")
+    @patch("google_docs.get_credential")
+    def test_get_google_credentials_oauth_flow_failure(
+        self, mock_get_cred, mock_get_config, mock_flow_class
+    ):
+        """Test OAuth flow failure."""
+        mock_get_cred.return_value = None
+        mock_config = {"installed": {"client_id": "id", "client_secret": "secret"}}
+        mock_get_config.return_value = mock_config
+
+        mock_flow_instance = Mock()
+        mock_flow_class.from_client_config.return_value = mock_flow_instance
+        mock_flow_instance.run_local_server.side_effect = Exception("Flow failed")
+
+        with pytest.raises(AuthenticationError, match="OAuth flow failed"):
+            get_google_credentials("google-docs", ["https://scope"])
+
+
+# ============================================================================
+# API ERROR HANDLING TESTS
+# ============================================================================
+
+
+class TestAPIErrorHandling:
+    """Tests for API error handling."""
+
+    def test_handle_api_error_basic(self):
+        """Test basic API error handling."""
+        from googleapiclient.errors import HttpError
+
+        error = Mock(spec=HttpError)
+        error.resp = Mock()
+        error.resp.status = 404
+        error.resp.reason = "Not found"
+        error.content = b'{"error": {"message": "Document not found"}}'
+
+        with pytest.raises(DocsAPIError, match="Document not found.*404"):
+            handle_api_error(error)
+
+    def test_handle_api_error_insufficient_scope(self):
+        """Test insufficient scope error with helpful message."""
+        from googleapiclient.errors import HttpError
+
+        error = Mock(spec=HttpError)
+        error.resp = Mock()
+        error.resp.status = 403
+        error.resp.reason = "Forbidden"
+        error.content = b'{"error": {"message": "Insufficient permissions"}}'
+
+        with pytest.raises(DocsAPIError, match="Insufficient OAuth scope"):
+            handle_api_error(error)
+
+    def test_handle_api_error_malformed_response(self):
+        """Test error with malformed JSON response."""
+        from googleapiclient.errors import HttpError
+
+        error = Mock(spec=HttpError)
+        error.resp = Mock()
+        error.resp.status = 500
+        error.resp.reason = "Internal Server Error"
+        error.content = b"not json"
+
+        with pytest.raises(DocsAPIError, match="Internal Server Error.*500"):
+            handle_api_error(error)
+
+    def test_docs_api_error_attributes(self):
+        """Test DocsAPIError attributes."""
+        error = DocsAPIError("Test error", status_code=404, details={"key": "value"})
+        assert str(error) == "Test error"
+        assert error.status_code == 404
+        assert error.details == {"key": "value"}
+
+
+# ============================================================================
+# COMMAND HANDLER TESTS (CONTENT AND FORMATTING)
+# ============================================================================
+
+
+class TestContentCommands:
+    """Tests for content manipulation commands."""
+
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.append_text")
+    def test_cmd_content_append(self, mock_append, _mock_build_service, capsys):
+        """Test content append command."""
+        mock_append.return_value = {}
+
+        args = Mock(document_id="doc-123", text="New paragraph", json=False)
+        result = cmd_content_append(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Text appended successfully" in captured.out
+
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.insert_text")
+    def test_cmd_content_insert(self, mock_insert, _mock_build_service, capsys):
+        """Test content insert command."""
+        mock_insert.return_value = {}
+
+        args = Mock(document_id="doc-123", text="Inserted text", index=10, json=False)
+        result = cmd_content_insert(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Text inserted successfully" in captured.out
+
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.delete_content")
+    def test_cmd_content_delete(self, mock_delete, _mock_build_service, capsys):
+        """Test content delete command."""
+        mock_delete.return_value = {}
+
+        args = Mock(document_id="doc-123", start_index=10, end_index=20, json=False)
+        result = cmd_content_delete(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Content deleted successfully" in captured.out
+
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.apply_formatting")
+    def test_cmd_formatting_apply(self, mock_format, _mock_build_service, capsys):
+        """Test formatting apply command."""
+        mock_format.return_value = {}
+
+        args = Mock(
+            document_id="doc-123",
+            start_index=1,
+            end_index=10,
+            bold=True,
+            italic=True,
+            underline=False,
+            font_size=14,
+            json=False,
+        )
+        result = cmd_formatting_apply(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Formatting applied successfully" in captured.out
+
+
+# ============================================================================
+# BUILD SERVICE TESTS
+# ============================================================================
+
+
+class TestBuildService:
+    """Tests for build_docs_service function."""
+
+    @patch("google_docs.get_google_credentials")
+    @patch("google_docs.build")
+    def test_build_docs_service_default_scopes(self, mock_build, mock_get_creds):
+        """Test building service with default scopes."""
+        mock_creds = Mock()
+        mock_get_creds.return_value = mock_creds
+        mock_service = Mock()
+        mock_build.return_value = mock_service
+
+        result = build_docs_service()
+
+        mock_get_creds.assert_called_once_with("google-docs", DOCS_SCOPES_DEFAULT)
+        mock_build.assert_called_once_with("docs", "v1", credentials=mock_creds)
+        assert result == mock_service
+
+    @patch("google_docs.get_google_credentials")
+    @patch("google_docs.build")
+    def test_build_docs_service_custom_scopes(self, mock_build, mock_get_creds):
+        """Test building service with custom scopes."""
+        mock_creds = Mock()
+        mock_get_creds.return_value = mock_creds
+        mock_service = Mock()
+        mock_build.return_value = mock_service
+
+        custom_scopes = ["https://custom.scope"]
+        result = build_docs_service(custom_scopes)
+
+        mock_get_creds.assert_called_once_with("google-docs", custom_scopes)
+        assert result == mock_service
