@@ -1109,16 +1109,20 @@ def search_issues(
 # ============================================================================
 
 
-def get_issue(issue_key: str) -> dict[str, Any]:
+def get_issue(issue_key: str, fields: list[str] | None = None) -> dict[str, Any]:
     """Get an issue by key.
 
     Args:
         issue_key: The issue key (e.g., DEMO-123).
+        fields: Optional list of fields to include in the response.
 
     Returns:
         Issue dictionary.
     """
-    response = get("jira", api_path(f"issue/{issue_key}"))
+    params = {}
+    if fields:
+        params["fields"] = ",".join(fields)
+    response = get("jira", api_path(f"issue/{issue_key}"), params=params if params else None)
     if isinstance(response, dict):
         return response
     return {}
@@ -1309,6 +1313,56 @@ def do_transition(
 
 
 # ============================================================================
+# METADATA DISCOVERY
+# ============================================================================
+
+
+def list_fields(project_key: str | None = None, issue_type: str | None = None) -> list[dict]:
+    """List available fields.
+
+    If project and issue_type provided, returns fields specific to that context.
+    Otherwise returns all global fields.
+
+    Args:
+        project_key: Optional project key for context-specific fields.
+        issue_type: Optional issue type name (requires project_key).
+
+    Returns:
+        List of field dictionaries.
+    """
+    if project_key and issue_type:
+        # Get project/issue-type specific fields via createmeta
+        response = get("jira", api_path(f"issue/createmeta/{project_key}/issuetypes/{issue_type}"))
+        if isinstance(response, dict):
+            return response.get("values", [])
+        return []
+    else:
+        # Get all global fields
+        response = get("jira", api_path("field"))
+        return response if isinstance(response, list) else []
+
+
+def list_statuses() -> list[dict]:
+    """List all available statuses.
+
+    Returns:
+        List of status dictionaries.
+    """
+    response = get("jira", api_path("status"))
+    return response if isinstance(response, list) else []
+
+
+def list_status_categories() -> list[dict]:
+    """List status categories (To Do, In Progress, Done).
+
+    Returns:
+        List of status category dictionaries.
+    """
+    response = get("jira", api_path("statuscategory"))
+    return response if isinstance(response, list) else []
+
+
+# ============================================================================
 # CHECK COMMAND - Validates configuration and connectivity
 # ============================================================================
 
@@ -1466,7 +1520,15 @@ def cmd_issue(args: argparse.Namespace) -> int:
     """Handle issue command."""
     try:
         if args.issue_command == "get":
-            issue = get_issue(args.issue_key)
+            # Load defaults and apply fields
+            defaults = get_jira_defaults()
+            if args.fields:
+                fields = args.fields.split(",")
+            elif defaults.fields:
+                fields = defaults.fields
+            else:
+                fields = None
+            issue = get_issue(args.issue_key, fields=fields)
             if args.json:
                 print(format_json(issue))
             else:
@@ -1623,6 +1685,84 @@ def cmd_config(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_fields(args: argparse.Namespace) -> int:
+    """Handle fields command."""
+    try:
+        fields = list_fields(args.project, args.issue_type)
+        if args.json:
+            print(format_json(fields))
+        else:
+            rows = [
+                {
+                    "id": f.get("id", f.get("fieldId", "N/A")),
+                    "name": f.get("name", "N/A"),
+                    "custom": "Yes" if f.get("custom") else "No",
+                }
+                for f in fields
+            ]
+            print(
+                format_table(
+                    rows,
+                    ["id", "name", "custom"],
+                    headers={"id": "ID", "name": "Name", "custom": "Custom"},
+                )
+            )
+        return 0
+
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_statuses(args: argparse.Namespace) -> int:
+    """Handle statuses command."""
+    try:
+        if args.categories:
+            categories = list_status_categories()
+            if args.json:
+                print(format_json(categories))
+            else:
+                rows = [
+                    {
+                        "key": c.get("key", "N/A"),
+                        "name": c.get("name", "N/A"),
+                        "color": c.get("colorName", "N/A"),
+                    }
+                    for c in categories
+                ]
+                print(
+                    format_table(
+                        rows,
+                        ["key", "name", "color"],
+                        headers={"key": "Key", "name": "Name", "color": "Color"},
+                    )
+                )
+        else:
+            statuses = list_statuses()
+            if args.json:
+                print(format_json(statuses))
+            else:
+                rows = [
+                    {
+                        "name": s.get("name", "N/A"),
+                        "category": s.get("statusCategory", {}).get("name", "Unknown"),
+                    }
+                    for s in statuses
+                ]
+                print(
+                    format_table(
+                        rows,
+                        ["name", "category"],
+                        headers={"name": "Status", "category": "Category"},
+                    )
+                )
+        return 0
+
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
 # ============================================================================
 # MAIN CLI
 # ============================================================================
@@ -1680,6 +1820,10 @@ def main() -> int:
     # Get subcommand
     get_parser = issue_subparsers.add_parser("get", help="Get issue details")
     get_parser.add_argument("issue_key", help="Issue key (e.g., DEMO-123)")
+    get_parser.add_argument(
+        "--fields",
+        help="Comma-separated list of fields to include",
+    )
     get_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Create subcommand
@@ -1755,6 +1899,46 @@ def main() -> int:
         help="Show project-specific defaults for this project",
     )
 
+    # ========================================================================
+    # FIELDS COMMAND
+    # ========================================================================
+    fields_parser = subparsers.add_parser(
+        "fields",
+        help="List available fields",
+    )
+    fields_parser.add_argument(
+        "--project",
+        help="Project key for context-specific fields",
+    )
+    fields_parser.add_argument(
+        "--issue-type",
+        dest="issue_type",
+        help="Issue type for context-specific fields (requires --project)",
+    )
+    fields_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON",
+    )
+
+    # ========================================================================
+    # STATUSES COMMAND
+    # ========================================================================
+    statuses_parser = subparsers.add_parser(
+        "statuses",
+        help="List available statuses",
+    )
+    statuses_parser.add_argument(
+        "--categories",
+        action="store_true",
+        help="Show status categories instead of individual statuses",
+    )
+    statuses_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON",
+    )
+
     # Parse and dispatch
     args = parser.parse_args()
 
@@ -1768,6 +1952,10 @@ def main() -> int:
         return cmd_transitions(args)
     elif args.command == "config":
         return cmd_config(args)
+    elif args.command == "fields":
+        return cmd_fields(args)
+    elif args.command == "statuses":
+        return cmd_statuses(args)
 
     return 1
 

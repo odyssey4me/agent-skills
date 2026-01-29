@@ -133,10 +133,10 @@ projects:
 
 ```bash
 # Show all configuration
-python scripts/jira.pyconfig show
+python scripts/jira.py config show
 
 # Show project-specific defaults
-python scripts/jira.pyconfig show --project DEMO
+python scripts/jira.py config show --project DEMO
 ```
 
 ## Commands
@@ -161,26 +161,26 @@ Search for issues using JQL (Jira Query Language).
 
 ```bash
 # Standard JQL
-python scripts/jira.pysearch "project = DEMO AND status = Open"
-python scripts/jira.pysearch "assignee = currentUser() ORDER BY updated DESC" --max-results 20
+python scripts/jira.py search "project = DEMO AND status = Open"
+python scripts/jira.py search "assignee = currentUser() ORDER BY updated DESC" --max-results 20
 
 # ScriptRunner Enhanced Search (if available)
 # Find issues linked to a specific issue
-python scripts/jira.pysearch 'issue in linkedIssuesOf("DEMO-123")'
+python scripts/jira.py search 'issue in linkedIssuesOf("DEMO-123")'
 
 # Find parent/child relationships
-python scripts/jira.pysearch 'issue in parentsOf("DEMO-123")'
-python scripts/jira.pysearch 'issue in subtasksOf("DEMO-123")'
+python scripts/jira.py search 'issue in parentsOf("DEMO-123")'
+python scripts/jira.py search 'issue in subtasksOf("DEMO-123")'
 
 # Find issues commented on by a specific user
-python scripts/jira.pysearch 'issue in commentedByUser("username")'
+python scripts/jira.py search 'issue in commentedByUser("username")'
 
 # Find epics and their issues
-python scripts/jira.pysearch 'issue in epicsOf("DEMO-123")'
-python scripts/jira.pysearch 'issue in issuesInEpics("EPIC-123")'
+python scripts/jira.py search 'issue in epicsOf("DEMO-123")'
+python scripts/jira.py search 'issue in issuesInEpics("EPIC-123")'
 
 # Find issues with specific link types (dependencies, blocks, etc.)
-python scripts/jira.pysearch 'issue in hasLinkType("Dependency")'
+python scripts/jira.py search 'issue in hasLinkType("Dependency")'
 ```
 
 **Arguments:**
@@ -209,20 +209,28 @@ Get, create, update, or comment on issues.
 
 ```bash
 # Get issue details
-python scripts/jira.pyissue get DEMO-123
+python scripts/jira.py issue get DEMO-123
+
+# Get issue with specific fields only
+python scripts/jira.py issue get DEMO-123 --fields "summary,status,assignee"
 
 # Create new issue
-python scripts/jira.pyissue create --project DEMO --type Task --summary "New task"
+python scripts/jira.py issue create --project DEMO --type Task --summary "New task"
 
 # Update issue
-python scripts/jira.pyissue update DEMO-123 --summary "Updated summary"
+python scripts/jira.py issue update DEMO-123 --summary "Updated summary"
 
 # Add comment
-python scripts/jira.pyissue comment DEMO-123 "This is a comment"
+python scripts/jira.py issue comment DEMO-123 "This is a comment"
 
 # Add private comment with security level
-python scripts/jira.pyissue comment DEMO-123 "Internal note" --security-level "Red Hat Internal"
+python scripts/jira.py issue comment DEMO-123 "Internal note" --security-level "Red Hat Internal"
 ```
+
+**Arguments for `issue get`:**
+- `issue_key`: Issue key (required)
+- `--fields`: Comma-separated list of fields to include (uses config default if not specified)
+- `--json`: Output as JSON
 
 ### transitions
 
@@ -230,14 +238,14 @@ Manage issue workflow transitions.
 
 ```bash
 # List available transitions
-python scripts/jira.pytransitions list DEMO-123
+python scripts/jira.py transitions list DEMO-123
 
 # Transition issue
-python scripts/jira.pytransitions do DEMO-123 "In Progress"
-python scripts/jira.pytransitions do DEMO-123 "Done" --comment "Completed"
+python scripts/jira.py transitions do DEMO-123 "In Progress"
+python scripts/jira.py transitions do DEMO-123 "Done" --comment "Completed"
 
 # Transition with private comment
-python scripts/jira.pytransitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Red Hat Internal"
+python scripts/jira.py transitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Red Hat Internal"
 ```
 
 ### config
@@ -246,16 +254,64 @@ Manage configuration and view effective defaults.
 
 ```bash
 # Show all configuration and defaults
-python scripts/jira.pyconfig show
+python scripts/jira.py config show
 
 # Show project-specific defaults
-python scripts/jira.pyconfig show --project DEMO
+python scripts/jira.py config show --project DEMO
 ```
 
 This displays:
 - Authentication settings (with masked token)
 - Default JQL scope, security level, max results, and fields
 - Project-specific defaults for issue type and priority
+
+### fields
+
+List available fields in your Jira instance.
+
+```bash
+# List all global fields
+python scripts/jira.py fields
+
+# List fields for specific project and issue type
+python scripts/jira.py fields --project DEMO --issue-type Task
+
+# Output as JSON
+python scripts/jira.py fields --json
+```
+
+**Arguments:**
+- `--project`: Project key for context-specific fields
+- `--issue-type`: Issue type name (requires --project)
+- `--json`: Output as JSON
+
+**Note:** Fields vary by project and issue type. When creating or searching issues, use `--project` and `--issue-type` to see only the fields available in that context.
+
+### statuses
+
+List available statuses and status categories.
+
+```bash
+# List all statuses
+python scripts/jira.py statuses
+
+# List status categories (To Do, In Progress, Done)
+python scripts/jira.py statuses --categories
+
+# Output as JSON
+python scripts/jira.py statuses --json
+```
+
+**Arguments:**
+- `--categories`: Show status categories instead of individual statuses
+- `--json`: Output as JSON
+
+**Recommendation:** Use `statusCategory` in JQL queries for more portable queries:
+- `statusCategory = "To Do"` - matches all statuses in the To Do category
+- `statusCategory = "In Progress"` - matches all in-progress statuses
+- `statusCategory = Done` - matches all completed statuses
+
+This is more reliable than using specific status names, which vary between projects.
 
 ## Examples
 
@@ -268,13 +324,13 @@ python scripts/jira.py check
 ### Find my open issues
 
 ```bash
-python scripts/jira.pysearch "assignee = currentUser() AND status != Done ORDER BY priority DESC"
+python scripts/jira.py search "assignee = currentUser() AND status != Done ORDER BY priority DESC"
 ```
 
 ### Create a bug report
 
 ```bash
-python scripts/jira.pyissue create \
+python scripts/jira.py issue create \
   --project DEMO \
   --type Bug \
   --summary "Login button not working" \
@@ -285,17 +341,17 @@ python scripts/jira.pyissue create \
 
 ```bash
 # Start work on an issue
-python scripts/jira.pytransitions do DEMO-123 "In Progress"
+python scripts/jira.py transitions do DEMO-123 "In Progress"
 
 # Complete the issue
-python scripts/jira.pytransitions do DEMO-123 "Done" --comment "Implemented and tested"
+python scripts/jira.py transitions do DEMO-123 "Done" --comment "Implemented and tested"
 ```
 
 ### Add private comment
 
 ```bash
 # Add comment visible only to specific security level
-python scripts/jira.pyissue comment DEMO-123 \
+python scripts/jira.py issue comment DEMO-123 \
   "This is sensitive internal information" \
   --security-level "Red Hat Internal"
 ```
@@ -303,7 +359,7 @@ python scripts/jira.pyissue comment DEMO-123 \
 ### Search with specific fields
 
 ```bash
-python scripts/jira.pysearch \
+python scripts/jira.py search \
   "project = DEMO AND created >= -7d" \
   --fields "key,summary,status,assignee,created"
 ```
@@ -314,23 +370,23 @@ With defaults configured as shown in the [Configuration Defaults](#configuration
 
 ```bash
 # Search uses JQL scope automatically
-python scripts/jira.pysearch "status = Open"
+python scripts/jira.py search "status = Open"
 # Becomes: (project = DEMO AND assignee = currentUser()) AND (status = Open)
 
 # Search with automatic max_results and fields from config
-python scripts/jira.pysearch "priority = High"
+python scripts/jira.py search "priority = High"
 # Uses configured max_results (25) and fields automatically
 
 # Create issue uses project defaults
-python scripts/jira.pyissue create --project DEMO --summary "Fix login bug"
+python scripts/jira.py issue create --project DEMO --summary "Fix login bug"
 # Automatically uses issue_type="Task" and priority="Medium" from DEMO project defaults
 
 # Comments use default security level
-python scripts/jira.pyissue comment DEMO-123 "Internal note"
+python scripts/jira.py issue comment DEMO-123 "Internal note"
 # Automatically applies security_level="Red Hat Internal"
 
 # Override defaults when needed
-python scripts/jira.pysearch "status = Open" --max-results 100
+python scripts/jira.py search "status = Open" --max-results 100
 # CLI argument overrides the configured default of 25
 ```
 
@@ -350,11 +406,25 @@ Common JQL queries:
 
 Combine with `AND`, `OR`, and use `ORDER BY` for sorting.
 
+### Status Categories
+
+Jira organizes all statuses into three categories. Use `statusCategory` for queries that work across projects:
+
+| Category | Meaning | Example Statuses |
+|----------|---------|------------------|
+| To Do | Not started | Open, Backlog, New |
+| In Progress | Being worked on | In Development, In Review |
+| Done | Completed | Closed, Resolved, Done |
+
+**Example:** Instead of `status = "Open" OR status = "Backlog"`, use `statusCategory = "To Do"`.
+
+Use `python scripts/jira.py statuses --categories` to see all status categories in your Jira instance.
+
 ## Troubleshooting
 
 ### Check command fails
 
-Run `python scripts/jira.pycheck` to diagnose issues. It will provide specific error messages and setup instructions.
+Run `python scripts/jira.py check` to diagnose issues. It will provide specific error messages and setup instructions.
 
 ### Authentication failed
 

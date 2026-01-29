@@ -22,8 +22,10 @@ from skills.jira.scripts.jira import (
     clear_cache,
     cmd_check,
     cmd_config,
+    cmd_fields,
     cmd_issue,
     cmd_search,
+    cmd_statuses,
     cmd_transitions,
     create_issue,
     delete_credential,
@@ -42,6 +44,9 @@ from skills.jira.scripts.jira import (
     get_project_defaults,
     get_transitions,
     is_cloud,
+    list_fields,
+    list_status_categories,
+    list_statuses,
     load_config,
     save_config,
     search_issues,
@@ -864,20 +869,24 @@ class TestCommandHandlers:
         assert result == 0
 
     @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
     @patch("skills.jira.scripts.jira.format_issue")
-    def test_cmd_issue_get(self, mock_format, mock_get_issue):
+    def test_cmd_issue_get(self, mock_format, mock_defaults, mock_get_issue):
         """Test issue get command."""
+        mock_defaults.return_value = JiraDefaults()
         mock_get_issue.return_value = {"key": "DEMO-123"}
         mock_format.return_value = "Issue: DEMO-123"
 
         args = argparse.Namespace(
             issue_command="get",
             issue_key="DEMO-123",
+            fields=None,
             json=False,
         )
 
         result = cmd_issue(args)
         assert result == 0
+        mock_get_issue.assert_called_once_with("DEMO-123", fields=None)
 
     @patch("skills.jira.scripts.jira.create_issue")
     @patch("skills.jira.scripts.jira.get_project_defaults")
@@ -1186,15 +1195,20 @@ class TestCommandHandlers:
         assert '{"key": "DEMO-123"}' in captured.out
 
     @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
     @patch("skills.jira.scripts.jira.format_json")
-    def test_cmd_issue_get_json_output(self, mock_format_json, mock_get_issue, capsys):
+    def test_cmd_issue_get_json_output(
+        self, mock_format_json, mock_defaults, mock_get_issue, capsys
+    ):
         """Test issue get with JSON output."""
+        mock_defaults.return_value = JiraDefaults()
         mock_get_issue.return_value = {"key": "DEMO-123"}
         mock_format_json.return_value = '{"key": "DEMO-123"}'
 
         args = argparse.Namespace(
             issue_command="get",
             issue_key="DEMO-123",
+            fields=None,
             json=True,
         )
 
@@ -1289,3 +1303,244 @@ class TestCommandHandlers:
         assert result == 0
         captured = capsys.readouterr()
         assert "private comment" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.format_issue")
+    def test_cmd_issue_get_with_fields(self, mock_format, mock_defaults, mock_get_issue):
+        """Test issue get with custom fields."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_get_issue.return_value = {"key": "DEMO-123"}
+        mock_format.return_value = "Issue: DEMO-123"
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-123",
+            fields="summary,status",
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        mock_get_issue.assert_called_once_with("DEMO-123", fields=["summary", "status"])
+
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.format_issue")
+    def test_cmd_issue_get_with_config_defaults(self, mock_format, mock_defaults, mock_get_issue):
+        """Test issue get uses config default fields."""
+        mock_defaults.return_value = JiraDefaults(fields=["summary", "status", "assignee"])
+        mock_get_issue.return_value = {"key": "DEMO-123"}
+        mock_format.return_value = "Issue: DEMO-123"
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-123",
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        mock_get_issue.assert_called_once_with("DEMO-123", fields=["summary", "status", "assignee"])
+
+
+class TestGetIssueWithFields:
+    """Tests for get_issue with fields parameter."""
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_get_issue_without_fields(self, mock_api_path, mock_get):
+        """Test getting issue without fields."""
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123"
+        mock_get.return_value = {"key": "DEMO-123", "fields": {"summary": "Test"}}
+
+        result = get_issue("DEMO-123")
+
+        assert result["key"] == "DEMO-123"
+        mock_get.assert_called_once_with("jira", "rest/api/3/issue/DEMO-123", params=None)
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_get_issue_with_fields(self, mock_api_path, mock_get):
+        """Test getting issue with specific fields."""
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123"
+        mock_get.return_value = {"key": "DEMO-123", "fields": {"summary": "Test"}}
+
+        result = get_issue("DEMO-123", fields=["summary", "status"])
+
+        assert result["key"] == "DEMO-123"
+        mock_get.assert_called_once_with(
+            "jira", "rest/api/3/issue/DEMO-123", params={"fields": "summary,status"}
+        )
+
+
+class TestMetadataDiscovery:
+    """Tests for metadata discovery functions."""
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_list_fields_global(self, mock_api_path, mock_get):
+        """Test listing all global fields."""
+        mock_api_path.return_value = "rest/api/3/field"
+        mock_get.return_value = [
+            {"id": "summary", "name": "Summary", "custom": False},
+            {"id": "customfield_10001", "name": "Story Points", "custom": True},
+        ]
+
+        result = list_fields()
+
+        assert len(result) == 2
+        assert result[0]["id"] == "summary"
+        assert result[1]["custom"] is True
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_list_fields_project_context(self, mock_api_path, mock_get):
+        """Test listing fields for project/issue-type context."""
+        mock_api_path.return_value = "rest/api/3/issue/createmeta/DEMO/issuetypes/Task"
+        mock_get.return_value = {
+            "values": [
+                {"fieldId": "summary", "name": "Summary"},
+                {"fieldId": "description", "name": "Description"},
+            ]
+        }
+
+        result = list_fields(project_key="DEMO", issue_type="Task")
+
+        assert len(result) == 2
+        assert result[0]["fieldId"] == "summary"
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_list_statuses(self, mock_api_path, mock_get):
+        """Test listing all statuses."""
+        mock_api_path.return_value = "rest/api/3/status"
+        mock_get.return_value = [
+            {"name": "Open", "statusCategory": {"name": "To Do"}},
+            {"name": "In Progress", "statusCategory": {"name": "In Progress"}},
+            {"name": "Done", "statusCategory": {"name": "Done"}},
+        ]
+
+        result = list_statuses()
+
+        assert len(result) == 3
+        assert result[0]["name"] == "Open"
+        assert result[1]["statusCategory"]["name"] == "In Progress"
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_list_status_categories(self, mock_api_path, mock_get):
+        """Test listing status categories."""
+        mock_api_path.return_value = "rest/api/3/statuscategory"
+        mock_get.return_value = [
+            {"key": "new", "name": "To Do", "colorName": "blue-gray"},
+            {"key": "indeterminate", "name": "In Progress", "colorName": "yellow"},
+            {"key": "done", "name": "Done", "colorName": "green"},
+        ]
+
+        result = list_status_categories()
+
+        assert len(result) == 3
+        assert result[0]["key"] == "new"
+        assert result[2]["colorName"] == "green"
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_cmd_fields_table_output(self, mock_list_fields, capsys):
+        """Test fields command with table output."""
+        mock_list_fields.return_value = [
+            {"id": "summary", "name": "Summary", "custom": False},
+            {"id": "customfield_10001", "name": "Story Points", "custom": True},
+        ]
+
+        args = argparse.Namespace(
+            project=None,
+            issue_type=None,
+            json=False,
+        )
+
+        result = cmd_fields(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Summary" in captured.out
+        assert "Story Points" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    @patch("skills.jira.scripts.jira.format_json")
+    def test_cmd_fields_json_output(self, mock_format_json, mock_list_fields, capsys):
+        """Test fields command with JSON output."""
+        mock_list_fields.return_value = [{"id": "summary", "name": "Summary"}]
+        mock_format_json.return_value = '[{"id": "summary", "name": "Summary"}]'
+
+        args = argparse.Namespace(
+            project=None,
+            issue_type=None,
+            json=True,
+        )
+
+        result = cmd_fields(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert '[{"id": "summary"' in captured.out
+
+    @patch("skills.jira.scripts.jira.list_statuses")
+    def test_cmd_statuses_table_output(self, mock_list_statuses, capsys):
+        """Test statuses command with table output."""
+        mock_list_statuses.return_value = [
+            {"name": "Open", "statusCategory": {"name": "To Do"}},
+            {"name": "Done", "statusCategory": {"name": "Done"}},
+        ]
+
+        args = argparse.Namespace(
+            categories=False,
+            json=False,
+        )
+
+        result = cmd_statuses(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Open" in captured.out
+        assert "To Do" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_status_categories")
+    def test_cmd_statuses_categories_output(self, mock_list_categories, capsys):
+        """Test statuses command with categories flag."""
+        mock_list_categories.return_value = [
+            {"key": "new", "name": "To Do", "colorName": "blue-gray"},
+            {"key": "done", "name": "Done", "colorName": "green"},
+        ]
+
+        args = argparse.Namespace(
+            categories=True,
+            json=False,
+        )
+
+        result = cmd_statuses(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "To Do" in captured.out
+        assert "blue-gray" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_statuses")
+    @patch("skills.jira.scripts.jira.format_json")
+    def test_cmd_statuses_json_output(self, mock_format_json, mock_list_statuses, capsys):
+        """Test statuses command with JSON output."""
+        mock_list_statuses.return_value = [{"name": "Open"}]
+        mock_format_json.return_value = '[{"name": "Open"}]'
+
+        args = argparse.Namespace(
+            categories=False,
+            json=True,
+        )
+
+        result = cmd_statuses(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert '[{"name": "Open"}]' in captured.out
