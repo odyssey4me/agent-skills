@@ -61,6 +61,7 @@ The skill requests granular scopes for different operations:
 |-------|-----------|----------|
 | `presentations.readonly` | Read presentations | Reading presentation metadata and content |
 | `presentations` | Full access | Creating and modifying presentations |
+| `drive.readonly` | Read Drive files | Exporting presentations as PDF |
 
 ### Scope Errors
 
@@ -163,7 +164,7 @@ python scripts/google-slides.py presentations get 1abc...xyz
 
 ### presentations read
 
-Read presentation text content from all slides.
+Read presentation text content from all slides, or export as PDF.
 
 ```bash
 python scripts/google-slides.py presentations read PRESENTATION_ID
@@ -173,13 +174,19 @@ python scripts/google-slides.py presentations read PRESENTATION_ID
 - `presentation_id` - The Google Slides presentation ID
 
 **Options:**
-- `--json` - Output as JSON with content field
+- `--format` - Output format: `text` (default) or `pdf`
+- `--output`, `-o` - Output file path (used with pdf format)
+- `--json` - Output as JSON with content field (for text format)
 
 **Example:**
 ```bash
+# Read as text (default)
 python scripts/google-slides.py presentations read 1abc...xyz
 
-# Output:
+# Export as PDF
+python scripts/google-slides.py presentations read 1abc...xyz --format pdf --output presentation.pdf
+
+# Output (text format):
 # --- Slide 1 ---
 # Welcome to Our Product
 # An introduction to key features
@@ -196,7 +203,7 @@ python scripts/google-slides.py presentations read 1abc...xyz
 # | Q2 | $300K | 20% |
 ```
 
-**Note:** Extracts text from all shapes, text boxes, and tables on each slide. Tables are formatted as markdown.
+**Note:** Text format extracts text from all shapes, text boxes, and tables on each slide (tables formatted as markdown). PDF export uses Google's native Drive API export, which requires the `drive.readonly` scope.
 
 ### slides create
 

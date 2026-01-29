@@ -484,6 +484,29 @@ def export_document_as_markdown(document_id: str) -> str:
         return ""  # Unreachable
 
 
+def export_document_as_pdf(document_id: str) -> bytes:
+    """Export document as PDF using Google's native export.
+
+    Uses the Drive API to export the document in PDF format.
+
+    Args:
+        document_id: The Google Docs document ID.
+
+    Returns:
+        PDF content as bytes.
+
+    Raises:
+        DocsAPIError: If the export fails.
+    """
+    try:
+        service = build_drive_service()
+        response = service.files().export(fileId=document_id, mimeType="application/pdf").execute()
+        return response
+    except HttpError as e:
+        handle_api_error(e)
+        return b""  # Unreachable
+
+
 def append_text(service, document_id: str, text: str) -> dict[str, Any]:
     """Append text to the end of a Google Doc.
 
@@ -856,7 +879,14 @@ def cmd_documents_get(args):
 
 def cmd_documents_read(args):
     """Handle 'documents read' command."""
-    if args.format == "markdown":
+    if args.format == "pdf":
+        content = export_document_as_pdf(args.document_id)
+        output_file = args.output or f"{args.document_id}.pdf"
+        with open(output_file, "wb") as f:
+            f.write(content)
+        print(f"PDF saved to: {output_file}")
+        return 0
+    elif args.format == "markdown":
         content = export_document_as_markdown(args.document_id)
     else:
         service = build_docs_service(DOCS_SCOPES_READONLY)
@@ -972,9 +1002,14 @@ def build_parser() -> argparse.ArgumentParser:
     read_parser.add_argument("document_id", help="Document ID")
     read_parser.add_argument(
         "--format",
-        choices=["text", "markdown"],
+        choices=["text", "markdown", "pdf"],
         default="text",
-        help="Output format: text (plain text) or markdown (preserves tables and headings)",
+        help="Output format: text (plain text), markdown (preserves tables and headings), or pdf",
+    )
+    read_parser.add_argument(
+        "--output",
+        "-o",
+        help="Output file path (used with pdf format)",
     )
     read_parser.add_argument("--json", action="store_true", help="Output as JSON")
 

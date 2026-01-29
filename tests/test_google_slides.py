@@ -24,6 +24,9 @@ AuthenticationError = google_slides.AuthenticationError
 SlidesAPIError = google_slides.SlidesAPIError
 SLIDES_SCOPES = google_slides.SLIDES_SCOPES
 SLIDES_SCOPES_DEFAULT = google_slides.SLIDES_SCOPES_DEFAULT
+DRIVE_SCOPES_READONLY = google_slides.DRIVE_SCOPES_READONLY
+build_drive_service = google_slides.build_drive_service
+export_presentation_as_pdf = google_slides.export_presentation_as_pdf
 build_parser = google_slides.build_parser
 build_slides_service = google_slides.build_slides_service
 check_slides_connectivity = google_slides.check_slides_connectivity
@@ -356,6 +359,20 @@ class TestPresentationOperations:
         assert "| Header 1 | Header 2 |" in result
         assert "| --- | --- |" in result
         assert "| Value 1 | Value 2 |" in result
+
+    @patch("google_slides.build_drive_service")
+    def test_export_presentation_as_pdf(self, mock_build_drive):
+        """Test exporting presentation as PDF."""
+        mock_service = Mock()
+        mock_build_drive.return_value = mock_service
+        mock_service.files().export().execute.return_value = b"%PDF-1.4 mock content"
+
+        result = export_presentation_as_pdf("pres-123")
+
+        assert result == b"%PDF-1.4 mock content"
+        call_args = mock_service.files().export.call_args
+        assert call_args[1]["fileId"] == "pres-123"
+        assert call_args[1]["mimeType"] == "application/pdf"
 
 
 # ============================================================================
@@ -754,7 +771,7 @@ class TestCLICommands:
         """Test presentations read command."""
         mock_read.return_value = "--- Slide 1 ---\nTitle Text\n\n--- Slide 2 ---\nContent"
 
-        args = Mock(presentation_id="pres-123", json=False)
+        args = Mock(presentation_id="pres-123", format="text", json=False)
         result = cmd_presentations_read(args)
 
         assert result == 0
@@ -768,13 +785,47 @@ class TestCLICommands:
         """Test presentations read command with JSON output."""
         mock_read.return_value = "Slide content here"
 
-        args = Mock(presentation_id="pres-123", json=True)
+        args = Mock(presentation_id="pres-123", format="text", json=True)
         result = cmd_presentations_read(args)
 
         assert result == 0
         captured = capsys.readouterr()
         assert '"content"' in captured.out
         assert "Slide content here" in captured.out
+
+    @patch("google_slides.export_presentation_as_pdf")
+    def test_cmd_presentations_read_pdf_format(self, mock_export, tmp_path, capsys):
+        """Test presentations read command with PDF format."""
+        mock_export.return_value = b"%PDF-1.4 mock content"
+        output_file = tmp_path / "test.pdf"
+
+        args = Mock(presentation_id="pres-123", format="pdf", output=str(output_file), json=False)
+        result = cmd_presentations_read(args)
+
+        assert result == 0
+        assert output_file.exists()
+        assert output_file.read_bytes() == b"%PDF-1.4 mock content"
+        captured = capsys.readouterr()
+        assert "PDF saved to:" in captured.out
+
+    @patch("google_slides.export_presentation_as_pdf")
+    def test_cmd_presentations_read_pdf_format_default_output(
+        self, mock_export, tmp_path, capsys, monkeypatch
+    ):
+        """Test presentations read command with PDF format using default output filename."""
+        mock_export.return_value = b"%PDF-1.4 mock content"
+        # Change to tmp_path so default file is created there
+        monkeypatch.chdir(tmp_path)
+
+        args = Mock(presentation_id="pres-123", format="pdf", output=None, json=False)
+        result = cmd_presentations_read(args)
+
+        assert result == 0
+        default_file = tmp_path / "pres-123.pdf"
+        assert default_file.exists()
+        assert default_file.read_bytes() == b"%PDF-1.4 mock content"
+        captured = capsys.readouterr()
+        assert "PDF saved to: pres-123.pdf" in captured.out
 
     @patch("google_slides.build_slides_service")
     @patch("google_slides.create_slide")
@@ -936,6 +987,29 @@ class TestArgumentParser:
         args = parser.parse_args(["presentations", "read", "pres-123", "--json"])
         assert args.presentations_command == "read"
         assert args.json is True
+
+    def test_parser_presentations_read_default_format(self):
+        """Test parser for presentations read defaults to text format."""
+        parser = build_parser()
+        args = parser.parse_args(["presentations", "read", "pres-123"])
+        assert args.format == "text"
+
+    def test_parser_presentations_read_pdf_format(self):
+        """Test parser for presentations read with pdf format and output."""
+        parser = build_parser()
+        args = parser.parse_args(
+            ["presentations", "read", "pres-123", "--format", "pdf", "--output", "output.pdf"]
+        )
+        assert args.format == "pdf"
+        assert args.output == "output.pdf"
+
+    def test_parser_presentations_read_output_short_flag(self):
+        """Test parser for presentations read with -o short flag."""
+        parser = build_parser()
+        args = parser.parse_args(
+            ["presentations", "read", "pres-123", "--format", "pdf", "-o", "pres.pdf"]
+        )
+        assert args.output == "pres.pdf"
 
     def test_parser_slides_create(self):
         """Test parser for slides create command."""
@@ -1222,4 +1296,19 @@ class TestBuildService:
         result = build_slides_service(custom_scopes)
 
         mock_get_creds.assert_called_once_with("google-slides", custom_scopes)
+        assert result == mock_service
+
+    @patch("google_slides.get_google_credentials")
+    @patch("google_slides.build")
+    def test_build_drive_service_default_scopes(self, mock_build, mock_get_creds):
+        """Test building Drive service with default scopes."""
+        mock_creds = Mock()
+        mock_get_creds.return_value = mock_creds
+        mock_service = Mock()
+        mock_build.return_value = mock_service
+
+        result = build_drive_service()
+
+        mock_get_creds.assert_called_once_with("google-slides", DRIVE_SCOPES_READONLY)
+        mock_build.assert_called_once_with("drive", "v3", credentials=mock_creds)
         assert result == mock_service

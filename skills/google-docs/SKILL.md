@@ -61,7 +61,7 @@ The skill requests granular scopes for different operations:
 |-------|-----------|----------|
 | `documents.readonly` | Read documents | Reading document content and metadata |
 | `documents` | Full access | Creating and modifying documents |
-| `drive.readonly` | Read Drive files | Exporting documents as markdown |
+| `drive.readonly` | Read Drive files | Exporting documents as markdown or PDF |
 
 ### Scope Errors
 
@@ -155,7 +155,7 @@ python scripts/google-docs.py documents get 1abc...xyz
 
 ### documents read
 
-Read document content as plain text or markdown.
+Read document content as plain text, markdown, or PDF.
 
 ```bash
 python scripts/google-docs.py documents read DOCUMENT_ID
@@ -165,8 +165,9 @@ python scripts/google-docs.py documents read DOCUMENT_ID
 - `document_id` - The Google Docs document ID
 
 **Options:**
-- `--format` - Output format: `text` (default) or `markdown` (preserves tables and headings)
-- `--json` - Output as JSON with content field
+- `--format` - Output format: `text` (default), `markdown` (preserves tables and headings), or `pdf`
+- `--output`, `-o` - Output file path (used with pdf format)
+- `--json` - Output as JSON with content field (for text/markdown formats)
 
 **Example:**
 ```bash
@@ -175,6 +176,9 @@ python scripts/google-docs.py documents read 1abc...xyz
 
 # Read as markdown with table preservation
 python scripts/google-docs.py documents read 1abc...xyz --format markdown
+
+# Export as PDF
+python scripts/google-docs.py documents read 1abc...xyz --format pdf --output document.pdf
 
 # Output as markdown:
 # # Heading
@@ -186,7 +190,7 @@ python scripts/google-docs.py documents read 1abc...xyz --format markdown
 # | Value 1  | Value 2  |
 ```
 
-**Note:** Markdown export uses Google's native Drive API export, which preserves tables, headings, formatting, and structure with high fidelity. This requires the `drive.readonly` scope.
+**Note:** Markdown and PDF export use Google's native Drive API export. Markdown preserves tables, headings, formatting, and structure with high fidelity. Both require the `drive.readonly` scope.
 
 ### content append
 

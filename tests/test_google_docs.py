@@ -49,6 +49,7 @@ get_document = google_docs.get_document
 get_google_credentials = google_docs.get_google_credentials
 get_oauth_client_config = google_docs.get_oauth_client_config
 export_document_as_markdown = google_docs.export_document_as_markdown
+export_document_as_pdf = google_docs.export_document_as_pdf
 handle_api_error = google_docs.handle_api_error
 insert_text = google_docs.insert_text
 load_config = google_docs.load_config
@@ -355,6 +356,21 @@ class TestDocumentOperations:
         assert call_args[1]["fileId"] == "test-doc-id"
         assert call_args[1]["mimeType"] == "text/markdown"
 
+    @patch("google_docs.build_drive_service")
+    def test_export_document_as_pdf(self, mock_build_drive):
+        """Test exporting document as PDF."""
+        mock_service = Mock()
+        mock_build_drive.return_value = mock_service
+        mock_service.files().export().execute.return_value = b"%PDF-1.4 mock content"
+
+        result = export_document_as_pdf("test-doc-id")
+
+        assert result == b"%PDF-1.4 mock content"
+        # Verify export was called with correct parameters
+        call_args = mock_service.files().export.call_args
+        assert call_args[1]["fileId"] == "test-doc-id"
+        assert call_args[1]["mimeType"] == "application/pdf"
+
 
 # ============================================================================
 # OUTPUT FORMATTING TESTS
@@ -498,6 +514,40 @@ class TestCLICommands:
         assert "# Title" in captured.out
         assert "Markdown content" in captured.out
 
+    @patch("google_docs.export_document_as_pdf")
+    def test_cmd_documents_read_pdf_format(self, mock_export, tmp_path, capsys):
+        """Test documents read command with PDF format."""
+        mock_export.return_value = b"%PDF-1.4 mock content"
+        output_file = tmp_path / "test.pdf"
+
+        args = Mock(document_id="doc-123", format="pdf", output=str(output_file), json=False)
+        result = cmd_documents_read(args)
+
+        assert result == 0
+        assert output_file.exists()
+        assert output_file.read_bytes() == b"%PDF-1.4 mock content"
+        captured = capsys.readouterr()
+        assert "PDF saved to:" in captured.out
+
+    @patch("google_docs.export_document_as_pdf")
+    def test_cmd_documents_read_pdf_format_default_output(
+        self, mock_export, tmp_path, capsys, monkeypatch
+    ):
+        """Test documents read command with PDF format using default output filename."""
+        mock_export.return_value = b"%PDF-1.4 mock content"
+        # Change to tmp_path so default file is created there
+        monkeypatch.chdir(tmp_path)
+
+        args = Mock(document_id="doc-123", format="pdf", output=None, json=False)
+        result = cmd_documents_read(args)
+
+        assert result == 0
+        default_file = tmp_path / "doc-123.pdf"
+        assert default_file.exists()
+        assert default_file.read_bytes() == b"%PDF-1.4 mock content"
+        captured = capsys.readouterr()
+        assert "PDF saved to: doc-123.pdf" in captured.out
+
 
 # ============================================================================
 # ARGUMENT PARSER TESTS
@@ -546,6 +596,23 @@ class TestArgumentParser:
         parser = build_parser()
         args = parser.parse_args(["documents", "read", "doc-123"])
         assert args.format == "text"
+
+    def test_parser_documents_read_pdf_format(self):
+        """Test parser for documents read with pdf format and output."""
+        parser = build_parser()
+        args = parser.parse_args(
+            ["documents", "read", "doc-123", "--format", "pdf", "--output", "output.pdf"]
+        )
+        assert args.format == "pdf"
+        assert args.output == "output.pdf"
+
+    def test_parser_documents_read_output_short_flag(self):
+        """Test parser for documents read with -o short flag."""
+        parser = build_parser()
+        args = parser.parse_args(
+            ["documents", "read", "doc-123", "--format", "pdf", "-o", "doc.pdf"]
+        )
+        assert args.output == "doc.pdf"
 
     def test_parser_content_append(self):
         """Test parser for content append command."""

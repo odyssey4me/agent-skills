@@ -78,6 +78,9 @@ SLIDES_SCOPES = ["https://www.googleapis.com/auth/presentations"]
 # Minimal read-only scope (default)
 SLIDES_SCOPES_DEFAULT = SLIDES_SCOPES_READONLY
 
+# Drive API scope needed for PDF export
+DRIVE_SCOPES_READONLY = ["https://www.googleapis.com/auth/drive.readonly"]
+
 # EMU (English Metric Units) conversion - Slides uses EMUs
 # 1 inch = 914400 EMUs
 # 1 point = 12700 EMUs
@@ -312,6 +315,24 @@ def build_slides_service(scopes: list[str] | None = None):
     return build("slides", "v1", credentials=creds)
 
 
+def build_drive_service(scopes: list[str] | None = None):
+    """Build and return Google Drive API service for export operations.
+
+    Args:
+        scopes: List of OAuth scopes to request. Defaults to drive.readonly.
+
+    Returns:
+        Google Drive API service object.
+
+    Raises:
+        AuthenticationError: If authentication fails.
+    """
+    if scopes is None:
+        scopes = DRIVE_SCOPES_READONLY
+    creds = get_google_credentials("google-slides", scopes)
+    return build("drive", "v3", credentials=creds)
+
+
 # ============================================================================
 # GOOGLE SLIDES API ERROR HANDLING
 # ============================================================================
@@ -505,6 +526,31 @@ def _extract_table_text(table: dict) -> str:
             if row_idx == 0:
                 rows_text.append("| " + " | ".join(["---"] * len(cell_texts)) + " |")
     return "\n".join(rows_text)
+
+
+def export_presentation_as_pdf(presentation_id: str) -> bytes:
+    """Export presentation as PDF using Google's native export.
+
+    Uses the Drive API to export the presentation in PDF format.
+
+    Args:
+        presentation_id: The Google Slides presentation ID.
+
+    Returns:
+        PDF content as bytes.
+
+    Raises:
+        SlidesAPIError: If the export fails.
+    """
+    try:
+        service = build_drive_service()
+        response = (
+            service.files().export(fileId=presentation_id, mimeType="application/pdf").execute()
+        )
+        return response
+    except HttpError as e:
+        handle_api_error(e)
+        return b""  # Unreachable
 
 
 # ============================================================================
@@ -1035,8 +1081,16 @@ def cmd_presentations_get(args):
 
 def cmd_presentations_read(args):
     """Handle 'presentations read' command."""
-    service = build_slides_service(SLIDES_SCOPES_READONLY)
-    content = read_presentation_content(service, args.presentation_id)
+    if args.format == "pdf":
+        content = export_presentation_as_pdf(args.presentation_id)
+        output_file = args.output or f"{args.presentation_id}.pdf"
+        with open(output_file, "wb") as f:
+            f.write(content)
+        print(f"PDF saved to: {output_file}")
+        return 0
+    else:
+        service = build_slides_service(SLIDES_SCOPES_READONLY)
+        content = read_presentation_content(service, args.presentation_id)
 
     if args.json:
         print(json.dumps({"content": content}, indent=2))
@@ -1192,6 +1246,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     read_parser = presentations_subparsers.add_parser("read", help="Read presentation text content")
     read_parser.add_argument("presentation_id", help="Presentation ID")
+    read_parser.add_argument(
+        "--format",
+        choices=["text", "pdf"],
+        default="text",
+        help="Output format: text (extracted text) or pdf (native export)",
+    )
+    read_parser.add_argument(
+        "--output",
+        "-o",
+        help="Output file path (used with pdf format)",
+    )
     read_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # slides commands
