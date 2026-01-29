@@ -413,6 +413,100 @@ def get_presentation(service, presentation_id: str) -> dict[str, Any]:
         return {}  # Unreachable
 
 
+def read_presentation_content(service, presentation_id: str) -> str:
+    """Extract text content from all slides in a presentation.
+
+    Args:
+        service: Google Slides API service object.
+        presentation_id: The presentation ID.
+
+    Returns:
+        Text content from all slides, with slide separators.
+
+    Raises:
+        SlidesAPIError: If the API call fails.
+    """
+    presentation = get_presentation(service, presentation_id)
+    slides = presentation.get("slides", [])
+
+    output_parts = []
+    for idx, slide in enumerate(slides):
+        slide_text = _extract_slide_text(slide)
+        if slide_text.strip():
+            output_parts.append(f"--- Slide {idx + 1} ---\n{slide_text}")
+
+    return "\n\n".join(output_parts)
+
+
+def _extract_slide_text(slide: dict) -> str:
+    """Extract all text from a slide's page elements.
+
+    Args:
+        slide: Slide dictionary from the API.
+
+    Returns:
+        Combined text from all elements on the slide.
+    """
+    text_parts = []
+
+    for element in slide.get("pageElements", []):
+        # Handle shapes with text (including text boxes)
+        if "shape" in element:
+            shape = element["shape"]
+            if "text" in shape:
+                text = _extract_text_from_text_content(shape["text"])
+                if text.strip():
+                    text_parts.append(text.strip())
+
+        # Handle tables
+        if "table" in element:
+            table_text = _extract_table_text(element["table"])
+            if table_text.strip():
+                text_parts.append(table_text)
+
+    return "\n".join(text_parts)
+
+
+def _extract_text_from_text_content(text_content: dict) -> str:
+    """Extract text from a textContent structure.
+
+    Args:
+        text_content: Text content dictionary from the API.
+
+    Returns:
+        Combined text string.
+    """
+    parts = []
+    for text_elem in text_content.get("textElements", []):
+        if "textRun" in text_elem:
+            parts.append(text_elem["textRun"].get("content", ""))
+    return "".join(parts)
+
+
+def _extract_table_text(table: dict) -> str:
+    """Extract text from a table element as markdown.
+
+    Args:
+        table: Table dictionary from the API.
+
+    Returns:
+        Markdown-formatted table string.
+    """
+    rows_text = []
+    for row_idx, row in enumerate(table.get("tableRows", [])):
+        cell_texts = []
+        for cell in row.get("tableCells", []):
+            if "text" in cell:
+                cell_texts.append(_extract_text_from_text_content(cell["text"]).strip())
+            else:
+                cell_texts.append("")
+        if cell_texts:
+            rows_text.append("| " + " | ".join(cell_texts) + " |")
+            if row_idx == 0:
+                rows_text.append("| " + " | ".join(["---"] * len(cell_texts)) + " |")
+    return "\n".join(rows_text)
+
+
 # ============================================================================
 # SLIDE OPERATIONS
 # ============================================================================
@@ -939,6 +1033,19 @@ def cmd_presentations_get(args):
     return 0
 
 
+def cmd_presentations_read(args):
+    """Handle 'presentations read' command."""
+    service = build_slides_service(SLIDES_SCOPES_READONLY)
+    content = read_presentation_content(service, args.presentation_id)
+
+    if args.json:
+        print(json.dumps({"content": content}, indent=2))
+    else:
+        print(content)
+
+    return 0
+
+
 def cmd_slides_create(args):
     """Handle 'slides create' command."""
     service = build_slides_service(SLIDES_SCOPES)
@@ -1082,6 +1189,10 @@ def build_parser() -> argparse.ArgumentParser:
     get_parser = presentations_subparsers.add_parser("get", help="Get presentation metadata")
     get_parser.add_argument("presentation_id", help="Presentation ID")
     get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    read_parser = presentations_subparsers.add_parser("read", help="Read presentation text content")
+    read_parser.add_argument("presentation_id", help="Presentation ID")
+    read_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # slides commands
     slides_parser = subparsers.add_parser("slides", help="Slide operations")
@@ -1229,6 +1340,8 @@ def main():
                 return cmd_presentations_create(args)
             elif args.presentations_command == "get":
                 return cmd_presentations_get(args)
+            elif args.presentations_command == "read":
+                return cmd_presentations_read(args)
         elif args.command == "slides":
             if args.slides_command == "create":
                 return cmd_slides_create(args)

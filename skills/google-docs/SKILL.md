@@ -61,6 +61,7 @@ The skill requests granular scopes for different operations:
 |-------|-----------|----------|
 | `documents.readonly` | Read documents | Reading document content and metadata |
 | `documents` | Full access | Creating and modifying documents |
+| `drive.readonly` | Read Drive files | Exporting documents as markdown |
 
 ### Scope Errors
 
@@ -154,7 +155,7 @@ python scripts/google-docs.py documents get 1abc...xyz
 
 ### documents read
 
-Read document content as plain text.
+Read document content as plain text or markdown.
 
 ```bash
 python scripts/google-docs.py documents read DOCUMENT_ID
@@ -164,15 +165,28 @@ python scripts/google-docs.py documents read DOCUMENT_ID
 - `document_id` - The Google Docs document ID
 
 **Options:**
+- `--format` - Output format: `text` (default) or `markdown` (preserves tables and headings)
 - `--json` - Output as JSON with content field
 
 **Example:**
 ```bash
-# Read document content
+# Read as plain text (default)
 python scripts/google-docs.py documents read 1abc...xyz
 
-# Output: (plain text content of the document)
+# Read as markdown with table preservation
+python scripts/google-docs.py documents read 1abc...xyz --format markdown
+
+# Output as markdown:
+# # Heading
+#
+# This is a paragraph.
+#
+# | Column 1 | Column 2 |
+# |----------|----------|
+# | Value 1  | Value 2  |
 ```
+
+**Note:** Markdown export uses Google's native Drive API export, which preserves tables, headings, formatting, and structure with high fidelity. This requires the `drive.readonly` scope.
 
 ### content append
 

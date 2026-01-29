@@ -161,6 +161,43 @@ python scripts/google-slides.py presentations get 1abc...xyz
 #   Elements: 3 (2 text, 1 shapes, 0 images, 0 other)
 ```
 
+### presentations read
+
+Read presentation text content from all slides.
+
+```bash
+python scripts/google-slides.py presentations read PRESENTATION_ID
+```
+
+**Arguments:**
+- `presentation_id` - The Google Slides presentation ID
+
+**Options:**
+- `--json` - Output as JSON with content field
+
+**Example:**
+```bash
+python scripts/google-slides.py presentations read 1abc...xyz
+
+# Output:
+# --- Slide 1 ---
+# Welcome to Our Product
+# An introduction to key features
+#
+# --- Slide 2 ---
+# Key Metrics
+# Revenue: $1.2M
+# Users: 50,000
+#
+# --- Slide 3 ---
+# | Quarter | Revenue | Growth |
+# | --- | --- | --- |
+# | Q1 | $250K | 10% |
+# | Q2 | $300K | 20% |
+```
+
+**Note:** Extracts text from all shapes, text boxes, and tables on each slide. Tables are formatted as markdown.
+
 ### slides create
 
 Add a new slide to a presentation.

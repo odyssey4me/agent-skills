@@ -75,6 +75,9 @@ CONFIG_DIR = Path.home() / ".config" / "agent-skills"
 DOCS_SCOPES_READONLY = ["https://www.googleapis.com/auth/documents.readonly"]
 DOCS_SCOPES = ["https://www.googleapis.com/auth/documents"]
 
+# Drive API scope needed for markdown export
+DRIVE_SCOPES_READONLY = ["https://www.googleapis.com/auth/drive.readonly"]
+
 # Minimal read-only scope (default)
 DOCS_SCOPES_DEFAULT = DOCS_SCOPES_READONLY
 
@@ -306,6 +309,24 @@ def build_docs_service(scopes: list[str] | None = None):
     return build("docs", "v1", credentials=creds)
 
 
+def build_drive_service(scopes: list[str] | None = None):
+    """Build and return Google Drive API service for export operations.
+
+    Args:
+        scopes: List of OAuth scopes to request. Defaults to drive.readonly.
+
+    Returns:
+        Google Drive API service object.
+
+    Raises:
+        AuthenticationError: If authentication fails.
+    """
+    if scopes is None:
+        scopes = DRIVE_SCOPES_READONLY
+    creds = get_google_credentials("google-docs", scopes)
+    return build("drive", "v3", credentials=creds)
+
+
 # ============================================================================
 # GOOGLE DOCS API ERROR HANDLING
 # ============================================================================
@@ -432,6 +453,35 @@ def read_document_content(service, document_id: str) -> str:
                     text_parts.append(text_element["textRun"].get("content", ""))
 
     return "".join(text_parts)
+
+
+def export_document_as_markdown(document_id: str) -> str:
+    """Export document as markdown using Google's native export.
+
+    Uses the Drive API to export the document in markdown format.
+    This preserves tables, headings, formatting, and structure.
+
+    Args:
+        document_id: The Google Docs document ID.
+
+    Returns:
+        Markdown content of the document.
+
+    Raises:
+        DocsAPIError: If the export fails.
+    """
+    try:
+        service = build_drive_service()
+        # Export using Drive API with markdown MIME type
+        response = service.files().export(fileId=document_id, mimeType="text/markdown").execute()
+
+        # Response is bytes, decode to string
+        if isinstance(response, bytes):
+            return response.decode("utf-8")
+        return response
+    except HttpError as e:
+        handle_api_error(e)
+        return ""  # Unreachable
 
 
 def append_text(service, document_id: str, text: str) -> dict[str, Any]:
@@ -806,8 +856,11 @@ def cmd_documents_get(args):
 
 def cmd_documents_read(args):
     """Handle 'documents read' command."""
-    service = build_docs_service(DOCS_SCOPES_READONLY)
-    content = read_document_content(service, args.document_id)
+    if args.format == "markdown":
+        content = export_document_as_markdown(args.document_id)
+    else:
+        service = build_docs_service(DOCS_SCOPES_READONLY)
+        content = read_document_content(service, args.document_id)
 
     if args.json:
         print(json.dumps({"content": content}, indent=2))
@@ -917,6 +970,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     read_parser = documents_subparsers.add_parser("read", help="Read document content as text")
     read_parser.add_argument("document_id", help="Document ID")
+    read_parser.add_argument(
+        "--format",
+        choices=["text", "markdown"],
+        default="text",
+        help="Output format: text (plain text) or markdown (preserves tables and headings)",
+    )
     read_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # content commands

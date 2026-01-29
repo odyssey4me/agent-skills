@@ -32,6 +32,7 @@ cmd_check = google_slides.cmd_check
 cmd_images_create = google_slides.cmd_images_create
 cmd_presentations_create = google_slides.cmd_presentations_create
 cmd_presentations_get = google_slides.cmd_presentations_get
+cmd_presentations_read = google_slides.cmd_presentations_read
 cmd_shapes_create = google_slides.cmd_shapes_create
 cmd_slides_create = google_slides.cmd_slides_create
 cmd_slides_delete = google_slides.cmd_slides_delete
@@ -50,6 +51,10 @@ get_oauth_client_config = google_slides.get_oauth_client_config
 get_presentation = google_slides.get_presentation
 handle_api_error = google_slides.handle_api_error
 insert_text = google_slides.insert_text
+read_presentation_content = google_slides.read_presentation_content
+_extract_slide_text = google_slides._extract_slide_text
+_extract_table_text = google_slides._extract_table_text
+_extract_text_from_text_content = google_slides._extract_text_from_text_content
 load_config = google_slides.load_config
 save_config = google_slides.save_config
 set_credential = google_slides.set_credential
@@ -252,6 +257,105 @@ class TestPresentationOperations:
         result = get_presentation(mock_service, "test-pres-id")
 
         assert result["presentationId"] == "test-pres-id"
+
+    def test_read_presentation_content(self):
+        """Test reading presentation content from all slides."""
+        mock_service = Mock()
+        mock_service.presentations().get().execute.return_value = {
+            "presentationId": "test-pres-id",
+            "title": "Test Presentation",
+            "slides": [
+                {
+                    "objectId": "slide1",
+                    "pageElements": [
+                        {
+                            "shape": {
+                                "shapeType": "TEXT_BOX",
+                                "text": {
+                                    "textElements": [{"textRun": {"content": "Title Slide\n"}}]
+                                },
+                            }
+                        }
+                    ],
+                },
+                {
+                    "objectId": "slide2",
+                    "pageElements": [
+                        {
+                            "shape": {
+                                "shapeType": "TEXT_BOX",
+                                "text": {
+                                    "textElements": [{"textRun": {"content": "Content Slide\n"}}]
+                                },
+                            }
+                        }
+                    ],
+                },
+            ],
+        }
+
+        result = read_presentation_content(mock_service, "test-pres-id")
+
+        assert "--- Slide 1 ---" in result
+        assert "Title Slide" in result
+        assert "--- Slide 2 ---" in result
+        assert "Content Slide" in result
+
+    def test_extract_slide_text_with_shapes(self):
+        """Test extracting text from slide with multiple shapes."""
+        slide = {
+            "objectId": "slide1",
+            "pageElements": [
+                {
+                    "shape": {
+                        "shapeType": "TEXT_BOX",
+                        "text": {
+                            "textElements": [
+                                {"textRun": {"content": "Heading\n"}},
+                                {"textRun": {"content": "Subheading\n"}},
+                            ]
+                        },
+                    }
+                },
+                {
+                    "shape": {
+                        "shapeType": "RECTANGLE",
+                        "text": {"textElements": [{"textRun": {"content": "Box text\n"}}]},
+                    }
+                },
+            ],
+        }
+
+        result = _extract_slide_text(slide)
+
+        assert "Heading" in result
+        assert "Subheading" in result
+        assert "Box text" in result
+
+    def test_extract_table_text(self):
+        """Test extracting text from a table element."""
+        table = {
+            "tableRows": [
+                {
+                    "tableCells": [
+                        {"text": {"textElements": [{"textRun": {"content": "Header 1\n"}}]}},
+                        {"text": {"textElements": [{"textRun": {"content": "Header 2\n"}}]}},
+                    ]
+                },
+                {
+                    "tableCells": [
+                        {"text": {"textElements": [{"textRun": {"content": "Value 1\n"}}]}},
+                        {"text": {"textElements": [{"textRun": {"content": "Value 2\n"}}]}},
+                    ]
+                },
+            ]
+        }
+
+        result = _extract_table_text(table)
+
+        assert "| Header 1 | Header 2 |" in result
+        assert "| --- | --- |" in result
+        assert "| Value 1 | Value 2 |" in result
 
 
 # ============================================================================
@@ -645,6 +749,34 @@ class TestCLICommands:
         assert "Test Presentation" in captured.out
 
     @patch("google_slides.build_slides_service")
+    @patch("google_slides.read_presentation_content")
+    def test_cmd_presentations_read(self, mock_read, _mock_build_service, capsys):
+        """Test presentations read command."""
+        mock_read.return_value = "--- Slide 1 ---\nTitle Text\n\n--- Slide 2 ---\nContent"
+
+        args = Mock(presentation_id="pres-123", json=False)
+        result = cmd_presentations_read(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "--- Slide 1 ---" in captured.out
+        assert "Title Text" in captured.out
+
+    @patch("google_slides.build_slides_service")
+    @patch("google_slides.read_presentation_content")
+    def test_cmd_presentations_read_json(self, mock_read, _mock_build_service, capsys):
+        """Test presentations read command with JSON output."""
+        mock_read.return_value = "Slide content here"
+
+        args = Mock(presentation_id="pres-123", json=True)
+        result = cmd_presentations_read(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert '"content"' in captured.out
+        assert "Slide content here" in captured.out
+
+    @patch("google_slides.build_slides_service")
     @patch("google_slides.create_slide")
     def test_cmd_slides_create(self, mock_create, _mock_build_service, capsys):
         """Test slides create command."""
@@ -789,6 +921,21 @@ class TestArgumentParser:
         assert args.command == "presentations"
         assert args.presentations_command == "get"
         assert args.presentation_id == "pres-123"
+
+    def test_parser_presentations_read(self):
+        """Test parser for presentations read command."""
+        parser = build_parser()
+        args = parser.parse_args(["presentations", "read", "pres-123"])
+        assert args.command == "presentations"
+        assert args.presentations_command == "read"
+        assert args.presentation_id == "pres-123"
+
+    def test_parser_presentations_read_json(self):
+        """Test parser for presentations read with --json flag."""
+        parser = build_parser()
+        args = parser.parse_args(["presentations", "read", "pres-123", "--json"])
+        assert args.presentations_command == "read"
+        assert args.json is True
 
     def test_parser_slides_create(self):
         """Test parser for slides create command."""

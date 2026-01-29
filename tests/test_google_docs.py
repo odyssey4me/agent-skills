@@ -24,9 +24,11 @@ AuthenticationError = google_docs.AuthenticationError
 DocsAPIError = google_docs.DocsAPIError
 DOCS_SCOPES = google_docs.DOCS_SCOPES
 DOCS_SCOPES_DEFAULT = google_docs.DOCS_SCOPES_DEFAULT
+DRIVE_SCOPES_READONLY = google_docs.DRIVE_SCOPES_READONLY
 apply_formatting = google_docs.apply_formatting
 append_text = google_docs.append_text
 build_docs_service = google_docs.build_docs_service
+build_drive_service = google_docs.build_drive_service
 build_parser = google_docs.build_parser
 check_docs_connectivity = google_docs.check_docs_connectivity
 cmd_auth_setup = google_docs.cmd_auth_setup
@@ -46,6 +48,7 @@ get_credential = google_docs.get_credential
 get_document = google_docs.get_document
 get_google_credentials = google_docs.get_google_credentials
 get_oauth_client_config = google_docs.get_oauth_client_config
+export_document_as_markdown = google_docs.export_document_as_markdown
 handle_api_error = google_docs.handle_api_error
 insert_text = google_docs.insert_text
 load_config = google_docs.load_config
@@ -337,6 +340,21 @@ class TestDocumentOperations:
         assert request["textStyle"]["italic"] is True
         assert request["textStyle"]["fontSize"]["magnitude"] == 14
 
+    @patch("google_docs.build_drive_service")
+    def test_export_document_as_markdown(self, mock_build_drive):
+        """Test exporting document as markdown."""
+        mock_service = Mock()
+        mock_build_drive.return_value = mock_service
+        mock_service.files().export().execute.return_value = b"# Heading\n\nParagraph text"
+
+        result = export_document_as_markdown("test-doc-id")
+
+        assert result == "# Heading\n\nParagraph text"
+        # Verify export was called with correct parameters
+        call_args = mock_service.files().export.call_args
+        assert call_args[1]["fileId"] == "test-doc-id"
+        assert call_args[1]["mimeType"] == "text/markdown"
+
 
 # ============================================================================
 # OUTPUT FORMATTING TESTS
@@ -459,12 +477,26 @@ class TestCLICommands:
         """Test documents read command."""
         mock_read.return_value = "Document content here"
 
-        args = Mock(document_id="doc-123", json=False)
+        args = Mock(document_id="doc-123", format="text", json=False)
         result = cmd_documents_read(args)
 
         assert result == 0
         captured = capsys.readouterr()
         assert "Document content here" in captured.out
+
+    @patch("google_docs.export_document_as_markdown")
+    def test_cmd_documents_read_markdown_format(self, mock_export, capsys):
+        """Test documents read command with markdown format."""
+        mock_export.return_value = "# Title\n\nMarkdown content"
+
+        args = Mock(document_id="doc-123", format="markdown", json=False)
+        result = cmd_documents_read(args)
+
+        assert result == 0
+        mock_export.assert_called_once_with("doc-123")
+        captured = capsys.readouterr()
+        assert "# Title" in captured.out
+        assert "Markdown content" in captured.out
 
 
 # ============================================================================
@@ -499,6 +531,21 @@ class TestArgumentParser:
         assert args.command == "documents"
         assert args.documents_command == "create"
         assert args.title == "Test"
+
+    def test_parser_documents_read_with_format(self):
+        """Test parser for documents read with format option."""
+        parser = build_parser()
+        args = parser.parse_args(["documents", "read", "doc-123", "--format", "markdown"])
+        assert args.command == "documents"
+        assert args.documents_command == "read"
+        assert args.document_id == "doc-123"
+        assert args.format == "markdown"
+
+    def test_parser_documents_read_default_format(self):
+        """Test parser for documents read defaults to text format."""
+        parser = build_parser()
+        args = parser.parse_args(["documents", "read", "doc-123"])
+        assert args.format == "text"
 
     def test_parser_content_append(self):
         """Test parser for content append command."""
@@ -790,4 +837,19 @@ class TestBuildService:
         result = build_docs_service(custom_scopes)
 
         mock_get_creds.assert_called_once_with("google-docs", custom_scopes)
+        assert result == mock_service
+
+    @patch("google_docs.get_google_credentials")
+    @patch("google_docs.build")
+    def test_build_drive_service_default_scopes(self, mock_build, mock_get_creds):
+        """Test building Drive service with default scopes."""
+        mock_creds = Mock()
+        mock_get_creds.return_value = mock_creds
+        mock_service = Mock()
+        mock_build.return_value = mock_service
+
+        result = build_drive_service()
+
+        mock_get_creds.assert_called_once_with("google-docs", DRIVE_SCOPES_READONLY)
+        mock_build.assert_called_once_with("drive", "v3", credentials=mock_creds)
         assert result == mock_service
