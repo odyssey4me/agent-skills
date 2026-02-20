@@ -237,6 +237,23 @@ python scripts/google-drive.py files upload /path/to/file.pdf --json
 - `--name`: Name for the file in Drive
 - `--json`: Output as JSON
 
+### files move
+
+Move a file to a different folder.
+
+```bash
+# Move a file to a folder
+python scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
+
+# Output as JSON
+python scripts/google-drive.py files move FILE_ID --parent FOLDER_ID --json
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `--parent`: Destination folder ID (required)
+- `--json`: Output as JSON
+
 ### folders create
 
 Create a new folder.
@@ -441,7 +458,6 @@ The following Google Drive API operations are **not yet implemented** in this sk
 
 | Operation | API Method | Alternative |
 |-----------|-----------|-------------|
-| Move files between folders | `files.update` (addParents/removeParents) | Use Google Drive web interface |
 | Rename files | `files.update` (name) | Use Google Drive web interface |
 | Delete files permanently | `files.delete` | Use Google Drive web interface |
 | Trash / untrash files | `files.update` (trashed) | Use Google Drive web interface |

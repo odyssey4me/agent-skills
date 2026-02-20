@@ -10,6 +10,7 @@ Usage:
     python google-drive.py files get FILE_ID
     python google-drive.py files download FILE_ID --output /path/to/file
     python google-drive.py files upload /path/to/file --parent FOLDER_ID
+    python google-drive.py files move FILE_ID --parent FOLDER_ID
     python google-drive.py folders create "New Folder" --parent FOLDER_ID
     python google-drive.py share FILE_ID --email user@example.com --role writer
     python google-drive.py permissions list FILE_ID
@@ -577,6 +578,42 @@ def upload_file(
         return {}  # Unreachable
 
 
+def move_file(service, file_id: str, new_parent_id: str) -> dict[str, Any]:
+    """Move a file to a different folder in Google Drive.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID to move.
+        new_parent_id: The destination folder ID.
+
+    Returns:
+        Updated file metadata dictionary.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        # Get current parents
+        file = service.files().get(fileId=file_id, fields="parents").execute()
+        previous_parents = ",".join(file.get("parents", []))
+
+        # Move file to new parent
+        file = (
+            service.files()
+            .update(
+                fileId=file_id,
+                addParents=new_parent_id,
+                removeParents=previous_parents,
+                fields="id, name, parents",
+            )
+            .execute()
+        )
+        return file
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
 # ============================================================================
 # FOLDER OPERATIONS
 # ============================================================================
@@ -1102,6 +1139,22 @@ def cmd_files_upload(args):
     return 0
 
 
+def cmd_files_move(args):
+    """Handle 'files move' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_FILE)
+    result = move_file(service, file_id=args.file_id, new_parent_id=args.parent)
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print("File moved successfully")
+        print(f"  ID: {result.get('id')}")
+        print(f"  Name: {result.get('name')}")
+        print(f"  Parent: {args.parent}")
+
+    return 0
+
+
 def cmd_folders_create(args):
     """Handle 'folders create' command."""
     service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_FILE)
@@ -1243,6 +1296,11 @@ def build_parser() -> argparse.ArgumentParser:
     upload_parser.add_argument("--name", help="Name for the file in Drive")
     upload_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    move_parser = files_subparsers.add_parser("move", help="Move a file to a different folder")
+    move_parser.add_argument("file_id", help="File ID")
+    move_parser.add_argument("--parent", required=True, help="Destination folder ID")
+    move_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # folders commands
     folders_parser = subparsers.add_parser("folders", help="Folder operations")
     folders_subparsers = folders_parser.add_subparsers(dest="folders_command")
@@ -1355,6 +1413,8 @@ def main():
                 return cmd_files_download(args)
             elif args.files_command == "upload":
                 return cmd_files_upload(args)
+            elif args.files_command == "move":
+                return cmd_files_move(args)
         elif args.command == "folders":
             if args.folders_command == "create":
                 return cmd_folders_create(args)

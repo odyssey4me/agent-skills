@@ -5,7 +5,6 @@ This document tracks planned features for the agent-skills repository. Only pend
 ## Google Drive Enhancements
 
 - [ ] **google-drive** - Add missing Drive API operations
-  - [ ] Move files between folders (`files.update` with addParents/removeParents)
   - [ ] Rename files (`files.update` with name)
   - [ ] Delete files permanently (`files.delete`)
   - [ ] Trash / untrash files (`files.update` with trashed)

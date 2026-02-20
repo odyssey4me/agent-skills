@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from googleapiclient.errors import HttpError
 
 # Load the module with hyphenated name
 spec = importlib.util.spec_from_file_location(
@@ -60,6 +61,8 @@ save_config = google_drive.save_config
 search_files = google_drive.search_files
 set_credential = google_drive.set_credential
 share_file = google_drive.share_file
+move_file = google_drive.move_file
+cmd_files_move = google_drive.cmd_files_move
 upload_file = google_drive.upload_file
 
 
@@ -570,6 +573,37 @@ class TestFileOperations:
         with pytest.raises(DriveAPIError, match="File not found"):
             upload_file(mock_service, "/nonexistent/file.txt")
 
+    def test_move_file(self):
+        """Test moving a file to a different folder."""
+        mock_service = Mock()
+        mock_service.files().get().execute.return_value = {"parents": ["old_parent_id"]}
+        mock_service.files().update().execute.return_value = {
+            "id": "file123",
+            "name": "Test.pdf",
+            "parents": ["new_parent_id"],
+        }
+
+        result = move_file(mock_service, "file123", "new_parent_id")
+
+        assert result["id"] == "file123"
+        assert result["parents"] == ["new_parent_id"]
+        mock_service.files().update.assert_called_with(
+            fileId="file123",
+            addParents="new_parent_id",
+            removeParents="old_parent_id",
+            fields="id, name, parents",
+        )
+
+    def test_move_file_api_error(self):
+        """Test moving a file when API returns an error."""
+        mock_service = Mock()
+        resp = Mock(status=404, reason="Not Found")
+        content = b'{"error": {"message": "File not found"}}'
+        mock_service.files().get().execute.side_effect = HttpError(resp, content)
+
+        with pytest.raises(DriveAPIError):
+            move_file(mock_service, "nonexistent", "new_parent_id")
+
 
 # ============================================================================
 # FOLDER OPERATIONS TESTS
@@ -1041,6 +1075,49 @@ class TestCLICommands:
         assert exit_code == 0
 
     @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "move_file")
+    @patch("builtins.print")
+    def test_cmd_files_move_text(self, _mock_print, mock_move, __mock_build_service):
+        """Test files move command with text output."""
+        mock_move.return_value = {
+            "id": "file123",
+            "name": "Test.pdf",
+            "parents": ["new_parent_id"],
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.parent = "new_parent_id"
+        args.json = False
+
+        exit_code = cmd_files_move(args)
+
+        assert exit_code == 0
+        mock_move.assert_called_once_with(
+            __mock_build_service.return_value, file_id="file123", new_parent_id="new_parent_id"
+        )
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "move_file")
+    @patch("builtins.print")
+    def test_cmd_files_move_json(self, _mock_print, mock_move, __mock_build_service):
+        """Test files move command with JSON output."""
+        mock_move.return_value = {
+            "id": "file123",
+            "name": "Test.pdf",
+            "parents": ["new_parent_id"],
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.parent = "new_parent_id"
+        args.json = True
+
+        exit_code = cmd_files_move(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "create_folder")
     @patch("builtins.print")
     def test_cmd_folders_create(self, _mock_print, mock_create_folder, __mock_build_service):
@@ -1218,6 +1295,13 @@ class TestArgumentParser:
         assert args.files_command == "upload"
         assert args.path == "/path/to/file.pdf"
         assert args.parent == "folder123"
+
+        # Test files move
+        args = parser.parse_args(["files", "move", "file123", "--parent", "folder456"])
+        assert args.command == "files"
+        assert args.files_command == "move"
+        assert args.file_id == "file123"
+        assert args.parent == "folder456"
 
         # Test folders create
         args = parser.parse_args(["folders", "create", "New Folder"])
