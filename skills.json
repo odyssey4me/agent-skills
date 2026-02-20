@@ -2,6 +2,27 @@
   "$schema": "https://agentskills.io/registry/v1",
   "skills": [
     {
+      "name": "code-review",
+      "description": "Review PRs, MRs, and Gerrit changes with focus on security, maintainability, and architectural fit. Leverages github, gitlab, or gerrit skills based on repository context.",
+      "version": "0.1.0",
+      "category": "development",
+      "tags": [
+        "review",
+        "security",
+        "maintainability",
+        "pr",
+        "mr"
+      ],
+      "type": "workflow",
+      "complexity": "orchestration",
+      "auth": "cli-auth",
+      "dependencies": [
+        "github",
+        "gitlab",
+        "gerrit"
+      ]
+    },
+    {
       "name": "confluence",
       "description": "Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.",
       "version": "0.2.0",
