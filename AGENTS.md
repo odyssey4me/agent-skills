@@ -106,6 +106,23 @@ Pre-commit hooks enforce code quality checks. To avoid failed commits, run these
    ```
    Changed lines must have at least 80% test coverage. If you added or modified Python code, write or update tests before committing.
 
+### Atomic commits
+
+Solve one problem or implement one feature at a time. Commit as soon as that unit of work is complete before moving on to the next. This keeps changes small, reviewable, and easy to revert if needed. Do not bundle unrelated changes into a single commit.
+
+### Conventional commits
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages:
+
+- `feat:` — a new feature
+- `fix:` — a bug fix
+- `docs:` — documentation-only changes
+- `refactor:` — code changes that neither fix a bug nor add a feature
+- `test:` — adding or updating tests
+- `chore:` — maintenance tasks (dependencies, CI, tooling)
+
+Include a scope when it adds clarity, e.g. `feat(jira):`, `fix(gmail):`, `docs(agents):`. Write the subject in imperative mood, lowercase, with no trailing period. Add a body when the "why" is not obvious from the subject alone.
+
 ### Additional guidance
 
 - **Type hints** are required for all function signatures.
