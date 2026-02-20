@@ -67,11 +67,10 @@ The skill requests granular scopes for different operations:
 
 ### Scope Errors
 
-If you encounter "insufficient scope" errors, revoke your token and re-authenticate:
+If you encounter "insufficient scope" errors, reset your token and re-authenticate:
 
-1. Revoke at https://myaccount.google.com/permissions
-2. Clear token: `keyring del agent-skills google-calendar-token-json`
-3. Re-run: `python scripts/google-calendar.py check`
+1. Reset token: `python scripts/google-calendar.py auth reset`
+2. Re-run: `python scripts/google-calendar.py check`
 
 ## Commands
 
@@ -100,6 +99,26 @@ python scripts/google-calendar.py auth setup \
 ```
 
 Credentials are saved to `~/.config/agent-skills/google-calendar.yaml`.
+
+### auth reset
+
+Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
+
+```bash
+python scripts/google-calendar.py auth reset
+```
+
+Use this when you encounter scope or authentication errors.
+
+### auth status
+
+Show current OAuth token information without making API calls.
+
+```bash
+python scripts/google-calendar.py auth status
+```
+
+Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
 
 ### calendars list
 
@@ -428,6 +447,17 @@ Use date format (YYYY-MM-DD):
 
 For all-day events, you can specify a timezone using the `--timezone` argument.
 
+## Error Handling
+
+**Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:
+
+1. Inform the user about the error
+2. Run `python scripts/google-calendar.py auth status` to check the current token state
+3. Suggest the user run `python scripts/google-calendar.py auth reset` followed by `python scripts/google-calendar.py check` to re-authenticate
+4. The `auth reset` and `check` commands require user interaction (browser-based OAuth consent) and cannot be completed autonomously
+
+**Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
+
 ## Model Guidance
 
 This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
@@ -440,16 +470,21 @@ Run `python scripts/google-calendar.py check` to diagnose issues. It will provid
 
 ### Authentication failed
 
-1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/google.yaml`
-2. Token expired or corrupted - clear and re-authenticate:
+1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/google-calendar.yaml`
+2. Token expired or corrupted — reset and re-authenticate:
    ```bash
-   keyring del agent-skills google-calendar-token-json
+   python scripts/google-calendar.py auth reset
    python scripts/google-calendar.py check
    ```
 
 ### Permission denied
 
-Your OAuth token may not have the necessary scopes. Revoke access at https://myaccount.google.com/permissions, clear your token, and re-authenticate.
+Your OAuth token may not have the necessary scopes. Reset your token and re-authenticate:
+
+```bash
+python scripts/google-calendar.py auth reset
+python scripts/google-calendar.py check
+```
 
 ### Import errors
 

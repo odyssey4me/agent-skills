@@ -27,7 +27,9 @@ build_calendar_service = google_calendar.build_calendar_service
 build_parser = google_calendar.build_parser
 check_calendar_connectivity = google_calendar.check_calendar_connectivity
 check_freebusy = google_calendar.check_freebusy
+cmd_auth_reset = google_calendar.cmd_auth_reset
 cmd_auth_setup = google_calendar.cmd_auth_setup
+cmd_auth_status = google_calendar.cmd_auth_status
 cmd_calendars_get = google_calendar.cmd_calendars_get
 cmd_calendars_list = google_calendar.cmd_calendars_list
 cmd_check = google_calendar.cmd_check
@@ -46,6 +48,7 @@ get_calendar = google_calendar.get_calendar
 get_credential = google_calendar.get_credential
 get_event = google_calendar.get_event
 get_google_credentials = google_calendar.get_google_credentials
+_run_oauth_flow = google_calendar._run_oauth_flow
 get_oauth_client_config = google_calendar.get_oauth_client_config
 handle_api_error = google_calendar.handle_api_error
 list_calendars = google_calendar.list_calendars
@@ -192,6 +195,7 @@ class TestAuthentication:
                 "token_uri": "https://oauth2.googleapis.com/token",
                 "client_id": "test-id",
                 "client_secret": "test-secret",
+                "scopes": ["calendar.readonly"],
             }
         )
         mock_get_cred.return_value = token_json
@@ -200,6 +204,69 @@ class TestAuthentication:
             mock_credentials_class.from_authorized_user_info.return_value = mock_creds
             result = get_google_credentials("google-calendar", ["calendar.readonly"])
             assert result == mock_creds
+
+    @patch.object(google_calendar, "delete_credential")
+    @patch.object(google_calendar, "_run_oauth_flow")
+    @patch.object(google_calendar, "set_credential")
+    @patch.object(google_calendar, "get_credential")
+    def test_get_google_credentials_scope_mismatch(
+        self, mock_get_cred, _mock_set_cred, mock_run_oauth, mock_delete_cred
+    ):
+        """Test re-auth triggers when token lacks requested scopes."""
+        mock_creds = Mock()
+        mock_creds.valid = True
+
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": "test-id",
+            "client_secret": "test-secret",
+            "scopes": ["https://www.googleapis.com/auth/calendar.readonly"],
+        }
+        mock_get_cred.return_value = json.dumps(token_data)
+
+        mock_new_creds = Mock()
+        mock_run_oauth.return_value = mock_new_creds
+
+        with patch("google_calendar.Credentials") as mock_credentials_class:
+            mock_credentials_class.from_authorized_user_info.return_value = mock_creds
+            result = get_google_credentials(
+                "google-calendar",
+                [
+                    "https://www.googleapis.com/auth/calendar.readonly",
+                    "https://www.googleapis.com/auth/calendar.events",
+                ],
+            )
+
+        assert result == mock_new_creds
+        mock_delete_cred.assert_called_once_with("google-calendar-token-json")
+        call_args = mock_run_oauth.call_args[0]
+        merged_scopes = set(call_args[1])
+        assert "https://www.googleapis.com/auth/calendar.readonly" in merged_scopes
+        assert "https://www.googleapis.com/auth/calendar.events" in merged_scopes
+
+    @patch.object(google_calendar, "set_credential")
+    @patch.object(google_calendar, "get_credential")
+    def test_get_google_credentials_no_scopes_in_token(self, mock_get_cred, _mock_set_cred):
+        """Test backward compatibility when token has no scopes field."""
+        mock_creds = Mock()
+        mock_creds.valid = True
+
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": "test-id",
+            "client_secret": "test-secret",
+        }
+        mock_get_cred.return_value = json.dumps(token_data)
+
+        with patch("google_calendar.Credentials") as mock_credentials_class:
+            mock_credentials_class.from_authorized_user_info.return_value = mock_creds
+            result = get_google_credentials("google-calendar", ["calendar.readonly"])
+
+        assert result == mock_creds
 
 
 # ============================================================================
@@ -584,6 +651,45 @@ class TestCLICommands:
         captured = capsys.readouterr()
         assert "saved to config file" in captured.out
 
+    @patch.object(google_calendar, "delete_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_reset(self, _mock_print, mock_delete):
+        """Test auth reset command."""
+        args = Mock()
+        exit_code = cmd_auth_reset(args)
+
+        assert exit_code == 0
+        mock_delete.assert_called_once_with("google-calendar-token-json")
+
+    @patch.object(google_calendar, "get_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_status_with_token(self, _mock_print, mock_get_credential):
+        """Test auth status command with stored token."""
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "scopes": ["https://www.googleapis.com/auth/calendar.readonly"],
+            "expiry": "2025-01-01T00:00:00Z",
+            "client_id": "1234567890abcdef.apps.googleusercontent.com",
+        }
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        args = Mock()
+        exit_code = cmd_auth_status(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_calendar, "get_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_status_no_token(self, _mock_print, mock_get_credential):
+        """Test auth status command with no stored token."""
+        mock_get_credential.return_value = None
+
+        args = Mock()
+        exit_code = cmd_auth_status(args)
+
+        assert exit_code == 1
+
     @patch.object(google_calendar, "build_calendar_service")
     @patch.object(google_calendar, "list_calendars")
     def test_cmd_calendars_list(self, mock_list, _mock_service, capsys):
@@ -832,6 +938,16 @@ class TestParser:
         assert args.command == "auth"
         assert args.auth_command == "setup"
         assert args.client_id == "id"
+
+        # Test auth reset
+        args = parser.parse_args(["auth", "reset"])
+        assert args.command == "auth"
+        assert args.auth_command == "reset"
+
+        # Test auth status
+        args = parser.parse_args(["auth", "status"])
+        assert args.command == "auth"
+        assert args.auth_command == "status"
 
         # Test events create command
         args = parser.parse_args(

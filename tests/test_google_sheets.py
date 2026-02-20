@@ -4,6 +4,7 @@ from __future__ import annotations
 
 # Import from skills module - use importlib to handle hyphenated module name
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -30,6 +31,8 @@ build_sheets_service = google_sheets.build_sheets_service
 check_sheets_connectivity = google_sheets.check_sheets_connectivity
 clear_values = google_sheets.clear_values
 cmd_auth_setup = google_sheets.cmd_auth_setup
+cmd_auth_reset = google_sheets.cmd_auth_reset
+cmd_auth_status = google_sheets.cmd_auth_status
 cmd_check = google_sheets.cmd_check
 cmd_sheets_create = google_sheets.cmd_sheets_create
 cmd_sheets_delete = google_sheets.cmd_sheets_delete
@@ -47,6 +50,7 @@ format_spreadsheet_summary = google_sheets.format_spreadsheet_summary
 format_values_output = google_sheets.format_values_output
 get_credential = google_sheets.get_credential
 get_google_credentials = google_sheets.get_google_credentials
+_run_oauth_flow = google_sheets._run_oauth_flow
 get_oauth_client_config = google_sheets.get_oauth_client_config
 get_spreadsheet = google_sheets.get_spreadsheet
 handle_api_error = google_sheets.handle_api_error
@@ -658,6 +662,45 @@ class TestCLICommands:
         captured = capsys.readouterr()
         assert "Invalid JSON" in captured.err
 
+    @patch("google_sheets.delete_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_reset(self, _mock_print, mock_delete):
+        """Test auth reset command."""
+        args = Mock()
+        exit_code = cmd_auth_reset(args)
+
+        assert exit_code == 0
+        mock_delete.assert_called_once_with("google-sheets-token-json")
+
+    @patch("google_sheets.get_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_status_with_token(self, _mock_print, mock_get_credential):
+        """Test auth status command with stored token."""
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "scopes": ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+            "expiry": "2025-01-01T00:00:00Z",
+            "client_id": "1234567890abcdef.apps.googleusercontent.com",
+        }
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        args = Mock()
+        exit_code = cmd_auth_status(args)
+
+        assert exit_code == 0
+
+    @patch("google_sheets.get_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_status_no_token(self, _mock_print, mock_get_credential):
+        """Test auth status command with no stored token."""
+        mock_get_credential.return_value = None
+
+        args = Mock()
+        exit_code = cmd_auth_status(args)
+
+        assert exit_code == 1
+
 
 # ============================================================================
 # ARGUMENT PARSER TESTS
@@ -683,6 +726,16 @@ class TestArgumentParser:
         assert args.auth_command == "setup"
         assert args.client_id == "id"
         assert args.client_secret == "secret"
+
+        # Test auth reset
+        args = parser.parse_args(["auth", "reset"])
+        assert args.command == "auth"
+        assert args.auth_command == "reset"
+
+        # Test auth status
+        args = parser.parse_args(["auth", "status"])
+        assert args.command == "auth"
+        assert args.auth_command == "status"
 
     def test_parser_spreadsheets_create(self):
         """Test parser for spreadsheets create command."""
@@ -859,6 +912,62 @@ class TestAuthenticationFlow:
 
         with pytest.raises(AuthenticationError, match="OAuth flow failed"):
             get_google_credentials("google-sheets", ["https://scope"])
+
+    @patch("google_sheets.delete_credential")
+    @patch("google_sheets._run_oauth_flow")
+    @patch("google_sheets.get_credential")
+    @patch("google_sheets.Credentials")
+    def test_get_google_credentials_scope_mismatch(
+        self,
+        mock_creds_class,
+        mock_get_credential,
+        mock_run_oauth,
+        mock_delete_credential,
+    ):
+        """Test re-auth triggers when token lacks requested scopes."""
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "scopes": ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+        }
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        mock_creds = Mock()
+        mock_creds.valid = True
+        mock_creds_class.from_authorized_user_info.return_value = mock_creds
+
+        mock_new_creds = Mock()
+        mock_run_oauth.return_value = mock_new_creds
+
+        result = get_google_credentials(
+            "google-sheets",
+            [
+                "https://www.googleapis.com/auth/spreadsheets.readonly",
+                "https://www.googleapis.com/auth/spreadsheets",
+            ],
+        )
+
+        assert result == mock_new_creds
+        mock_delete_credential.assert_called_once_with("google-sheets-token-json")
+        call_args = mock_run_oauth.call_args[0]
+        merged_scopes = set(call_args[1])
+        assert "https://www.googleapis.com/auth/spreadsheets.readonly" in merged_scopes
+        assert "https://www.googleapis.com/auth/spreadsheets" in merged_scopes
+
+    @patch("google_sheets.get_credential")
+    @patch("google_sheets.Credentials")
+    def test_get_google_credentials_no_scopes_in_token(self, mock_creds_class, mock_get_credential):
+        """Test backward compatibility when token has no scopes field."""
+        token_data = {"token": "access-token", "refresh_token": "refresh-token"}
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        mock_creds = Mock()
+        mock_creds.valid = True
+        mock_creds_class.from_authorized_user_info.return_value = mock_creds
+
+        result = get_google_credentials("google-sheets", ["https://scope"])
+
+        assert result == mock_creds
 
 
 # ============================================================================

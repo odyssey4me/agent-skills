@@ -145,6 +145,16 @@ python scripts/{{SERVICE_NAME}}.py get my-resource-id
 python scripts/{{SERVICE_NAME}}.py create --name "My Resource" --description "A description"
 ```
 
+## Error Handling
+
+**Authentication errors are not retryable.** If a command fails with an authentication or permission error (exit code 1), do NOT retry the same command. Instead:
+
+1. Inform the user about the error
+2. Suggest the user verify their credentials and re-run `python scripts/{{SERVICE_NAME}}.py check`
+3. Authentication setup requires user interaction and cannot be completed autonomously
+
+**Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
+
 ## Model Guidance
 
 This skill makes API calls requiring structured input/output. A standard-capability model is recommended.

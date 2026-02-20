@@ -67,11 +67,10 @@ The skill requests granular scopes for different operations:
 
 ### Scope Errors
 
-If you encounter "insufficient scope" errors, revoke your token and re-authenticate:
+If you encounter "insufficient scope" errors, reset your token and re-authenticate:
 
-1. Revoke at https://myaccount.google.com/permissions
-2. Clear token: `keyring del agent-skills google-sheets-token-json`
-3. Re-run: `python scripts/google-sheets.py check`
+1. Reset token: `python scripts/google-sheets.py auth reset`
+2. Re-run: `python scripts/google-sheets.py check`
 
 ## Commands
 
@@ -104,6 +103,26 @@ Credentials are saved to `~/.config/agent-skills/google-sheets.yaml`.
 **Options:**
 - `--client-id` - OAuth 2.0 client ID (required)
 - `--client-secret` - OAuth 2.0 client secret (required)
+
+### auth reset
+
+Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
+
+```bash
+python scripts/google-sheets.py auth reset
+```
+
+Use this when you encounter scope or authentication errors.
+
+### auth status
+
+Show current OAuth token information without making API calls.
+
+```bash
+python scripts/google-sheets.py auth status
+```
+
+Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
 
 ### spreadsheets create
 
@@ -416,20 +435,40 @@ for month in Jan Feb Mar; do
 done
 ```
 
+## Error Handling
+
+**Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:
+
+1. Inform the user about the error
+2. Run `python scripts/google-sheets.py auth status` to check the current token state
+3. Suggest the user run `python scripts/google-sheets.py auth reset` followed by `python scripts/google-sheets.py check` to re-authenticate
+4. The `auth reset` and `check` commands require user interaction (browser-based OAuth consent) and cannot be completed autonomously
+
+**Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
+
 ## Model Guidance
 
 This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 
-### "Insufficient scope" errors
+### Authentication failed
 
-You need to revoke and re-authenticate to grant additional permissions:
+1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/google-sheets.yaml`
+2. Token expired or corrupted — reset and re-authenticate:
+   ```bash
+   python scripts/google-sheets.py auth reset
+   python scripts/google-sheets.py check
+   ```
 
-1. Go to https://myaccount.google.com/permissions
-2. Find "Agent Skills" and remove access
-3. Delete stored token: `keyring del agent-skills google-sheets-token-json`
-4. Run `python scripts/google-sheets.py check` to re-authenticate
+### Permission denied
+
+Your OAuth token may not have the necessary scopes. Reset your token and re-authenticate:
+
+```bash
+python scripts/google-sheets.py auth reset
+python scripts/google-sheets.py check
+```
 
 ### Cannot find spreadsheet
 

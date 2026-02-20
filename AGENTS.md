@@ -68,6 +68,15 @@ python skills/<skill>/scripts/<skill>.py check
 
 For user-focused testing, authentication, and troubleshooting, see the skill's SKILL.md file and [docs/user-guide.md](docs/user-guide.md).
 
+## Error Handling in Skills
+
+Skills should include an **Error Handling** section in their SKILL.md that tells agents which errors are retryable and which require user intervention. Key principles:
+
+- **Authentication/permission errors are never retryable** — they require user action (re-entering credentials, granting OAuth consent, etc.)
+- **Rate limiting (429) and server errors (5xx) are retryable** after a brief wait
+- **All other errors should be reported to the user** rather than retried
+- Skills that use OAuth should document the `auth reset` → `check` workflow for recovering from scope/token errors
+
 ## Creating New Skills
 
 To create a new skill, use the template:

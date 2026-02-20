@@ -4,6 +4,7 @@ from __future__ import annotations
 
 # Import from skills module - use importlib to handle hyphenated module name
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -32,6 +33,8 @@ build_drive_service = google_docs.build_drive_service
 build_parser = google_docs.build_parser
 check_docs_connectivity = google_docs.check_docs_connectivity
 cmd_auth_setup = google_docs.cmd_auth_setup
+cmd_auth_reset = google_docs.cmd_auth_reset
+cmd_auth_status = google_docs.cmd_auth_status
 cmd_check = google_docs.cmd_check
 cmd_content_append = google_docs.cmd_content_append
 cmd_content_delete = google_docs.cmd_content_delete
@@ -47,6 +50,7 @@ format_document_summary = google_docs.format_document_summary
 get_credential = google_docs.get_credential
 get_document = google_docs.get_document
 get_google_credentials = google_docs.get_google_credentials
+_run_oauth_flow = google_docs._run_oauth_flow
 get_oauth_client_config = google_docs.get_oauth_client_config
 export_document_as_markdown = google_docs.export_document_as_markdown
 export_document_as_pdf = google_docs.export_document_as_pdf
@@ -548,6 +552,45 @@ class TestCLICommands:
         captured = capsys.readouterr()
         assert "PDF saved to: doc-123.pdf" in captured.out
 
+    @patch("google_docs.delete_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_reset(self, _mock_print, mock_delete):
+        """Test auth reset command."""
+        args = Mock()
+        exit_code = cmd_auth_reset(args)
+
+        assert exit_code == 0
+        mock_delete.assert_called_once_with("google-docs-token-json")
+
+    @patch("google_docs.get_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_status_with_token(self, _mock_print, mock_get_credential):
+        """Test auth status command with stored token."""
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "scopes": ["https://www.googleapis.com/auth/documents.readonly"],
+            "expiry": "2025-01-01T00:00:00Z",
+            "client_id": "1234567890abcdef.apps.googleusercontent.com",
+        }
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        args = Mock()
+        exit_code = cmd_auth_status(args)
+
+        assert exit_code == 0
+
+    @patch("google_docs.get_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_status_no_token(self, _mock_print, mock_get_credential):
+        """Test auth status command with no stored token."""
+        mock_get_credential.return_value = None
+
+        args = Mock()
+        exit_code = cmd_auth_status(args)
+
+        assert exit_code == 1
+
 
 # ============================================================================
 # ARGUMENT PARSER TESTS
@@ -573,6 +616,24 @@ class TestArgumentParser:
         assert args.auth_command == "setup"
         assert args.client_id == "id"
         assert args.client_secret == "secret"
+
+    def test_parser_auth_reset(self):
+        """Test parser for auth reset command."""
+        parser = build_parser()
+
+        # Test auth reset
+        args = parser.parse_args(["auth", "reset"])
+        assert args.command == "auth"
+        assert args.auth_command == "reset"
+
+    def test_parser_auth_status(self):
+        """Test parser for auth status command."""
+        parser = build_parser()
+
+        # Test auth status
+        args = parser.parse_args(["auth", "status"])
+        assert args.command == "auth"
+        assert args.auth_command == "status"
 
     def test_parser_documents_create(self):
         """Test parser for documents create command."""
@@ -741,6 +802,62 @@ class TestAuthenticationFlow:
 
         with pytest.raises(AuthenticationError, match="OAuth flow failed"):
             get_google_credentials("google-docs", ["https://scope"])
+
+    @patch("google_docs.delete_credential")
+    @patch("google_docs._run_oauth_flow")
+    @patch("google_docs.get_credential")
+    @patch("google_docs.Credentials")
+    def test_get_google_credentials_scope_mismatch(
+        self,
+        mock_creds_class,
+        mock_get_credential,
+        mock_run_oauth,
+        mock_delete_credential,
+    ):
+        """Test re-auth triggers when token lacks requested scopes."""
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "scopes": ["https://www.googleapis.com/auth/documents.readonly"],
+        }
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        mock_creds = Mock()
+        mock_creds.valid = True
+        mock_creds_class.from_authorized_user_info.return_value = mock_creds
+
+        mock_new_creds = Mock()
+        mock_run_oauth.return_value = mock_new_creds
+
+        result = get_google_credentials(
+            "google-docs",
+            [
+                "https://www.googleapis.com/auth/documents.readonly",
+                "https://www.googleapis.com/auth/documents",
+            ],
+        )
+
+        assert result == mock_new_creds
+        mock_delete_credential.assert_called_once_with("google-docs-token-json")
+        call_args = mock_run_oauth.call_args[0]
+        merged_scopes = set(call_args[1])
+        assert "https://www.googleapis.com/auth/documents.readonly" in merged_scopes
+        assert "https://www.googleapis.com/auth/documents" in merged_scopes
+
+    @patch("google_docs.get_credential")
+    @patch("google_docs.Credentials")
+    def test_get_google_credentials_no_scopes_in_token(self, mock_creds_class, mock_get_credential):
+        """Test backward compatibility when token has no scopes field."""
+        token_data = {"token": "access-token", "refresh_token": "refresh-token"}
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        mock_creds = Mock()
+        mock_creds.valid = True
+        mock_creds_class.from_authorized_user_info.return_value = mock_creds
+
+        result = get_google_credentials("google-docs", ["https://scope"])
+
+        assert result == mock_creds
 
 
 # ============================================================================

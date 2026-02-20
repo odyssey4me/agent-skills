@@ -238,6 +238,27 @@ def get_oauth_client_config(service: str) -> dict[str, Any]:
     )
 
 
+def _run_oauth_flow(service: str, scopes: list[str]) -> Credentials:
+    """Run OAuth browser flow and store resulting token.
+
+    Args:
+        service: Service name (e.g., "google-sheets").
+        scopes: List of OAuth scopes required.
+
+    Returns:
+        Valid Google credentials.
+
+    Raises:
+        AuthenticationError: If OAuth flow fails.
+    """
+    client_config = get_oauth_client_config(service)
+    flow = InstalledAppFlow.from_client_config(client_config, scopes)
+    creds = flow.run_local_server(port=0)  # Opens browser for consent
+    # Save token to keyring for future use
+    set_credential(f"{service}-token-json", creds.to_json())
+    return creds
+
+
 def get_google_credentials(service: str, scopes: list[str]) -> Credentials:
     """Get Google credentials for human-in-the-loop use cases.
 
@@ -262,8 +283,22 @@ def get_google_credentials(service: str, scopes: list[str]) -> Credentials:
     token_json = get_credential(f"{service}-token-json")
     if token_json:
         try:
-            creds = Credentials.from_authorized_user_info(json.loads(token_json), scopes)
+            token_data = json.loads(token_json)
+            creds = Credentials.from_authorized_user_info(token_data, scopes)
             if creds and creds.valid:
+                # Check if stored token has all requested scopes
+                granted = set(token_data.get("scopes", []))
+                requested = set(scopes)
+                if granted and not requested.issubset(granted):
+                    # Merge scopes so user doesn't lose existing access
+                    merged = list(granted | requested)
+                    print(
+                        "Current token lacks required scopes. "
+                        "Opening browser for re-authentication...",
+                        file=sys.stderr,
+                    )
+                    delete_credential(f"{service}-token-json")
+                    return _run_oauth_flow(service, merged)
                 return creds
             # Refresh if expired but has refresh token
             if creds and creds.expired and creds.refresh_token:
@@ -277,12 +312,7 @@ def get_google_credentials(service: str, scopes: list[str]) -> Credentials:
 
     # 2. Initiate OAuth flow - human interaction required
     try:
-        client_config = get_oauth_client_config(service)
-        flow = InstalledAppFlow.from_client_config(client_config, scopes)
-        creds = flow.run_local_server(port=0)  # Opens browser for consent
-        # Save token to keyring for future use
-        set_credential(f"{service}-token-json", creds.to_json())
-        return creds
+        return _run_oauth_flow(service, scopes)
     except Exception as e:
         raise AuthenticationError(f"OAuth flow failed: {e}") from e
 
@@ -343,10 +373,9 @@ def handle_api_error(error: HttpError) -> None:
     if status_code == 403 and "insufficient" in message.lower():
         scope_help = (
             "\n\nInsufficient OAuth scope. This operation requires additional permissions.\n"
-            "To grant full access, revoke your current token and re-authenticate:\n\n"
-            "  1. Revoke: Go to https://myaccount.google.com/permissions and remove 'Agent Skills'\n"
-            "  2. Clear token: keyring del agent-skills google-sheets-token-json\n"
-            "  3. Re-run: python scripts/google-sheets.py check\n\n"
+            "To re-authenticate with the required scopes:\n\n"
+            "  1. Reset token: python scripts/google-sheets.py auth reset\n"
+            "  2. Re-run: python scripts/google-sheets.py check\n\n"
             "For setup help, see: docs/google-oauth-setup.md\n"
         )
         message = f"{message}{scope_help}"
@@ -734,11 +763,10 @@ def cmd_check(_args):
             # Check if write scope is granted
             if not scopes.get("write"):
                 print("\n⚠️  Write scope not granted. Some operations will fail.")
-                print("   To grant full access, revoke and re-authenticate:")
+                print("   To grant full access, reset and re-authenticate:")
                 print()
-                print("   1. Revoke: https://myaccount.google.com/permissions")
-                print("   2. Clear token: keyring del agent-skills google-sheets-token-json")
-                print("   3. Re-run: python scripts/google-sheets.py check")
+                print("   1. Reset token: python scripts/google-sheets.py auth reset")
+                print("   2. Re-run: python scripts/google-sheets.py check")
                 print()
                 print("   See: docs/google-oauth-setup.md")
 
@@ -782,6 +810,55 @@ def cmd_auth_setup(args):
     print("✓ OAuth client credentials saved to config file")
     print(f"  Config location: {CONFIG_DIR / 'google-sheets.yaml'}")
     print("\nNext step: Run any Google Sheets command to initiate OAuth flow")
+    return 0
+
+
+def cmd_auth_reset(_args):
+    """Handle 'auth reset' command."""
+    delete_credential("google-sheets-token-json")
+    print("OAuth token cleared. Next command will trigger re-authentication.")
+    return 0
+
+
+def cmd_auth_status(_args):
+    """Handle 'auth status' command."""
+    token_json = get_credential("google-sheets-token-json")
+    if not token_json:
+        print("No OAuth token stored.")
+        return 1
+
+    try:
+        token_data = json.loads(token_json)
+    except json.JSONDecodeError:
+        print("Stored token is corrupted.")
+        return 1
+
+    print("OAuth token is stored.")
+
+    # Granted scopes
+    scopes = token_data.get("scopes", [])
+    if scopes:
+        print("\nGranted scopes:")
+        for scope in scopes:
+            print(f"  - {scope}")
+    else:
+        print("\nGranted scopes: (unknown - legacy token)")
+
+    # Refresh token
+    has_refresh = bool(token_data.get("refresh_token"))
+    print(f"\nRefresh token: {'present' if has_refresh else 'missing'}")
+
+    # Expiry
+    expiry = token_data.get("expiry")
+    if expiry:
+        print(f"Token expiry: {expiry}")
+
+    # Client ID (truncated)
+    client_id = token_data.get("client_id", "")
+    if client_id:
+        truncated = client_id[:16] + "..." if len(client_id) > 16 else client_id
+        print(f"Client ID: {truncated}")
+
     return 0
 
 
@@ -947,6 +1024,9 @@ def build_parser() -> argparse.ArgumentParser:
     setup_parser.add_argument("--client-id", required=True, help="OAuth client ID")
     setup_parser.add_argument("--client-secret", required=True, help="OAuth client secret")
 
+    auth_subparsers.add_parser("reset", help="Clear stored OAuth token")
+    auth_subparsers.add_parser("status", help="Show current token info")
+
     # spreadsheets commands
     spreadsheets_parser = subparsers.add_parser("spreadsheets", help="Spreadsheet operations")
     spreadsheets_subparsers = spreadsheets_parser.add_subparsers(dest="spreadsheets_command")
@@ -1070,6 +1150,10 @@ def main():
         elif args.command == "auth":
             if args.auth_command == "setup":
                 return cmd_auth_setup(args)
+            elif args.auth_command == "reset":
+                return cmd_auth_reset(args)
+            elif args.auth_command == "status":
+                return cmd_auth_status(args)
         elif args.command == "spreadsheets":
             if args.spreadsheets_command == "create":
                 return cmd_spreadsheets_create(args)

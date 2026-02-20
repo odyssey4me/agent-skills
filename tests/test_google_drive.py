@@ -27,6 +27,8 @@ build_drive_service = google_drive.build_drive_service
 build_parser = google_drive.build_parser
 check_drive_connectivity = google_drive.check_drive_connectivity
 cmd_auth_setup = google_drive.cmd_auth_setup
+cmd_auth_reset = google_drive.cmd_auth_reset
+cmd_auth_status = google_drive.cmd_auth_status
 cmd_check = google_drive.cmd_check
 cmd_files_download = google_drive.cmd_files_download
 cmd_files_get = google_drive.cmd_files_get
@@ -47,6 +49,7 @@ format_permission = google_drive.format_permission
 get_credential = google_drive.get_credential
 get_file_metadata = google_drive.get_file_metadata
 get_google_credentials = google_drive.get_google_credentials
+_run_oauth_flow = google_drive._run_oauth_flow
 get_oauth_client_config = google_drive.get_oauth_client_config
 handle_api_error = google_drive.handle_api_error
 list_files = google_drive.list_files
@@ -255,7 +258,11 @@ class TestGoogleCredentials:
     def test_get_google_credentials_from_keyring(self, mock_from_user_info, mock_get_credential):
         """Test getting credentials from keyring."""
         # Keyring has token
-        token_data = {"token": "access-token", "refresh_token": "refresh-token"}
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "scopes": ["scope1"],
+        }
         mock_get_credential.return_value = json.dumps(token_data)
 
         # Mock credentials object
@@ -316,6 +323,66 @@ class TestGoogleCredentials:
             AuthenticationError, match="OAuth flow failed|OAuth client credentials not found"
         ):
             get_google_credentials("google-drive", ["scope1"])
+
+    @patch.object(google_drive, "delete_credential")
+    @patch.object(google_drive, "_run_oauth_flow")
+    @patch.object(google_drive, "get_credential")
+    @patch("google.oauth2.credentials.Credentials.from_authorized_user_info")
+    def test_get_google_credentials_scope_mismatch(
+        self,
+        mock_from_user_info,
+        mock_get_credential,
+        mock_run_oauth,
+        mock_delete_credential,
+    ):
+        """Test re-auth triggers when token lacks requested scopes."""
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "scopes": ["https://www.googleapis.com/auth/drive.readonly"],
+        }
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        mock_creds = Mock()
+        mock_creds.valid = True
+        mock_from_user_info.return_value = mock_creds
+
+        mock_new_creds = Mock()
+        mock_run_oauth.return_value = mock_new_creds
+
+        result = get_google_credentials(
+            "google-drive",
+            [
+                "https://www.googleapis.com/auth/drive.readonly",
+                "https://www.googleapis.com/auth/drive.file",
+            ],
+        )
+
+        assert result == mock_new_creds
+        mock_delete_credential.assert_called_once_with("google-drive-token-json")
+        # Verify merged scopes include both old and new
+        call_args = mock_run_oauth.call_args[0]
+        merged_scopes = set(call_args[1])
+        assert "https://www.googleapis.com/auth/drive.readonly" in merged_scopes
+        assert "https://www.googleapis.com/auth/drive.file" in merged_scopes
+
+    @patch.object(google_drive, "get_credential")
+    @patch("google.oauth2.credentials.Credentials.from_authorized_user_info")
+    def test_get_google_credentials_no_scopes_in_token(
+        self, mock_from_user_info, mock_get_credential
+    ):
+        """Test backward compatibility when token has no scopes field."""
+        token_data = {"token": "access-token", "refresh_token": "refresh-token"}
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        mock_creds = Mock()
+        mock_creds.valid = True
+        mock_from_user_info.return_value = mock_creds
+
+        result = get_google_credentials("google-drive", ["scope1"])
+
+        # Should return credentials without triggering re-auth
+        assert result == mock_creds
 
 
 # ============================================================================
@@ -1059,6 +1126,48 @@ class TestCLICommands:
         assert exit_code == 0
         mock_delete_perm.assert_called_once()
 
+    @patch.object(google_drive, "delete_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_reset(self, _mock_print, mock_delete):
+        """Test auth reset command."""
+        args = Mock()
+        exit_code = cmd_auth_reset(args)
+
+        assert exit_code == 0
+        mock_delete.assert_called_once_with("google-drive-token-json")
+
+    @patch.object(google_drive, "get_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_status_with_token(self, _mock_print, mock_get_credential):
+        """Test auth status command with stored token."""
+        token_data = {
+            "token": "access-token",
+            "refresh_token": "refresh-token",
+            "scopes": [
+                "https://www.googleapis.com/auth/drive.readonly",
+                "https://www.googleapis.com/auth/drive.file",
+            ],
+            "expiry": "2025-01-01T00:00:00Z",
+            "client_id": "1234567890abcdef.apps.googleusercontent.com",
+        }
+        mock_get_credential.return_value = json.dumps(token_data)
+
+        args = Mock()
+        exit_code = cmd_auth_status(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "get_credential")
+    @patch("builtins.print")
+    def test_cmd_auth_status_no_token(self, _mock_print, mock_get_credential):
+        """Test auth status command with no stored token."""
+        mock_get_credential.return_value = None
+
+        args = Mock()
+        exit_code = cmd_auth_status(args)
+
+        assert exit_code == 1
+
 
 # ============================================================================
 # ARGUMENT PARSER TESTS
@@ -1083,6 +1192,16 @@ class TestArgumentParser:
         assert args.command == "auth"
         assert args.auth_command == "setup"
         assert args.client_id == "id"
+
+        # Test auth reset
+        args = parser.parse_args(["auth", "reset"])
+        assert args.command == "auth"
+        assert args.auth_command == "reset"
+
+        # Test auth status
+        args = parser.parse_args(["auth", "status"])
+        assert args.command == "auth"
+        assert args.auth_command == "status"
 
         # Test files list
         args = parser.parse_args(
