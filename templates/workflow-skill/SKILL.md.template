@@ -1,0 +1,84 @@
+---
+name: {{SERVICE_NAME}}
+description: {{DESCRIPTION}}
+metadata:
+  author: {{AUTHOR}}
+  version: "0.1.0"
+  category: {{CATEGORY}}
+  tags: [{{TAGS}}]
+  type: workflow
+  complexity: orchestration
+  requires: [{{REQUIRED_SKILLS}}]
+license: {{LICENSE}}
+---
+
+# {{SKILL_NAME}}
+
+{{DESCRIPTION}}
+
+This is a **workflow skill** -- it contains no scripts and instead guides the agent through a multi-step process using other skills.
+
+## Authentication
+
+This skill delegates authentication to the underlying skills:
+
+{{AUTH_INSTRUCTIONS}}
+
+## Commands
+
+### {{PRIMARY_COMMAND}}
+
+{{PRIMARY_COMMAND_DESCRIPTION}}
+
+**Usage:**
+```
+{{USAGE_EXAMPLE}}
+```
+
+### check
+
+Verify that the required skills are available and authenticated.
+
+{{CHECK_INSTRUCTIONS}}
+
+## Workflow
+
+### Step 1: {{STEP_1_NAME}}
+
+{{STEP_1_DESCRIPTION}}
+
+### Step 2: {{STEP_2_NAME}}
+
+{{STEP_2_DESCRIPTION}}
+
+### Step 3: {{STEP_3_NAME}}
+
+{{STEP_3_DESCRIPTION}}
+
+## Examples
+
+### {{EXAMPLE_1_NAME}}
+
+```
+{{EXAMPLE_1}}
+```
+
+### {{EXAMPLE_2_NAME}}
+
+```
+{{EXAMPLE_2}}
+```
+
+## Model Guidance
+
+This skill coordinates multiple sub-skills and requires reasoning about multi-step workflows. A higher-capability model is recommended for best results.
+
+## Troubleshooting
+
+### Required skill not available
+
+Ensure the required skills are installed and authenticated. Check the `requires` field in the frontmatter for the list of dependencies.
+
+### Authentication errors
+
+Verify the underlying skills are authenticated. See each skill's Authentication section for details.

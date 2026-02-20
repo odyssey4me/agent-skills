@@ -1,0 +1,99 @@
+---
+name: {{SERVICE_NAME}}
+description: {{DESCRIPTION}}
+metadata:
+  author: {{AUTHOR}}
+  version: "0.1.0"
+  category: {{CATEGORY}}
+  tags: [{{TAGS}}]
+  complexity: lightweight
+license: {{LICENSE}}
+---
+
+# {{SKILL_NAME}} Skill
+
+This skill provides guidance for working with {{SKILL_NAME}} using the official `{{CLI_TOOL}}` CLI tool. All {{SKILL_NAME}} operations are performed using `{{CLI_TOOL}}` commands.
+
+## Prerequisites
+
+**Install {{CLI_TOOL}} CLI**: <{{CLI_INSTALL_URL}}>
+
+Quick install:
+```bash
+# macOS
+brew install {{CLI_TOOL}}
+
+# Linux (Debian/Ubuntu)
+sudo apt install {{CLI_TOOL}}
+
+# Fedora/RHEL/CentOS
+sudo dnf install {{CLI_TOOL}}
+```
+
+## Authentication
+
+```bash
+# Authenticate with {{SKILL_NAME}}
+{{AUTH_COMMAND}}
+
+# Verify authentication
+{{AUTH_VERIFY_COMMAND}}
+```
+
+## Commands
+
+### {{COMMAND_GROUP_1}}
+
+```bash
+{{CLI_TOOL}} {{COMMAND_1}}             # {{COMMAND_1_DESC}}
+{{CLI_TOOL}} {{COMMAND_2}}             # {{COMMAND_2_DESC}}
+{{CLI_TOOL}} {{COMMAND_3}}             # {{COMMAND_3_DESC}}
+```
+
+### {{COMMAND_GROUP_2}}
+
+```bash
+{{CLI_TOOL}} {{COMMAND_4}}             # {{COMMAND_4_DESC}}
+{{CLI_TOOL}} {{COMMAND_5}}             # {{COMMAND_5_DESC}}
+```
+
+## Examples
+
+### {{EXAMPLE_1_NAME}}
+
+```bash
+{{EXAMPLE_1}}
+```
+
+### {{EXAMPLE_2_NAME}}
+
+```bash
+{{EXAMPLE_2}}
+```
+
+## Model Guidance
+
+This skill wraps an official CLI. A fast, lightweight model is sufficient.
+
+## Troubleshooting
+
+```bash
+# Check authentication
+{{AUTH_VERIFY_COMMAND}}
+
+# Check version
+{{CLI_TOOL}} --version
+```
+
+## Official Documentation
+
+- **CLI Manual**: <{{CLI_DOCS_URL}}>
+
+## Summary
+
+The {{SKILL_NAME}} skill uses the official `{{CLI_TOOL}}` CLI exclusively. No custom scripts are needed.
+
+**Quick start:**
+1. Install: `brew install {{CLI_TOOL}}` (or equivalent for your OS)
+2. Authenticate: `{{AUTH_COMMAND}}`
+3. Verify: `{{AUTH_VERIFY_COMMAND}}`
