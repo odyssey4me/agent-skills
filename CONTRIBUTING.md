@@ -92,6 +92,26 @@ docs(readme): update installation instructions
 - **Docstrings**: Google style
 - **Coverage**: Minimum 50% (goal: 80%)
 
+## Local Skill Testing
+
+When developing skills locally, use `dev-link.sh` to redirect Claude Code's skill symlinks to your repo checkout instead of the installed copies:
+
+```bash
+# Link all skills to local repo
+./scripts/dev-link.sh link
+
+# Link a single skill
+./scripts/dev-link.sh link jira
+
+# Check which skills are linked locally
+./scripts/dev-link.sh status
+
+# Restore installed versions
+./scripts/dev-link.sh unlink
+```
+
+Start a new Claude Code conversation after linking to pick up local changes. Run `unlink` when done to restore the installed versions.
+
 ## Creating a New Skill
 
 **Important**: Before creating a new skill, check if an official CLI tool exists for the service. See [AGENTS.md - Development Principles](AGENTS.md#development-principles) for guidance on preferring official CLIs over custom scripts.

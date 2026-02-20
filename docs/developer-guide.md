@@ -134,6 +134,7 @@ agent-skills/
 │       └── scripts/
 │           └── skill.py.template
 ├── scripts/                   # Development utilities
+│   ├── dev-link.sh           # Symlink skills to local repo for testing
 │   ├── validate_skill.py     # Validates skill structure and frontmatter
 │   └── setup_helper.py       # Setup and configuration helpers
 ├── tests/                     # Test suite
@@ -547,6 +548,25 @@ python skills/myskill/scripts/myskill.py check
 # Main operations
 python skills/myskill/scripts/myskill.py operation arg
 ```
+
+### Testing with Local Dev Links
+
+Use `dev-link.sh` to redirect Claude Code's skill symlinks to your local checkout so you can test changes without pushing to GitHub:
+
+```bash
+# Link your skill to the local repo
+./scripts/dev-link.sh link myskill
+
+# Start a new Claude Code conversation - it reads local files now
+
+# Check current link state
+./scripts/dev-link.sh status
+
+# Restore installed version when done
+./scripts/dev-link.sh unlink myskill
+```
+
+See [CONTRIBUTING.md - Local Skill Testing](../CONTRIBUTING.md#local-skill-testing) for more details.
 
 ### Testing with npx add-skill
 
