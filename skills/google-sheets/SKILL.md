@@ -4,6 +4,9 @@ description: Manage Google Sheets spreadsheets. Read/write cell values and range
 metadata:
   author: odyssey4me
   version: "0.1.0"
+  category: google-workspace
+  tags: [spreadsheets, data, formulas]
+  complexity: standard
 license: MIT
 ---
 
@@ -412,6 +415,10 @@ for month in Jan Feb Mar; do
     --values "[[\"\$month\",10000,7000,\"=B${ROW}-C${ROW}\"]]"
 done
 ```
+
+## Model Guidance
+
+This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 

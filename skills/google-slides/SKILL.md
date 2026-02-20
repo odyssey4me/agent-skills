@@ -4,6 +4,9 @@ description: Manage Google Slides presentations. Create presentations, add/delet
 metadata:
   author: odyssey4me
   version: "0.1.0"
+  category: google-workspace
+  tags: [presentations, slides]
+  complexity: standard
 license: MIT
 ---
 
@@ -509,6 +512,10 @@ Google Slides uses **points** for positioning and sizing:
   └───────────────────────────────────────┘
 (0, 540)                                (720, 540)
 ```
+
+## Model Guidance
+
+This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 

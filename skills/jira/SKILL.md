@@ -4,6 +4,9 @@ description: Search and manage Jira issues using JQL queries, create/update issu
 metadata:
   author: odyssey4me
   version: "0.2.0"
+  category: project-management
+  tags: [issues, agile, sprints]
+  complexity: standard
 license: MIT
 ---
 
@@ -419,6 +422,10 @@ Jira organizes all statuses into three categories. Use `statusCategory` for quer
 **Example:** Instead of `status = "Open" OR status = "Backlog"`, use `statusCategory = "To Do"`.
 
 Use `python scripts/jira.py statuses --categories` to see all status categories in your Jira instance.
+
+## Model Guidance
+
+This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 

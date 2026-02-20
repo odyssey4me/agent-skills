@@ -4,6 +4,9 @@ description: Create and modify Google Docs documents. Read document content and 
 metadata:
   author: odyssey4me
   version: "0.1.0"
+  category: google-workspace
+  tags: [documents, editing]
+  complexity: standard
 license: MIT
 ---
 
@@ -352,6 +355,10 @@ python scripts/google-docs.py formatting apply 1abc...xyz \
 python scripts/google-docs.py content append 1abc...xyz \
   --text "Additional details about the new section..."
 ```
+
+## Model Guidance
+
+This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 

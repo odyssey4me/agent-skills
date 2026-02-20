@@ -4,6 +4,9 @@ description: Work with GitHub issues, pull requests, workflows, and repositories
 metadata:
   author: odyssey4me
   version: "0.1.0"
+  category: code-hosting
+  tags: [issues, pull-requests, workflows]
+  complexity: lightweight
 license: MIT
 ---
 
@@ -228,6 +231,10 @@ gh config set git_protocol ssh
 ```
 
 Configuration stored in `~/.config/gh/config.yml`
+
+## Model Guidance
+
+This skill wraps an official CLI. A fast, lightweight model is sufficient.
 
 ## Troubleshooting
 

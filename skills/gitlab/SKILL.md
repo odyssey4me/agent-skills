@@ -4,6 +4,9 @@ description: Work with GitLab issues, merge requests, pipelines, and repositorie
 metadata:
   author: odyssey4me
   version: "0.1.0"
+  category: code-hosting
+  tags: [issues, merge-requests, pipelines]
+  complexity: lightweight
 license: MIT
 ---
 
@@ -207,6 +210,10 @@ glab config set git_protocol ssh
 ```
 
 Configuration stored in `~/.config/glab-cli/config.yml`
+
+## Model Guidance
+
+This skill wraps an official CLI. A fast, lightweight model is sufficient.
 
 ## Troubleshooting
 

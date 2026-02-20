@@ -4,6 +4,9 @@ description: Work with Gerrit code review using git-review CLI. Use when submitt
 metadata:
   author: odyssey4me
   version: "0.1.0"
+  category: code-hosting
+  tags: [code-review, patches]
+  complexity: lightweight
 license: MIT
 ---
 
@@ -235,6 +238,10 @@ git config gitreview.remote gerrit-prod
 # Or specify via command line
 git review -r gerrit-staging
 ```
+
+## Model Guidance
+
+This skill wraps an official CLI. A fast, lightweight model is sufficient.
 
 ## Troubleshooting
 

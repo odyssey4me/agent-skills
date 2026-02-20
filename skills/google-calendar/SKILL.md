@@ -4,6 +4,9 @@ description: Manage Google Calendar events and calendars. List, create, update, 
 metadata:
   author: odyssey4me
   version: "0.1.0"
+  category: google-workspace
+  tags: [events, scheduling, availability]
+  complexity: standard
 license: MIT
 ---
 
@@ -424,6 +427,10 @@ Use date format (YYYY-MM-DD):
 ```
 
 For all-day events, you can specify a timezone using the `--timezone` argument.
+
+## Model Guidance
+
+This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 

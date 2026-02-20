@@ -4,6 +4,9 @@ description: {{DESCRIPTION}}
 metadata:
   author: {{AUTHOR}}
   version: "0.1.0"
+  category: {{CATEGORY}}
+  tags: [{{TAGS}}]
+  complexity: standard
 license: {{LICENSE}}
 ---
 
@@ -141,6 +144,10 @@ python scripts/{{SERVICE_NAME}}.py get my-resource-id
 ```bash
 python scripts/{{SERVICE_NAME}}.py create --name "My Resource" --description "A description"
 ```
+
+## Model Guidance
+
+This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 

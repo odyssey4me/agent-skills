@@ -4,6 +4,9 @@ description: Manage Google Drive files and folders. List, search, upload, downlo
 metadata:
   author: odyssey4me
   version: "0.1.0"
+  category: google-workspace
+  tags: [files, folders, sharing]
+  complexity: standard
 license: MIT
 ---
 
@@ -412,6 +415,10 @@ For the complete reference, see [drive-queries.md](references/drive-queries.md).
 | CSV | `text/csv` |
 | Image (JPEG) | `image/jpeg` |
 | Image (PNG) | `image/png` |
+
+## Model Guidance
+
+This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 

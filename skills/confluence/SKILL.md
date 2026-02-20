@@ -4,6 +4,9 @@ description: Search and manage Confluence pages and spaces using CQL, read/creat
 metadata:
   author: odyssey4me
   version: "0.2.0"
+  category: documentation
+  tags: [wiki, pages, spaces]
+  complexity: standard
 license: MIT
 ---
 
@@ -353,6 +356,10 @@ Combine with `AND`, `OR`, and use `ORDER BY` for sorting:
 ```bash
 python scripts/confluence.pysearch "type=page AND space=DEMO AND created >= now('-30d') ORDER BY created DESC"
 ```
+
+## Model Guidance
+
+This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 

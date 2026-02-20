@@ -4,6 +4,9 @@ description: Manage Gmail messages, drafts, and labels. Send emails, search inbo
 metadata:
   author: odyssey4me
   version: "0.1.0"
+  category: communication
+  tags: [email, drafts, labels]
+  complexity: standard
 license: MIT
 ---
 
@@ -390,6 +393,10 @@ from:user@example.com OR from:other@example.com
 ```
 
 For the complete reference, see [gmail-queries.md](references/gmail-queries.md).
+
+## Model Guidance
+
+This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
 ## Troubleshooting
 
