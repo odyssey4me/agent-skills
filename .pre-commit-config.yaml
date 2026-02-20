@@ -14,6 +14,16 @@ repos:
       - id: ruff-format
         name: ruff format
         stages: [pre-commit]
+      # Pre-push: strict checks matching CI (no auto-fix)
+      - id: ruff
+        name: ruff check (pre-push)
+        alias: ruff-check-prepush
+        stages: [pre-push]
+      - id: ruff-format
+        name: ruff format check (pre-push)
+        alias: ruff-format-prepush
+        args: [--check]
+        stages: [pre-push]
 
   # Validate skill structure before commit
   - repo: local
@@ -43,9 +53,26 @@ repos:
         types: [python]
         stages: [pre-commit]
 
-  # Run full test suite with coverage before push
+  # Run full CI checks before push
   - repo: local
     hooks:
+      - id: validate-skills-prepush
+        name: validate skill structure (pre-push)
+        entry: python scripts/validate_skill.py
+        language: system
+        pass_filenames: false
+        args: [skills/*]
+        stages: [pre-push]
+        always_run: true
+
+      - id: check-registry-prepush
+        name: check skills registry is up to date (pre-push)
+        entry: python scripts/generate_registry.py --check
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        always_run: true
+
       - id: pytest-coverage
         name: pytest (full test suite with coverage)
         entry: pytest
@@ -54,6 +81,7 @@ repos:
         args: [tests/, -v, --cov=skills, --cov=scripts, --cov-report=term-missing, --cov-fail-under=80]
         stages: [pre-push]
         always_run: true
+
 
 # Default stages (can be overridden per hook)
 default_stages: [pre-commit]
