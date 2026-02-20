@@ -357,7 +357,7 @@ class TestGoogleCredentials:
             "google-drive",
             [
                 "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/drive.file",
+                "https://www.googleapis.com/auth/drive",
             ],
         )
 
@@ -367,7 +367,7 @@ class TestGoogleCredentials:
         call_args = mock_run_oauth.call_args[0]
         merged_scopes = set(call_args[1])
         assert "https://www.googleapis.com/auth/drive.readonly" in merged_scopes
-        assert "https://www.googleapis.com/auth/drive.file" in merged_scopes
+        assert "https://www.googleapis.com/auth/drive" in merged_scopes
 
     @patch.object(google_drive, "get_credential")
     @patch("google.oauth2.credentials.Credentials.from_authorized_user_info")
@@ -1222,7 +1222,7 @@ class TestCLICommands:
             "refresh_token": "refresh-token",
             "scopes": [
                 "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/drive.file",
+                "https://www.googleapis.com/auth/drive",
             ],
             "expiry": "2025-01-01T00:00:00Z",
             "client_id": "1234567890abcdef.apps.googleusercontent.com",

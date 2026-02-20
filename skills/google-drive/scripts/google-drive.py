@@ -77,11 +77,11 @@ CONFIG_DIR = Path.home() / ".config" / "agent-skills"
 
 # Google Drive API scopes - granular scopes for different operations
 DRIVE_SCOPES_READONLY = ["https://www.googleapis.com/auth/drive.readonly"]
-DRIVE_SCOPES_FILE = ["https://www.googleapis.com/auth/drive.file"]
+DRIVE_SCOPES_WRITE = ["https://www.googleapis.com/auth/drive"]
 DRIVE_SCOPES_METADATA = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
 
 # Full scope set for maximum functionality
-DRIVE_SCOPES_FULL = DRIVE_SCOPES_READONLY + DRIVE_SCOPES_FILE + DRIVE_SCOPES_METADATA
+DRIVE_SCOPES_FULL = DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE + DRIVE_SCOPES_METADATA
 
 # Minimal read-only scope (default)
 DRIVE_SCOPES_DEFAULT = DRIVE_SCOPES_READONLY
@@ -885,7 +885,7 @@ def check_drive_connectivity() -> dict[str, Any]:
         }
         result["scopes"] = {
             "readonly": any("drive.readonly" in s for s in available_scopes),
-            "file": any("drive.file" in s for s in available_scopes),
+            "drive": any(s.endswith("/drive") for s in available_scopes),
             "metadata": any("drive.metadata" in s for s in available_scopes),
             "all_scopes": available_scopes,
         }
@@ -924,14 +924,14 @@ def cmd_check(_args):
         if scopes:
             print("\nGranted OAuth Scopes:")
             print(f"  Read-only (drive.readonly):    {'Yes' if scopes.get('readonly') else 'No'}")
-            print(f"  File access (drive.file):      {'Yes' if scopes.get('file') else 'No'}")
+            print(f"  Full access (drive):           {'Yes' if scopes.get('drive') else 'No'}")
             print(f"  Metadata (drive.metadata):     {'Yes' if scopes.get('metadata') else 'No'}")
 
             # Check if all scopes are granted
             all_granted = all(
                 [
                     scopes.get("readonly"),
-                    scopes.get("file"),
+                    scopes.get("drive"),
                     scopes.get("metadata"),
                 ]
             )
@@ -1119,7 +1119,7 @@ def cmd_files_download(args):
 
 def cmd_files_upload(args):
     """Handle 'files upload' command."""
-    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_FILE)
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
     result = upload_file(
         service,
         file_path=args.path,
@@ -1141,7 +1141,7 @@ def cmd_files_upload(args):
 
 def cmd_files_move(args):
     """Handle 'files move' command."""
-    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_FILE)
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
     result = move_file(service, file_id=args.file_id, new_parent_id=args.parent)
 
     if args.json:
@@ -1157,7 +1157,7 @@ def cmd_files_move(args):
 
 def cmd_folders_create(args):
     """Handle 'folders create' command."""
-    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_FILE)
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
     result = create_folder(service, name=args.name, parent_folder_id=args.parent)
 
     if args.json:
@@ -1192,7 +1192,7 @@ def cmd_folders_list(args):
 
 def cmd_share(args):
     """Handle 'share' command."""
-    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_FILE)
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
     result = share_file(
         service,
         file_id=args.file_id,
@@ -1231,7 +1231,7 @@ def cmd_permissions_list(args):
 
 def cmd_permissions_delete(args):
     """Handle 'permissions delete' command."""
-    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_FILE)
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
     delete_permission(service, args.file_id, args.permission_id)
     print("Permission deleted successfully")
     return 0

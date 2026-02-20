@@ -115,7 +115,7 @@ Each skill requests specific scopes. When you authenticate with a skill for the 
 | Scope | Permission | Used For |
 |-------|-----------|----------|
 | `drive.readonly` | Read files and metadata | list, search, download |
-| `drive.file` | Create/edit files created by app | upload, create folders, share |
+| `drive` | Full read/write access to all files | upload, create folders, share, move |
 | `drive.metadata.readonly` | View file metadata only | get file info |
 
 ### Google Calendar Scopes

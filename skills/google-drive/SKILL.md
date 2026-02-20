@@ -63,7 +63,7 @@ The skill requests granular scopes for different operations:
 | Scope | Permission | Used For |
 |-------|-----------|----------|
 | `drive.readonly` | Read files and metadata | list, search, download |
-| `drive.file` | Create/edit files created by app | upload, create folders, share |
+| `drive` | Full read/write access to all files | upload, create folders, share, move |
 | `drive.metadata.readonly` | View file metadata only | get file info |
 
 ### Scope Errors
@@ -529,10 +529,10 @@ Drive API has quota limits. If you hit rate limits, wait a few minutes before re
 This skill requests the following OAuth scopes:
 
 - `https://www.googleapis.com/auth/drive.readonly` - Read files and metadata
-- `https://www.googleapis.com/auth/drive.file` - Create, modify, delete files created by the app
+- `https://www.googleapis.com/auth/drive` - Full read/write access to all files
 - `https://www.googleapis.com/auth/drive.metadata.readonly` - View file metadata only
 
-These scopes provide file management capabilities while following the principle of least privilege.
+These scopes provide full file management capabilities across all Drive files.
 
 ## Security Notes
 
