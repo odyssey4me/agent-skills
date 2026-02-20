@@ -77,6 +77,43 @@ Skills should include an **Error Handling** section in their SKILL.md that tells
 - **All other errors should be reported to the user** rather than retried
 - Skills that use OAuth should document the `auth reset` → `check` workflow for recovering from scope/token errors
 
+## Before Committing
+
+Pre-commit hooks enforce code quality checks. To avoid failed commits, run these steps before committing:
+
+1. **Format and lint Python code**:
+   ```bash
+   ruff check --fix .
+   ruff format .
+   ```
+
+2. **Validate skill structure** (if you modified any skill):
+   ```bash
+   python scripts/validate_skill.py skills/*
+   ```
+   Checks: SKILL.md frontmatter, required sections (Authentication, Commands, Examples), script structure (argparse, check subcommand, main guard, docstring).
+
+3. **Regenerate the skills registry** (if you added/removed a skill or changed SKILL.md frontmatter):
+   ```bash
+   python scripts/generate_registry.py
+   ```
+   This updates `skills.json`. The pre-commit hook runs `--check` mode and will reject commits where the registry is stale.
+
+4. **Run tests with coverage for changed files**:
+   ```bash
+   pytest tests/ -q --cov=skills --cov=scripts --cov-report=xml:coverage.xml
+   diff-cover coverage.xml --compare-branch=HEAD --fail-under=80
+   ```
+   Changed lines must have at least 80% test coverage. If you added or modified Python code, write or update tests before committing.
+
+### Additional guidance
+
+- **Type hints** are required for all function signatures.
+- **Google-style docstrings** are required for modules, classes, and public functions.
+- **Line length** is 100 characters (configured in `pyproject.toml`).
+- **Import sorting** is handled by ruff (`isort` rules) — do not manually reorder imports.
+- When adding a new skill script, ensure it has: a module docstring, `if __name__ == "__main__":` guard, argparse with subcommands, and a `check` subcommand.
+
 ## Creating New Skills
 
 To create a new skill, use the template:
