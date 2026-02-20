@@ -435,6 +435,25 @@ For the complete reference, see [drive-queries.md](references/drive-queries.md).
 | Image (JPEG) | `image/jpeg` |
 | Image (PNG) | `image/png` |
 
+## Unsupported Operations
+
+The following Google Drive API operations are **not yet implemented** in this skill:
+
+| Operation | API Method | Alternative |
+|-----------|-----------|-------------|
+| Move files between folders | `files.update` (addParents/removeParents) | Use Google Drive web interface |
+| Rename files | `files.update` (name) | Use Google Drive web interface |
+| Delete files permanently | `files.delete` | Use Google Drive web interface |
+| Trash / untrash files | `files.update` (trashed) | Use Google Drive web interface |
+| Copy files | `files.copy` | Download and re-upload as a workaround |
+| Export Google Docs/Sheets/Slides | `files.export` | Use the **google-docs**, **google-sheets**, or **google-slides** skills to work with Workspace document content |
+| Update existing permissions (change role) | `permissions.update` | Delete and re-create the permission with the new role |
+| Empty trash | `files.emptyTrash` | Use Google Drive web interface |
+| File version history | `revisions.*` | Use Google Drive web interface |
+| Comments and replies | `comments.*`, `replies.*` | Use Google Drive web interface |
+| Watch for file changes | `files.watch`, `changes.*` | Not available via any skill |
+| Shared drive management | `drives.*` | Not available via any skill |
+
 ## Error Handling
 
 **Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:

@@ -106,6 +106,10 @@ Pre-commit hooks enforce code quality checks. To avoid failed commits, run these
    ```
    Changed lines must have at least 80% test coverage. If you added or modified Python code, write or update tests before committing.
 
+### TODO.md maintenance
+
+[TODO.md](TODO.md) tracks only **pending** work. Completed items must not remain in the file. When committing a feature or fix that addresses a TODO item, remove that item from TODO.md as part of the same commit.
+
 ### Atomic commits
 
 Solve one problem or implement one feature at a time. Commit as soon as that unit of work is complete before moving on to the next. This keeps changes small, reviewable, and easy to revert if needed. Do not bundle unrelated changes into a single commit.
