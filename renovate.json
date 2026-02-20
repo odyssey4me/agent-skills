@@ -1,34 +1,62 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "schedule": ["after 10pm and before 5am every weekday", "every weekend"],
-  "enabledManagers": ["pip_requirements", "pip_setup", "pep621", "github-actions", "pre-commit"],
+  "extends": [
+    "config:recommended"
+  ],
+  "schedule": [
+    "after 10pm every weekday",
+    "every weekend",
+    "before 5am every weekday"
+  ],
+  "enabledManagers": [
+    "pip_requirements",
+    "pip_setup",
+    "pep621",
+    "github-actions",
+    "pre-commit"
+  ],
   "minimumReleaseAge": "14 days",
   "osvVulnerabilityAlerts": true,
   "packageRules": [
     {
       "description": "Auto-merge patch and minor updates when CI passes",
-      "matchUpdateTypes": ["patch", "minor"],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
       "automerge": true
     },
     {
       "description": "Group ruff-related updates",
-      "matchPackageNames": ["ruff", "ruff-pre-commit", "astral-sh/ruff-pre-commit"],
+      "matchPackageNames": [
+        "ruff",
+        "ruff-pre-commit",
+        "astral-sh/ruff-pre-commit"
+      ],
       "groupName": "ruff"
     },
     {
       "description": "Group Google packages",
-      "matchPackageNames": ["google-auth", "google-auth-oauthlib", "google-api-python-client"],
+      "matchPackageNames": [
+        "google-auth",
+        "google-auth-oauthlib",
+        "google-api-python-client"
+      ],
       "groupName": "google"
     },
     {
       "description": "Group pytest-related updates",
-      "matchPackageNames": ["pytest", "pytest-cov"],
+      "matchPackageNames": [
+        "pytest",
+        "pytest-cov"
+      ],
       "groupName": "pytest"
     },
     {
       "description": "Group GitHub Actions updates",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "github-actions"
     }
   ]
