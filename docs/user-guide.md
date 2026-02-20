@@ -26,11 +26,10 @@ Agent skills work with [multiple AI coding assistants](https://github.com/vercel
 **Agent-Specific Installation:**
 ```bash
 # Install for specific agent (optional, auto-detects by default)
-npx add-skill odyssey4me/agent-skills --skill jira -a cursor
-npx add-skill odyssey4me/agent-skills --skill jira -a continue
+npx add-skill odyssey4me/agent-skills --skill gitlab -a cursor
 
 # Install for multiple agents
-npx add-skill odyssey4me/agent-skills --skill jira -a claude-code -a cursor
+npx add-skill odyssey4me/agent-skills --skill gitlab -a claude-code -a cursor
 ```
 
 The examples in this guide use Claude Code, but the same natural language patterns and commands work across all supported AI agents.
@@ -42,22 +41,11 @@ The examples in this guide use Claude Code, but the same natural language patter
 The fastest way to install skills is using the official `add-skill` CLI tool:
 
 ```bash
-# Install Jira skill
+# Install a specific skill
 npx add-skill odyssey4me/agent-skills --skill jira
 
-# Install Confluence skill
-npx add-skill odyssey4me/agent-skills --skill confluence
-
-# Install Gmail skill
-npx add-skill odyssey4me/agent-skills --skill gmail
-
-# Install Google Workspace skills
-npx add-skill odyssey4me/agent-skills --skill google-docs
-npx add-skill odyssey4me/agent-skills --skill google-sheets
-npx add-skill odyssey4me/agent-skills --skill google-slides
-
 # Install multiple skills
-npx add-skill odyssey4me/agent-skills --skill jira --skill confluence --skill gmail --skill google-docs
+npx add-skill odyssey4me/agent-skills --skill google-docs --skill google-sheets
 ```
 
 This will:

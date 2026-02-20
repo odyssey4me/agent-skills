@@ -20,21 +20,11 @@ Install skills using the official `add-skill` CLI:
 # Install all skills
 npx add-skill odyssey4me/agent-skills
 
-# Or install individual skills
-npx add-skill odyssey4me/agent-skills --skill jira
+# Or install a specific skill
 npx add-skill odyssey4me/agent-skills --skill confluence
-npx add-skill odyssey4me/agent-skills --skill gmail
-npx add-skill odyssey4me/agent-skills --skill google-drive
-npx add-skill odyssey4me/agent-skills --skill google-calendar
-npx add-skill odyssey4me/agent-skills --skill google-docs
-npx add-skill odyssey4me/agent-skills --skill google-sheets
-npx add-skill odyssey4me/agent-skills --skill google-slides
-npx add-skill odyssey4me/agent-skills --skill github
-npx add-skill odyssey4me/agent-skills --skill gitlab
-npx add-skill odyssey4me/agent-skills --skill gerrit
 
 # Or install multiple specific skills
-npx add-skill odyssey4me/agent-skills --skill jira --skill confluence
+npx add-skill odyssey4me/agent-skills --skill gmail --skill google-calendar
 ```
 
 This automatically:
