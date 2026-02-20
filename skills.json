@@ -1,0 +1,223 @@
+{
+  "$schema": "https://agentskills.io/registry/v1",
+  "skills": [
+    {
+      "name": "confluence",
+      "description": "Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.",
+      "version": "0.2.0",
+      "category": "documentation",
+      "tags": [
+        "wiki",
+        "pages",
+        "spaces"
+      ],
+      "type": "api",
+      "complexity": "standard",
+      "auth": "api-token",
+      "dependencies": [
+        "requests",
+        "keyring",
+        "pyyaml"
+      ]
+    },
+    {
+      "name": "gerrit",
+      "description": "Work with Gerrit code review using git-review CLI. Use when submitting changes, downloading patches, and managing code reviews in Gerrit.",
+      "version": "0.1.0",
+      "category": "code-hosting",
+      "tags": [
+        "code-review",
+        "patches"
+      ],
+      "type": "cli",
+      "complexity": "lightweight",
+      "auth": "cli-auth",
+      "dependencies": [
+        "git-review"
+      ]
+    },
+    {
+      "name": "github",
+      "description": "Work with GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when managing GitHub projects.",
+      "version": "0.1.0",
+      "category": "code-hosting",
+      "tags": [
+        "issues",
+        "pull-requests",
+        "workflows"
+      ],
+      "type": "cli",
+      "complexity": "lightweight",
+      "auth": "cli-auth",
+      "dependencies": [
+        "gh"
+      ]
+    },
+    {
+      "name": "gitlab",
+      "description": "Work with GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when managing GitLab projects.",
+      "version": "0.1.0",
+      "category": "code-hosting",
+      "tags": [
+        "issues",
+        "merge-requests",
+        "pipelines"
+      ],
+      "type": "cli",
+      "complexity": "lightweight",
+      "auth": "cli-auth",
+      "dependencies": [
+        "glab"
+      ]
+    },
+    {
+      "name": "gmail",
+      "description": "Manage Gmail messages, drafts, and labels. Send emails, search inbox, and organize email. Use when working with Gmail email management.",
+      "version": "0.1.0",
+      "category": "communication",
+      "tags": [
+        "email",
+        "drafts",
+        "labels"
+      ],
+      "type": "api",
+      "complexity": "standard",
+      "auth": "oauth",
+      "dependencies": [
+        "google-auth",
+        "google-auth-oauthlib",
+        "google-api-python-client",
+        "requests",
+        "keyring",
+        "pyyaml"
+      ]
+    },
+    {
+      "name": "google-calendar",
+      "description": "Manage Google Calendar events and calendars. List, create, update, and delete events, check availability, and organize schedules. Use when working with Google Calendar management.",
+      "version": "0.1.0",
+      "category": "google-workspace",
+      "tags": [
+        "events",
+        "scheduling",
+        "availability"
+      ],
+      "type": "api",
+      "complexity": "standard",
+      "auth": "oauth",
+      "dependencies": [
+        "google-auth",
+        "google-auth-oauthlib",
+        "google-api-python-client",
+        "requests",
+        "keyring",
+        "pyyaml"
+      ]
+    },
+    {
+      "name": "google-docs",
+      "description": "Create and modify Google Docs documents. Read document content and structure, manage formatting, paragraphs, and styles. Use when working with Google Docs document management.",
+      "version": "0.1.0",
+      "category": "google-workspace",
+      "tags": [
+        "documents",
+        "editing"
+      ],
+      "type": "api",
+      "complexity": "standard",
+      "auth": "oauth",
+      "dependencies": [
+        "google-auth",
+        "google-auth-oauthlib",
+        "google-api-python-client",
+        "requests",
+        "keyring",
+        "pyyaml"
+      ]
+    },
+    {
+      "name": "google-drive",
+      "description": "Manage Google Drive files and folders. List, search, upload, download files, create folders, and manage sharing. Use when working with Google Drive file management.",
+      "version": "0.1.0",
+      "category": "google-workspace",
+      "tags": [
+        "files",
+        "folders",
+        "sharing"
+      ],
+      "type": "api",
+      "complexity": "standard",
+      "auth": "oauth",
+      "dependencies": [
+        "google-auth",
+        "google-auth-oauthlib",
+        "google-api-python-client",
+        "requests",
+        "keyring",
+        "pyyaml"
+      ]
+    },
+    {
+      "name": "google-sheets",
+      "description": "Manage Google Sheets spreadsheets. Read/write cell values and ranges, manage sheets, formatting, and formulas. Use when working with Google Sheets spreadsheet management.",
+      "version": "0.1.0",
+      "category": "google-workspace",
+      "tags": [
+        "spreadsheets",
+        "data",
+        "formulas"
+      ],
+      "type": "api",
+      "complexity": "standard",
+      "auth": "oauth",
+      "dependencies": [
+        "google-auth",
+        "google-auth-oauthlib",
+        "google-api-python-client",
+        "requests",
+        "keyring",
+        "pyyaml"
+      ]
+    },
+    {
+      "name": "google-slides",
+      "description": "Manage Google Slides presentations. Create presentations, add/delete slides, insert text, shapes, and images. Use when working with Google Slides presentation management.",
+      "version": "0.1.0",
+      "category": "google-workspace",
+      "tags": [
+        "presentations",
+        "slides"
+      ],
+      "type": "api",
+      "complexity": "standard",
+      "auth": "oauth",
+      "dependencies": [
+        "google-auth",
+        "google-auth-oauthlib",
+        "google-api-python-client",
+        "requests",
+        "keyring",
+        "pyyaml"
+      ]
+    },
+    {
+      "name": "jira",
+      "description": "Search and manage Jira issues using JQL queries, create/update issues, and manage workflows. Use when working with Jira project management.",
+      "version": "0.2.0",
+      "category": "project-management",
+      "tags": [
+        "issues",
+        "agile",
+        "sprints"
+      ],
+      "type": "api",
+      "complexity": "standard",
+      "auth": "api-token",
+      "dependencies": [
+        "requests",
+        "keyring",
+        "pyyaml"
+      ]
+    }
+  ]
+}

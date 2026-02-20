@@ -63,6 +63,9 @@ jobs:
       - name: Validate skill structure
         run: python scripts/validate_skill.py skills/*
 
+      - name: Check skills registry is up to date
+        run: python scripts/generate_registry.py --check
+
   test-skills:
     runs-on: ubuntu-latest
     steps:
