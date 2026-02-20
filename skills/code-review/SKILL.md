@@ -48,6 +48,41 @@ The agent will:
 4. Provide focused review feedback
 5. Optionally post review comments
 
+### remember
+
+Save additional context for the current repository's reviews. This persists information that should be considered in future reviews of the same repo.
+
+**Usage:**
+```
+Remember that this repo follows the Google Python Style Guide
+Remember: authentication changes must be reviewed by the security team
+Remember https://internal-docs.example.com/api-conventions as a reference for API design
+Remember that the data layer uses the Repository pattern, not Active Record
+```
+
+**Keyword**: The word **remember** at the start of a message triggers saving. The context is stored in `~/.config/agent-skills/code-review.yaml` under the current repository's remote URL.
+
+**What to save**: Coding standards, architectural decisions, external documentation links, team conventions, review policies, or any context that should inform future reviews.
+
+### forget
+
+Remove previously saved context for the current repository.
+
+**Usage:**
+```
+Forget the note about the Google Python Style Guide
+Forget all saved context for this repo
+```
+
+### show context
+
+Display all saved context for the current repository.
+
+**Usage:**
+```
+Show review context for this repo
+```
+
 ### check
 
 Verify that the required platform skill is available and authenticated.
@@ -63,7 +98,75 @@ glab auth status
 git review --version
 ```
 
+## Repository Context
+
+The code-review skill persists per-repository context in `~/.config/agent-skills/code-review.yaml`. This allows the agent to accumulate knowledge about a repository's conventions, architecture, and review policies across sessions.
+
+### Config File Structure
+
+```yaml
+# ~/.config/agent-skills/code-review.yaml
+repositories:
+  "git@github.com:myorg/myrepo.git":
+    references:
+      - "https://internal-docs.example.com/api-conventions"
+      - "https://google.github.io/styleguide/pyguide.html"
+    standards:
+      - "All API endpoints must validate input with Pydantic models"
+      - "Authentication changes require security team review"
+    notes:
+      - "Data layer uses Repository pattern, not Active Record"
+      - "Legacy modules in src/compat/ are exempt from new style rules"
+  "https://gitlab.com/myorg/other-repo.git":
+    references:
+      - "https://docs.example.com/other-repo/architecture"
+    standards: []
+    notes:
+      - "Migrating from REST to GraphQL -- new endpoints should use GraphQL"
+```
+
+The repository key is the first remote URL from `git remote -v` (normalized to the fetch URL). Each repository entry has three lists:
+
+- **references**: URLs to external documentation, style guides, or architecture docs
+- **standards**: Coding standards, policies, or rules specific to this repo
+- **notes**: Architectural decisions, team conventions, or other contextual information
+
+### Loading Context
+
+At the start of every review, the agent checks for saved context:
+
+```bash
+# Get the repo remote URL for config lookup
+git remote get-url origin
+```
+
+If context exists for the repo, the agent loads it and applies it during the review. For example, if a standard says "API endpoints must validate input with Pydantic models," the agent checks whether new endpoints follow that rule.
+
+### Prompting to Save
+
+When the user provides out-of-repo context during a review (e.g., links to external docs, mentions of team conventions, or references to other repositories), the agent should proactively suggest:
+
+> "This seems like useful context for future reviews of this repo. Say **remember** followed by what you'd like me to save, and I'll persist it for next time."
+
+This ensures users discover the feature naturally without needing to read documentation.
+
 ## Workflow
+
+### Step 0: Load Repository Context
+
+Before starting the review, check for saved context:
+
+```bash
+git remote get-url origin
+```
+
+Read `~/.config/agent-skills/code-review.yaml` and look up the remote URL. If context exists, load it and keep it in mind throughout the review:
+
+- **references**: Consult these when evaluating architectural decisions
+- **standards**: Actively check compliance with each standard
+- **notes**: Factor these into review feedback
+
+If no context file exists or the repo has no entries, proceed without additional context.
 
 ### Step 1: Detect Platform
 
@@ -213,6 +316,20 @@ Review PR #42 and post your findings as a review comment
 
 ```
 Review PR #42, focus only on security concerns
+```
+
+### Save Context for Future Reviews
+
+```
+Remember that this repo uses the Twelve-Factor App methodology
+Remember https://wiki.example.com/team/coding-standards as a reference
+Remember: all database migrations must be backwards-compatible
+```
+
+### Show Saved Context
+
+```
+Show review context for this repo
 ```
 
 ## Model Guidance
