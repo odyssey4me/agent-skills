@@ -684,11 +684,11 @@ def format_calendar(calendar: dict[str, Any]) -> str:
     timezone = calendar.get("timeZone", "")
     primary = " [PRIMARY]" if calendar.get("primary", False) else ""
 
-    output = f"{summary}{primary}\n  ID: {cal_id}"
+    output = f"### {summary}{primary}\n- **ID:** {cal_id}"
     if timezone:
-        output += f"\n  Timezone: {timezone}"
+        output += f"\n- **Timezone:** {timezone}"
     if description:
-        output += f"\n  Description: {description}"
+        output += f"\n- **Description:** {description}"
     return output
 
 
@@ -710,22 +710,24 @@ def format_event(event: dict[str, Any]) -> str:
     start_time = start.get("dateTime", start.get("date", "(Unknown)"))
     end_time = end.get("dateTime", end.get("date", "(Unknown)"))
 
-    output = f"{summary}\n  ID: {event_id}\n  Start: {start_time}\n  End: {end_time}"
+    output = (
+        f"### {summary}\n- **ID:** {event_id}\n- **Start:** {start_time}\n- **End:** {end_time}"
+    )
 
     location = event.get("location")
     if location:
-        output += f"\n  Location: {location}"
+        output += f"\n- **Location:** {location}"
 
     description = event.get("description")
     if description:
         # Truncate long descriptions
         desc_preview = description[:100] + "..." if len(description) > 100 else description
-        output += f"\n  Description: {desc_preview}"
+        output += f"\n- **Description:** {desc_preview}"
 
     attendees = event.get("attendees", [])
     if attendees:
         emails = [a.get("email", "") for a in attendees]
-        output += f"\n  Attendees: {', '.join(emails)}"
+        output += f"\n- **Attendees:** {', '.join(emails)}"
 
     return output
 
@@ -874,7 +876,7 @@ def cmd_calendars_list(args):
             print(f"Found {len(calendars)} calendar(s):\n")
             for cal in calendars:
                 print(format_calendar(cal))
-                print("-" * 80)
+                print()
 
     return 0
 
@@ -913,7 +915,7 @@ def cmd_events_list(args):
             print(f"Found {len(events)} event(s):\n")
             for event in events:
                 print(format_event(event))
-                print("-" * 80)
+                print()
 
     return 0
 
@@ -955,12 +957,12 @@ def cmd_events_create(args):
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print("✓ Event created successfully")
-        print(f"  Event ID: {result.get('id')}")
-        print(f"  Summary: {result.get('summary')}")
+        print("**Event created successfully**")
+        print(f"- **Event ID:** {result.get('id')}")
+        print(f"- **Summary:** {result.get('summary')}")
         html_link = result.get("htmlLink")
         if html_link:
-            print(f"  Link: {html_link}")
+            print(f"- **Link:** {html_link}")
 
     return 0
 
@@ -982,9 +984,9 @@ def cmd_events_update(args):
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print("✓ Event updated successfully")
-        print(f"  Event ID: {result.get('id')}")
-        print(f"  Summary: {result.get('summary')}")
+        print("**Event updated successfully**")
+        print(f"- **Event ID:** {result.get('id')}")
+        print(f"- **Summary:** {result.get('summary')}")
 
     return 0
 
@@ -1019,18 +1021,18 @@ def cmd_freebusy(args):
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print("Free/Busy Information:\n")
+        print("## Free/Busy Information\n")
         calendars = result.get("calendars", {})
         for cal_id, cal_info in calendars.items():
-            print(f"Calendar: {cal_id}")
+            print(f"### {cal_id}")
             busy = cal_info.get("busy", [])
             if not busy:
-                print("  No busy times")
+                print("No busy times")
             else:
-                print(f"  Busy periods: {len(busy)}")
+                print(f"**Busy periods:** {len(busy)}")
                 for period in busy:
-                    print(f"    {period.get('start')} - {period.get('end')}")
-            print("-" * 80)
+                    print(f"- {period.get('start')} \u2014 {period.get('end')}")
+            print()
 
     return 0
 
