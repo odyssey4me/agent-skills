@@ -33,6 +33,7 @@ dev = [
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
     "responses>=0.23.0",
+    "diff-cover>=7.0.0",
     "pre-commit>=3.0.0",
 ]
 google = [

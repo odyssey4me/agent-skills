@@ -35,10 +35,11 @@ repos:
         stages: [pre-commit]
         always_run: true
 
-      - id: pytest-changed
-        name: coverage check for changed files
-        entry: bash -c 'cov_args=""; for f in "$@"; do cov_args="$cov_args --cov=$f"; done; pytest tests/ -q $cov_args --cov-report=term-missing --cov-fail-under=80' --
+      - id: diff-cover
+        name: coverage for changed lines
+        entry: bash -c 'pytest tests/ -q --cov=skills --cov=scripts --cov-report=xml:coverage.xml && diff-cover coverage.xml --compare-branch=HEAD --fail-under=80'
         language: system
+        pass_filenames: false
         types: [python]
         stages: [pre-commit]
 

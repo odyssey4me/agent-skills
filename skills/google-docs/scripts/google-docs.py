@@ -722,7 +722,7 @@ def format_document_summary(doc: dict[str, Any]) -> str:
     return f"""Title: {title}
 Document ID: {doc_id}
 Characters: {char_count}
-Revision ID: {doc.get('revisionId', 'N/A')}"""
+Revision ID: {doc.get("revisionId", "N/A")}"""
 
 
 # ============================================================================

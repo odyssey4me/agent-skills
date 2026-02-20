@@ -918,7 +918,7 @@ def format_slide_info(slide: dict[str, Any], index: int) -> str:
     return f"""Slide {index + 1}:
   ID: {slide_id}
   Layout: {layout}
-  Elements: {sum(element_counts.values())} ({element_counts['text']} text, {element_counts['shapes']} shapes, {element_counts['images']} images, {element_counts['other']} other)"""
+  Elements: {sum(element_counts.values())} ({element_counts["text"]} text, {element_counts["shapes"]} shapes, {element_counts["images"]} images, {element_counts["other"]} other)"""
 
 
 # ============================================================================
