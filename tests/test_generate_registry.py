@@ -328,9 +328,9 @@ description: Skill {name}
         generated = json.dumps(registry, indent=2) + "\n"
         committed = skills_json.read_text()
 
-        assert (
-            generated == committed
-        ), "skills.json is out of date. Run 'python scripts/generate_registry.py' to update."
+        assert generated == committed, (
+            "skills.json is out of date. Run 'python scripts/generate_registry.py' to update."
+        )
 
 
 class TestMain:
