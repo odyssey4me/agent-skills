@@ -52,18 +52,18 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 
 | Skill | Description |
 |-------|-------------|
-| [Jira](skills/jira/SKILL.md) | Issue tracking, search, create/update, transitions |
+| [Code Review](skills/code-review/SKILL.md) | Review PRs, MRs, and Gerrit changes with focus on security, maintainability, and architectural fit |
 | [Confluence](skills/confluence/SKILL.md) | Content management, page CRUD with Markdown support, CQL search |
-| [Gmail](skills/gmail/SKILL.md) | Email management, send/receive messages, drafts, labels |
-| [Google Drive](skills/google-drive/SKILL.md) | File management, list/search/upload/download files, folder management, sharing |
-| [Google Calendar](skills/google-calendar/SKILL.md) | Calendar management, event CRUD, availability checking, scheduling |
-| [Google Docs](skills/google-docs/SKILL.md) | Document creation and editing, content management, formatting |
-| [Google Sheets](skills/google-sheets/SKILL.md) | Spreadsheet management, cell values, formulas, sheets |
-| [Google Slides](skills/google-slides/SKILL.md) | Presentation creation, slides, shapes, images, layouts |
+| [Gerrit](skills/gerrit/SKILL.md) | Code review, submit changes, download patches via `git-review` CLI |
 | [GitHub](skills/github/SKILL.md) | Issues, pull requests, workflows, and repositories via `gh` CLI |
 | [GitLab](skills/gitlab/SKILL.md) | Issues, merge requests, pipelines, and repositories via `glab` CLI |
-| [Gerrit](skills/gerrit/SKILL.md) | Code review, submit changes, download patches via `git-review` CLI |
-| [Code Review](skills/code-review/SKILL.md) | Review PRs, MRs, and Gerrit changes with focus on security, maintainability, and architectural fit |
+| [Gmail](skills/gmail/SKILL.md) | Email management, send/receive messages, drafts, labels |
+| [Google Calendar](skills/google-calendar/SKILL.md) | Calendar management, event CRUD, availability checking, scheduling |
+| [Google Docs](skills/google-docs/SKILL.md) | Document creation and editing, content management, formatting |
+| [Google Drive](skills/google-drive/SKILL.md) | File management, list/search/upload/download files, folder management, sharing |
+| [Google Sheets](skills/google-sheets/SKILL.md) | Spreadsheet management, cell values, formulas, sheets |
+| [Google Slides](skills/google-slides/SKILL.md) | Presentation creation, slides, shapes, images, layouts |
+| [Jira](skills/jira/SKILL.md) | Issue tracking, search, create/update, transitions |
 
 Browse install counts and popularity on [skills.sh](https://skills.sh/odyssey4me/agent-skills). See [TODO.md](TODO.md) for planned skills.
 
