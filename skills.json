@@ -44,13 +44,13 @@
     {
       "name": "gerrit",
       "description": "Work with Gerrit code review using git-review CLI. Use when submitting changes, downloading patches, and managing code reviews in Gerrit.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "code-hosting",
       "tags": [
         "code-review",
         "patches"
       ],
-      "type": "cli",
+      "type": "api",
       "complexity": "lightweight",
       "auth": "cli-auth",
       "dependencies": [

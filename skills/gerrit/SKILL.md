@@ -3,7 +3,7 @@ name: gerrit
 description: Work with Gerrit code review using git-review CLI. Use when submitting changes, downloading patches, and managing code reviews in Gerrit.
 metadata:
   author: odyssey4me
-  version: "0.1.0"
+  version: "0.2.0"
   category: code-hosting
   tags: [code-review, patches]
   complexity: lightweight
@@ -12,7 +12,7 @@ license: MIT
 
 # Gerrit Skill
 
-This skill provides guidance for working with Gerrit code review using the `git-review` CLI tool. All Gerrit operations (submitting changes, downloading patches, reviewing code) are performed using `git-review` commands.
+This skill provides Gerrit code review integration using `git-review` with a Python wrapper for markdown-formatted query output on read/view operations. Action commands (submit, review, abandon) should use `git-review` or SSH commands directly.
 
 ## Prerequisites
 
@@ -76,7 +76,30 @@ EOF
 
 See [Installation Guide](https://docs.opendev.org/opendev/git-review/latest/installation.html) for details.
 
-## Commands
+## Script Usage
+
+The wrapper script (`scripts/gerrit.py`) uses Gerrit SSH query commands and formats output as markdown. Connection details are read from `.gitreview` or provided via `--host`/`--port`/`--username` flags.
+
+```bash
+# Check Gerrit SSH access
+python scripts/gerrit.py check
+
+# Changes
+python scripts/gerrit.py changes list
+python scripts/gerrit.py changes view 12345
+python scripts/gerrit.py changes search "status:open project:myproject"
+
+# Projects
+python scripts/gerrit.py projects list
+```
+
+All commands support `--json` for raw JSON output and `--limit N` for list commands (default 30).
+
+Global connection options: `--host`, `--port` (default 29418), `--username`.
+
+## Commands (Direct git-review Usage)
+
+For action commands, use `git-review` or SSH commands directly:
 
 ### Submitting Changes
 
@@ -304,12 +327,13 @@ git review -s
 
 ## Summary
 
-The Gerrit skill uses `git-review` CLI exclusively. No custom scripts are needed - `git-review` provides comprehensive functionality for all Gerrit code review operations.
+The Gerrit skill uses `git-review` with a Python wrapper for markdown-formatted query output on read/view operations.
 
 **Quick start:**
 1. Install: `pip install git-review`
 2. Setup: `git review -s` (in repository)
-3. Submit: `git review`
-4. Download: `git review -d 12345`
+3. Verify: `python scripts/gerrit.py check`
+4. Read: `python scripts/gerrit.py changes list`
+5. Write: `git review`, `git review -d 12345`, etc. (use `git-review` directly)
 
 For detailed command reference, use `git review --help` or visit <https://docs.opendev.org/opendev/git-review/latest/>.

@@ -17,13 +17,6 @@ This document tracks planned features for the agent-skills repository. Only pend
   - [ ] Watch for file changes (`files.watch`, `changes.*`)
   - [ ] Shared drive management (`drives.*`)
 
-## Markdown Output Compliance
-
-- [ ] **gerrit** - Add markdown wrapper script for `git-review` / Gerrit REST API
-  - `git-review` has limited output formatting
-  - Wrapper may need to call Gerrit REST API directly for structured data
-  - Cover read/view commands: changes, reviews, projects
-
 ## Infrastructure Improvements
 
 - [ ] Consider migrating Jira skill to use official Atlassian CLI (ACLI)
