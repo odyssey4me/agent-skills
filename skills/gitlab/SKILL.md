@@ -3,7 +3,7 @@ name: gitlab
 description: Work with GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when managing GitLab projects.
 metadata:
   author: odyssey4me
-  version: "0.1.0"
+  version: "0.2.0"
   category: code-hosting
   tags: [issues, merge-requests, pipelines]
   complexity: lightweight
@@ -12,7 +12,7 @@ license: MIT
 
 # GitLab Skill
 
-This skill provides guidance for working with GitLab using the official `glab` CLI tool. All GitLab operations (issues, merge requests, pipelines, repositories) are performed using `glab` commands.
+This skill provides GitLab integration using the official `glab` CLI tool. A Python wrapper script produces markdown-formatted output for read/view operations. Action commands (create, merge, close, comment) should use `glab` directly.
 
 ## Prerequisites
 
@@ -46,7 +46,36 @@ glab auth status
 Supports GitLab.com, GitLab Dedicated, and GitLab Self-Managed instances.
 See [GitLab CLI Authentication](https://docs.gitlab.com/cli/#authentication) for details.
 
-## Commands
+## Script Usage
+
+The wrapper script (`scripts/gitlab.py`) calls `glab --output json` and formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `glab` directly for action commands (create, merge, close, comment).
+
+```bash
+# Check glab CLI is installed and authenticated
+python scripts/gitlab.py check
+
+# Issues
+python scripts/gitlab.py issues list --repo GROUP/REPO
+python scripts/gitlab.py issues view 123 --repo GROUP/REPO
+
+# Merge Requests
+python scripts/gitlab.py mrs list --repo GROUP/REPO
+python scripts/gitlab.py mrs view 456 --repo GROUP/REPO
+
+# Pipelines
+python scripts/gitlab.py pipelines list --repo GROUP/REPO
+python scripts/gitlab.py pipelines view 123456 --repo GROUP/REPO
+
+# Repositories
+python scripts/gitlab.py repos list
+python scripts/gitlab.py repos view GROUP/REPO
+```
+
+All commands support `--json` for raw JSON output and `--limit N` for list commands (default 30).
+
+## Commands (Direct glab Usage)
+
+For action commands, use `glab` directly:
 
 ### Issues
 
@@ -240,12 +269,13 @@ glab version
 
 ## Summary
 
-The GitLab skill uses the official `glab` CLI exclusively. No custom scripts are needed - `glab` provides comprehensive functionality for all GitLab operations.
+The GitLab skill uses the official `glab` CLI with a Python wrapper for markdown-formatted output on read/view commands.
 
 **Quick start:**
 1. Install: `brew install glab` (or equivalent for your OS)
 2. Authenticate: `glab auth login`
-3. Verify: `glab auth status`
-4. Use: `glab issue list`, `glab mr create`, etc.
+3. Verify: `python scripts/gitlab.py check`
+4. Read: `python scripts/gitlab.py issues list --repo GROUP/REPO`
+5. Write: `glab issue create`, `glab mr create`, etc. (use `glab` directly)
 
 For detailed command reference, use `glab <command> --help` or visit <https://docs.gitlab.com/cli/>.

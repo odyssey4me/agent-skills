@@ -77,14 +77,14 @@
     {
       "name": "gitlab",
       "description": "Work with GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when managing GitLab projects.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "code-hosting",
       "tags": [
         "issues",
         "merge-requests",
         "pipelines"
       ],
-      "type": "cli",
+      "type": "api",
       "complexity": "lightweight",
       "auth": "cli-auth",
       "dependencies": [
