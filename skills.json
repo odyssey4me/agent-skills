@@ -60,7 +60,7 @@
     {
       "name": "github",
       "description": "Work with GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when managing GitHub projects.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "code-hosting",
       "tags": [
         "issues",

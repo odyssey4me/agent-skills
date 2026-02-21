@@ -3,7 +3,7 @@ name: github
 description: Work with GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when managing GitHub projects.
 metadata:
   author: odyssey4me
-  version: "0.1.0"
+  version: "0.2.0"
   category: code-hosting
   tags: [issues, pull-requests, workflows]
   complexity: lightweight
@@ -12,7 +12,7 @@ license: MIT
 
 # GitHub Skill
 
-This skill provides guidance for working with GitHub using the official `gh` CLI tool. All GitHub operations (issues, PRs, workflows, repositories) are performed using `gh` commands.
+This skill provides GitHub integration using the official `gh` CLI tool. A Python wrapper script produces markdown-formatted output for read/view operations. Action commands (create, merge, close, comment) should use `gh` directly.
 
 ## Prerequisites
 
@@ -45,7 +45,42 @@ gh auth status
 
 See [GitHub CLI Authentication](https://cli.github.com/manual/gh_auth_login) for details.
 
-## Commands
+## Script Usage
+
+The wrapper script (`scripts/github.py`) calls `gh --json` and formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `gh` directly for action commands (create, merge, close, comment).
+
+```bash
+# Check gh CLI is installed and authenticated
+python scripts/github.py check
+
+# Issues
+python scripts/github.py issues list --repo OWNER/REPO
+python scripts/github.py issues view 123 --repo OWNER/REPO
+
+# Pull Requests
+python scripts/github.py prs list --repo OWNER/REPO
+python scripts/github.py prs view 456 --repo OWNER/REPO
+python scripts/github.py prs checks 456 --repo OWNER/REPO
+
+# Workflow Runs
+python scripts/github.py runs list --repo OWNER/REPO
+python scripts/github.py runs view 12345 --repo OWNER/REPO
+
+# Repositories
+python scripts/github.py repos list
+python scripts/github.py repos view OWNER/REPO
+
+# Search
+python scripts/github.py search repos "machine learning"
+python scripts/github.py search issues "label:bug is:open"
+python scripts/github.py search prs "is:open review:required"
+```
+
+All commands support `--json` for raw JSON output and `--limit N` for list commands (default 30).
+
+## Commands (Direct gh Usage)
+
+For action commands, use `gh` directly:
 
 ### Issues
 
@@ -261,12 +296,13 @@ gh --version
 
 ## Summary
 
-The GitHub skill uses the official `gh` CLI exclusively. No custom scripts are needed - `gh` provides comprehensive functionality for all GitHub operations.
+The GitHub skill uses the official `gh` CLI with a Python wrapper for markdown-formatted output on read/view commands.
 
 **Quick start:**
 1. Install: `brew install gh` (or equivalent for your OS)
 2. Authenticate: `gh auth login`
-3. Verify: `gh auth status`
-4. Use: `gh issue list`, `gh pr create`, etc.
+3. Verify: `python scripts/github.py check`
+4. Read: `python scripts/github.py issues list --repo OWNER/REPO`
+5. Write: `gh issue create`, `gh pr create`, etc. (use `gh` directly)
 
 For detailed command reference, use `gh <command> --help` or visit <https://cli.github.com/manual/>.
