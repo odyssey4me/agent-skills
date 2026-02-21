@@ -811,17 +811,21 @@ def format_file_summary(file: dict[str, Any]) -> str:
 
     # Indicate if it's a folder
     if mime_type == MIME_TYPE_FOLDER:
-        type_indicator = "[Folder]"
+        type_indicator = " [Folder]"
         size = "-"
     else:
         type_indicator = ""
 
-    return f"""ID: {file_id}
-Name: {name} {type_indicator}
-Type: {mime_type}
-Size: {size}
-Modified: {modified}
-Link: {link}"""
+    lines = [
+        f"### {name}{type_indicator}",
+        f"- **ID:** {file_id}",
+        f"- **Type:** {mime_type}",
+        f"- **Size:** {size}",
+        f"- **Modified:** {modified}",
+    ]
+    if link:
+        lines.append(f"- **Link:** {link}")
+    return "\n".join(lines)
 
 
 def format_permission(permission: dict[str, Any]) -> str:
@@ -840,7 +844,7 @@ def format_permission(permission: dict[str, Any]) -> str:
     perm_id = permission.get("id", "(Unknown)")
 
     user_info = display_name or email or perm_type
-    return f"{user_info} ({role}) - ID: {perm_id}"
+    return f"- **{user_info}** ({role}, ID: {perm_id})"
 
 
 # ============================================================================

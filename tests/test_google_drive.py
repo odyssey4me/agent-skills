@@ -741,7 +741,7 @@ class TestFormatting:
     """Tests for output formatting functions."""
 
     def test_format_file_summary(self):
-        """Test formatting file summary."""
+        """Test formatting file summary as markdown."""
         file = {
             "id": "file123",
             "name": "Report.pdf",
@@ -753,13 +753,14 @@ class TestFormatting:
 
         formatted = format_file_summary(file)
 
-        assert "file123" in formatted
-        assert "Report.pdf" in formatted
-        assert "application/pdf" in formatted
-        assert "1.0 MB" in formatted
+        assert formatted.startswith("### Report.pdf\n")
+        assert "- **ID:** file123" in formatted
+        assert "- **Type:** application/pdf" in formatted
+        assert "- **Size:** 1.0 MB" in formatted
+        assert "- **Link:** https://drive.google.com/file/d/file123" in formatted
 
     def test_format_file_summary_folder(self):
-        """Test formatting folder summary."""
+        """Test formatting folder summary as markdown."""
         folder = {
             "id": "folder123",
             "name": "Documents",
@@ -769,25 +770,25 @@ class TestFormatting:
 
         formatted = format_file_summary(folder)
 
-        assert "[Folder]" in formatted
-        assert "Documents" in formatted
+        assert formatted.startswith("### Documents [Folder]\n")
+        assert "- **ID:** folder123" in formatted
 
     def test_format_file_summary_sizes(self):
         """Test formatting various file sizes."""
         # KB
         file_kb = {"id": "f1", "name": "a.txt", "size": "2048"}
-        assert "2.0 KB" in format_file_summary(file_kb)
+        assert "- **Size:** 2.0 KB" in format_file_summary(file_kb)
 
         # GB
         file_gb = {"id": "f2", "name": "b.zip", "size": "2147483648"}
-        assert "2.0 GB" in format_file_summary(file_gb)
+        assert "- **Size:** 2.0 GB" in format_file_summary(file_gb)
 
         # Bytes
         file_b = {"id": "f3", "name": "c.txt", "size": "500"}
-        assert "500 B" in format_file_summary(file_b)
+        assert "- **Size:** 500 B" in format_file_summary(file_b)
 
     def test_format_permission(self):
-        """Test formatting permission."""
+        """Test formatting permission as markdown."""
         permission = {
             "id": "perm123",
             "type": "user",
@@ -798,7 +799,7 @@ class TestFormatting:
 
         formatted = format_permission(permission)
 
-        assert "John Doe" in formatted
+        assert "- **John Doe**" in formatted
         assert "reader" in formatted
         assert "perm123" in formatted
 
