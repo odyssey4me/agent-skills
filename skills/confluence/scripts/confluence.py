@@ -1336,12 +1336,14 @@ def format_page(
     version_info = page.get("version", {})
     version = version_info.get("number", "1") if version_info else "1"
 
-    result = f"""Page ID: {page_id}
-Title: {title}
-Type: {page_type}
-Space: {space_key}
-Status: {status}
-Version: {version}"""
+    result = (
+        f"### {title}\n"
+        f"- **Page ID:** {page_id}\n"
+        f"- **Type:** {page_type}\n"
+        f"- **Space:** {space_key}\n"
+        f"- **Status:** {status}\n"
+        f"- **Version:** {version}"
+    )
 
     if include_body:
         body = page.get("body", {})
@@ -1378,25 +1380,22 @@ def format_pages_list(pages: list[dict[str, Any]]) -> str:
     if not pages:
         return "No pages found"
 
-    rows = []
+    parts = []
     for page in pages:
         space = page.get("space", {})
         space_key = space.get("key", "Unknown") if space else "Unknown"
+        page_id = page.get("id", "N/A")
+        title = page.get("title", "No title")
+        page_type = page.get("type", "page")
 
-        rows.append(
-            {
-                "id": page.get("id", "N/A"),
-                "title": page.get("title", "No title"),
-                "type": page.get("type", "page"),
-                "space": space_key,
-            }
+        parts.append(
+            f"### {title}\n"
+            f"- **Page ID:** {page_id}\n"
+            f"- **Type:** {page_type}\n"
+            f"- **Space:** {space_key}"
         )
 
-    return format_table(
-        rows,
-        ["id", "title", "type", "space"],
-        headers={"id": "ID", "title": "Title", "type": "Type", "space": "Space"},
-    )
+    return "\n\n".join(parts)
 
 
 # ============================================================================

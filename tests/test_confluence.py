@@ -593,7 +593,7 @@ class TestFormatFunctions:
     """Tests for page formatting functions."""
 
     def test_format_page(self):
-        """Test page formatting."""
+        """Test page formatting as markdown."""
         from skills.confluence.scripts.confluence import format_page
 
         page = {
@@ -606,12 +606,12 @@ class TestFormatFunctions:
         }
 
         result = format_page(page)
-        assert "Test Page" in result
-        assert "DEMO" in result
-        assert "123" in result
+        assert result.startswith("### Test Page\n")
+        assert "- **Page ID:** 123" in result
+        assert "- **Space:** DEMO" in result
 
     def test_format_pages_list(self):
-        """Test formatting list of pages."""
+        """Test formatting list of pages as markdown."""
         from skills.confluence.scripts.confluence import format_pages_list
 
         pages = [
@@ -630,8 +630,10 @@ class TestFormatFunctions:
         ]
 
         result = format_pages_list(pages)
-        assert "Page 1" in result
-        assert "Page 2" in result
+        assert "### Page 1" in result
+        assert "### Page 2" in result
+        assert "- **Page ID:** 1" in result
+        assert "- **Page ID:** 2" in result
 
     def test_format_content_markdown_to_storage(self):
         """Test format_content conversion."""
