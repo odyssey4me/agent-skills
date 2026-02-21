@@ -459,6 +459,30 @@ It should verify:
 - Service connectivity
 - Provide actionable error messages
 
+### Output Formatting
+
+**Principle**: All skill scripts must output markdown by default for immediate agent consumability.
+
+**Why**: Markdown is the standard format that AI agents can parse and present directly. Plain text key-value pairs or ASCII tables require additional processing.
+
+**Standard pattern**:
+- `### {title}` for item headings (e.g., `### My Document`, `### DEMO-123: Fix bug`)
+- `- **Label:** value` for metadata fields
+- `## {Section}` for top-level grouping (e.g., `## Issues`, `## Files`)
+- Comma-separated inline for multi-value fields (labels, assignees)
+- ISO dates formatted as `YYYY-MM-DD` or `YYYY-MM-DD HH:MM`
+- `--json` flag preserved for raw JSON output on all commands
+
+**Example**:
+```python
+def format_document_summary(doc: dict[str, Any]) -> str:
+    title = doc.get("title", "(Untitled)")
+    doc_id = doc.get("documentId", "(Unknown)")
+    return f"### {title}\n- **Document ID:** {doc_id}\n- **Characters:** {char_count}"
+```
+
+**Canonical reference**: `skills/gmail/scripts/gmail.py` — see `format_message_summary()` and `format_label()`.
+
 ### Error Handling
 
 **Provide context and solutions**:

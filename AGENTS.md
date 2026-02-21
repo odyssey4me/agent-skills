@@ -44,6 +44,14 @@ When working on this repository:
      - ✅ Jira skill uses custom script (no official CLI with full API coverage)
      - ✅ Google skills use custom scripts (gcloud is infrastructure-focused, not API-focused)
 
+5. **Default to markdown output format**:
+   - All skill scripts must output markdown by default for immediate agent consumability
+   - Use `### {title}` for item headings, `- **Label:** value` for metadata fields
+   - Use `## {Section}` for top-level grouping (e.g., list results header)
+   - Preserve `--json` flag as an alternative for raw JSON output on all commands
+   - Reference `skills/gmail/scripts/gmail.py` as the canonical example
+   - CLI-wrapping skills should provide a wrapper script when the CLI doesn't natively produce markdown
+
 ## Quick Reference
 
 **For users**: See [docs/user-guide.md](docs/user-guide.md)
@@ -155,20 +163,22 @@ For detailed development guidelines, see [docs/developer-guide.md](docs/develope
 
 ### Documentation-Only Skills
 
-Skills that wrap official CLI tools (like `gh` for GitHub or `glab` for GitLab) are documentation-only and don't require a `scripts/` directory or Python implementation. These skills:
+Skills that wrap official CLI tools (like `glab` for GitLab) are documentation-only and don't require a `scripts/` directory or Python implementation. These skills:
 
 - Provide comprehensive documentation in SKILL.md
 - Guide users to use the official CLI directly
 - Include practical examples in references/common-workflows.md
 - Don't need custom Python scripts or a scripts/ directory
 
-**Examples**: `github`, `gitlab`
+**Examples**: `gitlab`, `gerrit`
 
 **When to use this approach**:
 - An official CLI exists that covers all needed functionality
 - The CLI is well-maintained by the service provider
 - The CLI handles authentication, API changes, and edge cases
-- Users benefit more from learning the official tool than a custom wrapper
+- The CLI natively produces markdown-compatible output, or the skill is purely documentation
+
+**When to add a wrapper script**: If an official CLI exists but doesn't produce markdown output by default, provide a thin wrapper script that calls the CLI with `--json` and formats results as markdown. This ensures consistent agent-consumable output across all skills (see Development Principle #5).
 
 ## Repository Structure
 
