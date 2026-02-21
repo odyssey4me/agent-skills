@@ -999,11 +999,12 @@ def format_issue(issue: dict[str, Any]) -> str:
     priority = fields.get("priority", {})
     priority_name = priority.get("name", "None") if priority else "None"
 
-    return f"""Issue: {key}
-Summary: {summary}
-Status: {status}
-Assignee: {assignee_name}
-Priority: {priority_name}"""
+    return (
+        f"### {key}: {summary}\n"
+        f"- **Status:** {status}\n"
+        f"- **Assignee:** {assignee_name}\n"
+        f"- **Priority:** {priority_name}"
+    )
 
 
 def format_issues_list(issues: list[dict[str, Any]]) -> str:
@@ -1018,24 +1019,19 @@ def format_issues_list(issues: list[dict[str, Any]]) -> str:
     if not issues:
         return "No issues found"
 
-    rows = []
+    parts = []
     for issue in issues:
         fields = issue.get("fields", {})
         assignee = fields.get("assignee", {})
-        rows.append(
-            {
-                "key": issue.get("key", "N/A"),
-                "summary": fields.get("summary", "No summary"),
-                "status": fields.get("status", {}).get("name", "Unknown"),
-                "assignee": assignee.get("displayName", "Unassigned") if assignee else "Unassigned",
-            }
+        key = issue.get("key", "N/A")
+        summary = fields.get("summary", "No summary")
+        status = fields.get("status", {}).get("name", "Unknown")
+        assignee_name = assignee.get("displayName", "Unassigned") if assignee else "Unassigned"
+        parts.append(
+            f"### {key}: {summary}\n- **Status:** {status}\n- **Assignee:** {assignee_name}"
         )
 
-    return format_table(
-        rows,
-        ["key", "summary", "status", "assignee"],
-        headers={"key": "Key", "summary": "Summary", "status": "Status", "assignee": "Assignee"},
-    )
+    return "\n\n".join(parts)
 
 
 # ============================================================================

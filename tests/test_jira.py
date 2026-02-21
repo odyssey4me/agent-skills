@@ -402,7 +402,7 @@ class TestFormatting:
         assert result == "No data"
 
     def test_format_issue(self):
-        """Test issue formatting."""
+        """Test issue formatting as markdown."""
         issue = {
             "key": "DEMO-123",
             "fields": {
@@ -415,14 +415,13 @@ class TestFormatting:
 
         result = format_issue(issue)
 
-        assert "DEMO-123" in result
-        assert "Test issue" in result
-        assert "Open" in result
-        assert "Alice" in result
-        assert "High" in result
+        assert result.startswith("### DEMO-123: Test issue\n")
+        assert "- **Status:** Open" in result
+        assert "- **Assignee:** Alice" in result
+        assert "- **Priority:** High" in result
 
     def test_format_issues_list(self):
-        """Test formatting issue list."""
+        """Test formatting issue list as markdown."""
         issues = [
             {
                 "key": "DEMO-1",
@@ -444,11 +443,10 @@ class TestFormatting:
 
         result = format_issues_list(issues)
 
-        assert "DEMO-1" in result
-        assert "DEMO-2" in result
-        assert "First" in result
-        assert "Second" in result
-        assert "Unassigned" in result
+        assert "### DEMO-1: First" in result
+        assert "### DEMO-2: Second" in result
+        assert "- **Assignee:** Alice" in result
+        assert "- **Assignee:** Unassigned" in result
 
     def test_format_issues_list_empty(self):
         """Test formatting empty issue list."""
