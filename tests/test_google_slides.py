@@ -628,7 +628,7 @@ class TestOutputFormatting:
     """Tests for output formatting functions."""
 
     def test_format_presentation_summary(self):
-        """Test formatting presentation summary."""
+        """Test formatting presentation summary as markdown."""
         presentation = {
             "presentationId": "abc123",
             "title": "Test Presentation",
@@ -640,12 +640,12 @@ class TestOutputFormatting:
 
         result = format_presentation_summary(presentation)
 
-        assert "Test Presentation" in result
-        assert "abc123" in result
-        assert "2" in result  # slide count
+        assert result.startswith("### Test Presentation\n")
+        assert "- **Presentation ID:** abc123" in result
+        assert "- **Slides:** 2" in result
 
     def test_format_slide_info(self):
-        """Test formatting slide information."""
+        """Test formatting slide information as markdown."""
         slide = {
             "objectId": "slide_abc123",
             "slideProperties": {"layoutObjectId": "layout1"},
@@ -658,8 +658,8 @@ class TestOutputFormatting:
 
         result = format_slide_info(slide, 0)
 
-        assert "Slide 1" in result
-        assert "slide_abc123" in result
+        assert result.startswith("### Slide 1\n")
+        assert "- **ID:** slide_abc123" in result
         assert "1 text" in result
         assert "1 shapes" in result
         assert "1 images" in result

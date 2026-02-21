@@ -910,10 +910,12 @@ def format_presentation_summary(presentation: dict[str, Any]) -> str:
     presentation_id = presentation.get("presentationId", "(Unknown)")
     slides = presentation.get("slides", [])
 
-    return f"""Title: {title}
-Presentation ID: {presentation_id}
-Slides: {len(slides)}
-URL: https://docs.google.com/presentation/d/{presentation_id}/edit"""
+    return (
+        f"### {title}\n"
+        f"- **Presentation ID:** {presentation_id}\n"
+        f"- **Slides:** {len(slides)}\n"
+        f"- **URL:** https://docs.google.com/presentation/d/{presentation_id}/edit"
+    )
 
 
 def format_slide_info(slide: dict[str, Any], index: int) -> str:
@@ -944,10 +946,15 @@ def format_slide_info(slide: dict[str, Any], index: int) -> str:
         else:
             element_counts["other"] += 1
 
-    return f"""Slide {index + 1}:
-  ID: {slide_id}
-  Layout: {layout}
-  Elements: {sum(element_counts.values())} ({element_counts["text"]} text, {element_counts["shapes"]} shapes, {element_counts["images"]} images, {element_counts["other"]} other)"""
+    total = sum(element_counts.values())
+    return (
+        f"### Slide {index + 1}\n"
+        f"- **ID:** {slide_id}\n"
+        f"- **Layout:** {layout}\n"
+        f"- **Elements:** {total} ({element_counts['text']} text, "
+        f"{element_counts['shapes']} shapes, {element_counts['images']} images, "
+        f"{element_counts['other']} other)"
+    )
 
 
 # ============================================================================
