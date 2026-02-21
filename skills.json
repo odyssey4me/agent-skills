@@ -4,7 +4,7 @@
     {
       "name": "code-review",
       "description": "Review PRs, MRs, and Gerrit changes with focus on security, maintainability, and architectural fit. Leverages github, gitlab, or gerrit skills based on repository context.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "development",
       "tags": [
         "review",
