@@ -101,13 +101,16 @@ Pre-commit hooks enforce code quality checks. To avoid failed commits, run these
    ```
    Checks: SKILL.md frontmatter, required sections (Authentication, Commands, Examples), script structure (argparse, check subcommand, main guard, docstring).
 
-3. **Regenerate the skills registry** (if you added/removed a skill or changed SKILL.md frontmatter):
+3. **Update README.md** (if you added or removed a skill):
+   Ensure the [Available Skills](README.md#available-skills) table includes an entry for every skill. New skills must be added to the table before committing.
+
+4. **Regenerate the skills registry** (if you added/removed a skill or changed SKILL.md frontmatter):
    ```bash
    python scripts/generate_registry.py
    ```
    This updates `skills.json`. The pre-commit hook runs `--check` mode and will reject commits where the registry is stale.
 
-4. **Run tests with coverage for changed files**:
+5. **Run tests with coverage for changed files**:
    ```bash
    pytest tests/ -q --cov=skills --cov=scripts --cov-report=xml:coverage.xml
    diff-cover coverage.xml --compare-branch=HEAD --fail-under=80
