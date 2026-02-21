@@ -625,10 +625,10 @@ class TestFormatting:
 
         formatted = format_message_summary(message)
 
-        assert "msg123" in formatted
-        assert "sender@example.com" in formatted
-        assert "Test Subject" in formatted
-        assert "This is a preview" in formatted
+        assert "### Test Subject" in formatted
+        assert "**ID:** msg123" in formatted
+        assert "**From:** sender@example.com" in formatted
+        assert "**Preview:** This is a preview" in formatted
 
     def test_format_label(self):
         """Test formatting label."""
@@ -636,7 +636,7 @@ class TestFormatting:
 
         formatted = format_label(label)
 
-        assert "Work" in formatted
+        assert "- **Work**" in formatted
         assert "label123" in formatted
         assert "user" in formatted
 
@@ -776,6 +776,23 @@ class TestCLICommands:
         exit_code = cmd_messages_list(args)
 
         assert exit_code == 0
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.list_messages")
+    @patch("builtins.print")
+    def test_cmd_messages_list_empty(self, mock_print, mock_list_messages, _mock_build_service):
+        """Test messages list command with no results."""
+        mock_list_messages.return_value = []
+
+        args = Mock()
+        args.query = None
+        args.max_results = 10
+        args.json = False
+
+        exit_code = cmd_messages_list(args)
+
+        assert exit_code == 0
+        mock_print.assert_called_with("No messages found")
 
     @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("skills.gmail.scripts.gmail.list_messages")
@@ -1106,6 +1123,22 @@ class TestMoreCLICommands:
     @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("skills.gmail.scripts.gmail.list_drafts")
     @patch("builtins.print")
+    def test_cmd_drafts_list_empty(self, mock_print, mock_list_drafts, _mock_build_service):
+        """Test drafts list command with no results."""
+        mock_list_drafts.return_value = []
+
+        args = Mock()
+        args.max_results = 10
+        args.json = False
+
+        exit_code = cmd_drafts_list(args)
+
+        assert exit_code == 0
+        mock_print.assert_called_with("No drafts found")
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.list_drafts")
+    @patch("builtins.print")
     def test_cmd_drafts_list_json(self, _mock_print, mock_list_drafts, _mock_build_service):
         """Test drafts list command with JSON output."""
         mock_list_drafts.return_value = []
@@ -1117,6 +1150,21 @@ class TestMoreCLICommands:
         exit_code = cmd_drafts_list(args)
 
         assert exit_code == 0
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.list_labels")
+    @patch("builtins.print")
+    def test_cmd_labels_list_empty(self, mock_print, mock_list_labels, _mock_build_service):
+        """Test labels list command with no results."""
+        mock_list_labels.return_value = []
+
+        args = Mock()
+        args.json = False
+
+        exit_code = cmd_labels_list(args)
+
+        assert exit_code == 0
+        mock_print.assert_called_with("No labels found")
 
     @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("skills.gmail.scripts.gmail.list_labels")

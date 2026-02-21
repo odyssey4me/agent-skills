@@ -693,11 +693,12 @@ def format_message_summary(message: dict[str, Any]) -> str:
     date = headers.get("Date", "(Unknown)")
     snippet = message.get("snippet", "")
 
-    return f"""ID: {message["id"]}
-From: {from_addr}
-Date: {date}
-Subject: {subject}
-Preview: {snippet[:100]}..."""
+    output = (
+        f"### {subject}\n- **ID:** {message['id']}\n- **From:** {from_addr}\n- **Date:** {date}"
+    )
+    if snippet:
+        output += f"\n- **Preview:** {snippet[:100]}..."
+    return output
 
 
 def format_label(label: dict[str, Any]) -> str:
@@ -712,7 +713,7 @@ def format_label(label: dict[str, Any]) -> str:
     name = label.get("name", "(Unknown)")
     label_id = label.get("id", "(Unknown)")
     label_type = label.get("type", "user")
-    return f"{name} (ID: {label_id}, Type: {label_type})"
+    return f"- **{name}** (ID: {label_id}, Type: {label_type})"
 
 
 # ============================================================================
@@ -912,12 +913,11 @@ def cmd_messages_list(args):
         if not messages:
             print("No messages found")
         else:
-            print(f"Found {len(messages)} message(s):\n")
+            print(f"## Messages\n\nFound {len(messages)} message(s):\n")
             for msg in messages:
                 # Fetch full message details for display
                 full_msg = get_message(service, msg["id"], format="metadata")
                 print(format_message_summary(full_msg))
-                print("-" * 80)
 
     return 0
 
@@ -945,9 +945,9 @@ def cmd_send(args):
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print("✓ Message sent successfully")
-        print(f"  Message ID: {result.get('id')}")
-        print(f"  Thread ID: {result.get('threadId')}")
+        print("**Message sent successfully**")
+        print(f"- **Message ID:** {result.get('id')}")
+        print(f"- **Thread ID:** {result.get('threadId')}")
 
     return 0
 
@@ -963,12 +963,11 @@ def cmd_drafts_list(args):
         if not drafts:
             print("No drafts found")
         else:
-            print(f"Found {len(drafts)} draft(s):\n")
+            print(f"## Drafts\n\nFound {len(drafts)} draft(s):\n")
             for draft in drafts:
-                print(f"Draft ID: {draft['id']}")
+                print(f"- **Draft ID:** {draft['id']}")
                 if "message" in draft:
-                    print(f"  Message ID: {draft['message']['id']}")
-                print("-" * 40)
+                    print(f"  - **Message ID:** {draft['message']['id']}")
 
     return 0
 
@@ -983,8 +982,8 @@ def cmd_drafts_create(args):
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print("✓ Draft created successfully")
-        print(f"  Draft ID: {result.get('id')}")
+        print("**Draft created successfully**")
+        print(f"- **Draft ID:** {result.get('id')}")
 
     return 0
 
@@ -997,8 +996,8 @@ def cmd_drafts_send(args):
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print("✓ Draft sent successfully")
-        print(f"  Message ID: {result.get('id')}")
+        print("**Draft sent successfully**")
+        print(f"- **Message ID:** {result.get('id')}")
 
     return 0
 
@@ -1014,7 +1013,7 @@ def cmd_labels_list(args):
         if not labels:
             print("No labels found")
         else:
-            print(f"Found {len(labels)} label(s):\n")
+            print(f"## Labels\n\nFound {len(labels)} label(s):\n")
             for label in labels:
                 print(format_label(label))
 
@@ -1029,9 +1028,9 @@ def cmd_labels_create(args):
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print("✓ Label created successfully")
-        print(f"  Name: {result.get('name')}")
-        print(f"  ID: {result.get('id')}")
+        print("**Label created successfully**")
+        print(f"- **Name:** {result.get('name')}")
+        print(f"- **ID:** {result.get('id')}")
 
     return 0
 
