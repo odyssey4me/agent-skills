@@ -748,10 +748,12 @@ def format_document_summary(doc: dict[str, Any]) -> str:
                 if "textRun" in text_element:
                     char_count += len(text_element["textRun"].get("content", ""))
 
-    return f"""Title: {title}
-Document ID: {doc_id}
-Characters: {char_count}
-Revision ID: {doc.get("revisionId", "N/A")}"""
+    return (
+        f"### {title}\n"
+        f"- **Document ID:** {doc_id}\n"
+        f"- **Characters:** {char_count}\n"
+        f"- **Revision ID:** {doc.get('revisionId', 'N/A')}"
+    )
 
 
 # ============================================================================

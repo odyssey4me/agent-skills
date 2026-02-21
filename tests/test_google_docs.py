@@ -385,7 +385,7 @@ class TestOutputFormatting:
     """Tests for output formatting functions."""
 
     def test_format_document_summary(self):
-        """Test formatting document summary."""
+        """Test formatting document summary as markdown."""
         doc = {
             "documentId": "abc123",
             "title": "Test Doc",
@@ -397,10 +397,10 @@ class TestOutputFormatting:
 
         result = format_document_summary(doc)
 
-        assert "Test Doc" in result
-        assert "abc123" in result
-        assert "rev456" in result
-        assert "11" in result  # character count
+        assert result.startswith("### Test Doc\n")
+        assert "- **Document ID:** abc123" in result
+        assert "- **Characters:** 11" in result
+        assert "- **Revision ID:** rev456" in result
 
 
 # ============================================================================
