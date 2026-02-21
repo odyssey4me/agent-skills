@@ -65,7 +65,7 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 | [Gerrit](skills/gerrit/SKILL.md) | Code review, submit changes, download patches via `git-review` CLI |
 | [Code Review](skills/code-review/SKILL.md) | Review PRs, MRs, and Gerrit changes with focus on security, maintainability, and architectural fit |
 
-See [TODO.md](TODO.md) for planned skills.
+Browse install counts and popularity on [skills.sh](https://skills.sh/odyssey4me/agent-skills). See [TODO.md](TODO.md) for planned skills.
 
 **Installation**: Use `npx add-skill odyssey4me/agent-skills` to install all skills, or see individual SKILL.md files for details. Manual downloads available from [Releases](https://github.com/odyssey4me/agent-skills/releases).
 
