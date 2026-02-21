@@ -394,7 +394,7 @@ class TestOutputFormatting:
     """Tests for output formatting functions."""
 
     def test_format_spreadsheet_summary(self):
-        """Test formatting spreadsheet summary."""
+        """Test formatting spreadsheet summary as markdown."""
         spreadsheet = {
             "spreadsheetId": "abc123",
             "properties": {"title": "Test Spreadsheet"},
@@ -406,11 +406,9 @@ class TestOutputFormatting:
 
         result = format_spreadsheet_summary(spreadsheet)
 
-        assert "Test Spreadsheet" in result
-        assert "abc123" in result
-        assert "2" in result  # sheet count
-        assert "Sheet1" in result
-        assert "Summary" in result
+        assert result.startswith("### Test Spreadsheet\n")
+        assert "- **Spreadsheet ID:** abc123" in result
+        assert "- **Sheets:** 2 (Sheet1, Summary)" in result
 
     def test_format_values_output(self):
         """Test formatting values for display."""

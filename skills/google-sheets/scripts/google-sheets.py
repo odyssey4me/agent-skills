@@ -646,10 +646,12 @@ def format_spreadsheet_summary(spreadsheet: dict[str, Any]) -> str:
     sheets = spreadsheet.get("sheets", [])
     sheet_names = [s.get("properties", {}).get("title", "Unknown") for s in sheets]
 
-    return f"""Title: {title}
-Spreadsheet ID: {spreadsheet_id}
-Sheets: {len(sheets)} ({", ".join(sheet_names)})
-URL: https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"""
+    return (
+        f"### {title}\n"
+        f"- **Spreadsheet ID:** {spreadsheet_id}\n"
+        f"- **Sheets:** {len(sheets)} ({', '.join(sheet_names)})\n"
+        f"- **URL:** https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
+    )
 
 
 def format_values_output(values: list[list[Any]]) -> str:
