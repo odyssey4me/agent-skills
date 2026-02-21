@@ -11,6 +11,7 @@ Usage:
     python github.py prs list --repo OWNER/REPO
     python github.py prs view 456 --repo OWNER/REPO
     python github.py prs checks 456 --repo OWNER/REPO
+    python github.py prs status --repo OWNER/REPO
     python github.py runs list --repo OWNER/REPO
     python github.py runs view 123456 --repo OWNER/REPO
     python github.py repos list
@@ -46,6 +47,7 @@ PR_VIEW_FIELDS = (
     "createdAt,updatedAt,comments,url,isDraft,mergeable,reviewDecision,"
     "additions,deletions,changedFiles,headRefName,baseRefName"
 )
+PR_STATUS_FIELDS = "number,title,state,headRefName,baseRefName,isDraft,reviewDecision,author,url"
 PR_CHECKS_FIELDS = "name,status,conclusion,startedAt,completedAt,detailsUrl"
 RUN_LIST_FIELDS = "databaseId,displayTitle,status,conclusion,event,createdAt,updatedAt,url"
 RUN_VIEW_FIELDS = (
@@ -272,6 +274,65 @@ def format_pr_row(pr: dict[str, Any]) -> str:
     if labels:
         lines.append(f"- **Labels:** {labels}")
     lines.append(f"- **Created:** {created}")
+    return "\n".join(lines)
+
+
+def format_pr_status(data: dict[str, Any]) -> str:
+    """Format gh pr status output as markdown.
+
+    Args:
+        data: Dictionary with 'currentBranch', 'createdBy', 'needsReview' keys.
+
+    Returns:
+        Markdown-formatted string.
+    """
+    lines = ["## PR Status"]
+
+    current = data.get("currentBranch")
+    lines.append("\n### Current Branch")
+    if current:
+        pr = current
+        number = pr.get("number", "?")
+        title = pr.get("title", "(No title)")
+        state = pr.get("state", "UNKNOWN")
+        draft = " (Draft)" if pr.get("isDraft") else ""
+        review = pr.get("reviewDecision", "")
+        url = pr.get("url", "")
+        lines.append(f"- **#{number}: {title}**{draft}")
+        line_parts = [f"  {state}"]
+        if review:
+            line_parts.append(f"Review: {review}")
+        lines.append(" | ".join(line_parts))
+        if url:
+            lines.append(f"  {url}")
+    else:
+        lines.append("No PR for current branch")
+
+    for section_key, section_title in [
+        ("createdBy", "Created by You"),
+        ("needsReview", "Requesting Your Review"),
+    ]:
+        prs = data.get(section_key, [])
+        lines.append(f"\n### {section_title}")
+        if not prs:
+            lines.append("None")
+        else:
+            for pr in prs:
+                number = pr.get("number", "?")
+                title = pr.get("title", "(No title)")
+                state = pr.get("state", "UNKNOWN")
+                draft = " (Draft)" if pr.get("isDraft") else ""
+                head = pr.get("headRefName", "")
+                base = pr.get("baseRefName", "")
+                review = pr.get("reviewDecision", "")
+                branch = f" ({head} → {base})" if head and base else ""
+                entry = f"- **#{number}: {title}**{draft}{branch}"
+                parts = [f"  {state}"]
+                if review:
+                    parts.append(f"Review: {review}")
+                lines.append(entry)
+                lines.append(" | ".join(parts))
+
     return "\n".join(lines)
 
 
@@ -738,6 +799,29 @@ def cmd_prs_checks(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_prs_status(args: argparse.Namespace) -> int:
+    """Show status of relevant pull requests.
+
+    Args:
+        args: Parsed arguments with repo, json flags.
+
+    Returns:
+        Exit code.
+    """
+    gh_args = ["pr", "status"]
+    if args.repo:
+        gh_args.extend(["-R", args.repo])
+
+    if args.json:
+        data = run_gh(gh_args, PR_STATUS_FIELDS)
+        print(json.dumps(data, indent=2))
+    else:
+        data = run_gh(gh_args, PR_STATUS_FIELDS)
+        if isinstance(data, dict):
+            print(format_pr_status(data))
+    return 0
+
+
 def cmd_runs_list(args: argparse.Namespace) -> int:
     """List workflow runs for a repository.
 
@@ -964,6 +1048,10 @@ def build_parser() -> argparse.ArgumentParser:
     prs_checks.add_argument("--repo", "-R", help="Repository (OWNER/REPO)")
     prs_checks.add_argument("--json", action="store_true", help="Output raw JSON")
 
+    prs_status = prs_sub.add_parser("status", help="Show status of relevant PRs")
+    prs_status.add_argument("--repo", "-R", help="Repository (OWNER/REPO)")
+    prs_status.add_argument("--json", action="store_true", help="Output raw JSON")
+
     # runs
     runs_parser = subparsers.add_parser("runs", help="Workflow run operations")
     runs_sub = runs_parser.add_subparsers(dest="runs_command")
@@ -1050,6 +1138,8 @@ def main() -> int:
             return cmd_prs_view(args)
         elif args.prs_command == "checks":
             return cmd_prs_checks(args)
+        elif args.prs_command == "status":
+            return cmd_prs_status(args)
     elif args.command == "runs":
         if not hasattr(args, "runs_command") or not args.runs_command:
             parser.parse_args(["runs", "--help"])

@@ -17,6 +17,7 @@ from skills.github.scripts.github import (
     cmd_issues_view,
     cmd_prs_checks,
     cmd_prs_list,
+    cmd_prs_status,
     cmd_prs_view,
     cmd_repos_list,
     cmd_repos_view,
@@ -30,6 +31,7 @@ from skills.github.scripts.github import (
     format_issue_row,
     format_issue_summary,
     format_pr_row,
+    format_pr_status,
     format_pr_summary,
     format_repo_row,
     format_repo_summary,
@@ -286,6 +288,67 @@ class TestFormatFunctions:
         result = format_check(check)
 
         assert "- **CI:** in_progress" in result
+
+    def test_format_pr_status_full(self):
+        """Test formatting pr status with all sections populated."""
+        data = {
+            "currentBranch": {
+                "number": 10,
+                "title": "Current PR",
+                "state": "OPEN",
+                "isDraft": False,
+                "reviewDecision": "REVIEW_REQUIRED",
+                "url": "https://github.com/owner/repo/pull/10",
+            },
+            "createdBy": [
+                {
+                    "number": 5,
+                    "title": "My PR",
+                    "state": "OPEN",
+                    "isDraft": True,
+                    "headRefName": "feature",
+                    "baseRefName": "main",
+                    "reviewDecision": "APPROVED",
+                },
+            ],
+            "needsReview": [
+                {
+                    "number": 8,
+                    "title": "Review me",
+                    "state": "OPEN",
+                    "isDraft": False,
+                    "headRefName": "fix",
+                    "baseRefName": "main",
+                    "reviewDecision": "",
+                },
+            ],
+        }
+
+        result = format_pr_status(data)
+
+        assert "## PR Status" in result
+        assert "### Current Branch" in result
+        assert "**#10: Current PR**" in result
+        assert "Review: REVIEW_REQUIRED" in result
+        assert "### Created by You" in result
+        assert "**#5: My PR** (Draft)" in result
+        assert "(feature → main)" in result
+        assert "Review: APPROVED" in result
+        assert "### Requesting Your Review" in result
+        assert "**#8: Review me**" in result
+
+    def test_format_pr_status_empty(self):
+        """Test formatting pr status with no PRs."""
+        data = {
+            "currentBranch": None,
+            "createdBy": [],
+            "needsReview": [],
+        }
+
+        result = format_pr_status(data)
+
+        assert "No PR for current branch" in result
+        assert "None" in result
 
     def test_format_run_summary(self):
         """Test formatting run summary."""
@@ -583,6 +646,43 @@ class TestCmdPrs:
         captured = capsys.readouterr()
         assert "- **CI:** success" in captured.out
 
+    @patch("skills.github.scripts.github.run_gh")
+    def test_prs_status_markdown(self, mock_run_gh, capsys):
+        """Test PR status with markdown output."""
+        mock_run_gh.return_value = {
+            "currentBranch": {
+                "number": 10,
+                "title": "My PR",
+                "state": "OPEN",
+                "isDraft": False,
+                "reviewDecision": "",
+                "url": "https://github.com/owner/repo/pull/10",
+            },
+            "createdBy": [],
+            "needsReview": [],
+        }
+
+        args = Mock(repo=None, json=False)
+        result = cmd_prs_status(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "## PR Status" in captured.out
+        assert "**#10: My PR**" in captured.out
+
+    @patch("skills.github.scripts.github.run_gh")
+    def test_prs_status_json(self, mock_run_gh, capsys):
+        """Test PR status with JSON output."""
+        data = {"currentBranch": None, "createdBy": [], "needsReview": []}
+        mock_run_gh.return_value = data
+
+        args = Mock(repo="owner/repo", json=True)
+        result = cmd_prs_status(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert json.loads(captured.out) == data
+
 
 class TestCmdRuns:
     """Tests for runs commands."""
@@ -789,6 +889,13 @@ class TestBuildParser:
         args = parser.parse_args(["prs", "checks", "5"])
         assert args.prs_command == "checks"
         assert args.number == 5
+
+    def test_parser_prs_status(self):
+        """Test parser for prs status command."""
+        parser = build_parser()
+        args = parser.parse_args(["prs", "status", "--repo", "owner/repo"])
+        assert args.prs_command == "status"
+        assert args.repo == "owner/repo"
 
     def test_parser_runs_list(self):
         """Test parser for runs list command."""

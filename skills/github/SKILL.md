@@ -61,6 +61,7 @@ python scripts/github.py issues view 123 --repo OWNER/REPO
 python scripts/github.py prs list --repo OWNER/REPO
 python scripts/github.py prs view 456 --repo OWNER/REPO
 python scripts/github.py prs checks 456 --repo OWNER/REPO
+python scripts/github.py prs status --repo OWNER/REPO
 
 # Workflow Runs
 python scripts/github.py runs list --repo OWNER/REPO
@@ -154,12 +155,12 @@ Full reference: [gh search](https://cli.github.com/manual/gh_search)
 ### Daily PR Review
 
 ```bash
-# List PRs waiting for your review
-gh pr list --search "review-requested:@me"
+# Show PRs needing your attention
+python scripts/github.py prs status
 
 # Review a specific PR
-gh pr view 456
-gh pr checks 456
+python scripts/github.py prs view 456
+python scripts/github.py prs checks 456
 gh pr diff 456
 gh pr review 456 --approve
 ```
