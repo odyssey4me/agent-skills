@@ -63,6 +63,7 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 | [GitHub](skills/github/SKILL.md) | Issues, pull requests, workflows, and repositories via `gh` CLI |
 | [GitLab](skills/gitlab/SKILL.md) | Issues, merge requests, pipelines, and repositories via `glab` CLI |
 | [Gerrit](skills/gerrit/SKILL.md) | Code review, submit changes, download patches via `git-review` CLI |
+| [Code Review](skills/code-review/SKILL.md) | Review PRs, MRs, and Gerrit changes with focus on security, maintainability, and architectural fit |
 
 See [TODO.md](TODO.md) for planned skills.
 
