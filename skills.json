@@ -67,7 +67,7 @@
         "pull-requests",
         "workflows"
       ],
-      "type": "cli",
+      "type": "api",
       "complexity": "lightweight",
       "auth": "cli-auth",
       "dependencies": [
