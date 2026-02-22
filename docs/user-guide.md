@@ -220,6 +220,18 @@ Simply describe what you want in natural language:
 
 Claude Code will automatically use the appropriate skill to fulfill your request.
 
+### Best Practices for Agent Behaviour
+
+Add these guidelines to your project's `AGENTS.md` (or equivalent agent instructions file) to ensure agents use skills correctly:
+
+1. **Always invoke skills via the Skill tool** — don't bypass them with direct CLI calls to underlying scripts. The Skill tool loads the skill's SKILL.md which documents defaults, conventions, and correct usage.
+
+2. **Trust skill defaults** — don't add post-processing, format flags, or output transformations unless there's a specific reason. Skills default to markdown output; use it as-is.
+
+3. **Subagents follow the same rules** — when spawning agents via the Task tool, instruct them to use skills by name (e.g. "Use the gmail skill to search for..."). The agent will invoke the Skill tool, which loads the correct documentation and conventions. Agents should not construct raw API calls or CLI commands that replicate what a skill already provides.
+
+4. **Describe what, not how** — tell agents what information to gather, not which commands to run. The skills evolve independently; hardcoding their implementation details creates coupling that breaks when skills change.
+
 ### Skill-Specific Commands
 
 You can also invoke skills directly with specific commands. See individual skill documentation:
