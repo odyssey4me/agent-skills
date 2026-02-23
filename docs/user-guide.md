@@ -79,19 +79,7 @@ If you prefer manual installation or need to customize the setup:
 
 ### Option 3: Development Installation
 
-For contributors or developers who want to modify skills:
-
-```bash
-# Clone the repository
-git clone https://github.com/odyssey4me/agent-skills.git
-cd agent-skills
-
-# Install development dependencies
-pip install -e ".[dev]"
-
-# Skills are now available in skills/ directory
-# You can use them directly or symlink to ~/.claude/skills/
-```
+For contributors or developers who want to modify skills, see the [Contributing Guide](../CONTRIBUTING.md#quick-start) for setup instructions.
 
 ## Authentication Setup
 
