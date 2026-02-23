@@ -1085,8 +1085,8 @@ def build_parser() -> argparse.ArgumentParser:
     read_parser.add_argument(
         "--format",
         choices=["text", "markdown", "pdf"],
-        default="text",
-        help="Output format: text (plain text), markdown (preserves tables and headings), or pdf",
+        default="markdown",
+        help="Output format: markdown (default, preserves tables and headings), text (plain text), or pdf",
     )
     read_parser.add_argument(
         "--output",

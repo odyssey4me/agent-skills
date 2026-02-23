@@ -183,16 +183,13 @@ python scripts/google-docs.py documents read DOCUMENT_ID
 - `document_id` - The Google Docs document ID
 
 **Options:**
-- `--format` - Output format: `text` (default), `markdown` (preserves tables and headings), or `pdf`
+- `--format` - Output format: `markdown` (default, preserves tables and headings) or `pdf`
 - `--output`, `-o` - Output file path (used with pdf format)
 
 **Example:**
 ```bash
-# Read as plain text (default)
+# Read as markdown (default, preserves tables and headings)
 python scripts/google-docs.py documents read 1abc...xyz
-
-# Read as markdown with table preservation
-python scripts/google-docs.py documents read 1abc...xyz --format markdown
 
 # Export as PDF
 python scripts/google-docs.py documents read 1abc...xyz --format pdf --output document.pdf

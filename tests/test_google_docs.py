@@ -653,10 +653,10 @@ class TestArgumentParser:
         assert args.format == "markdown"
 
     def test_parser_documents_read_default_format(self):
-        """Test parser for documents read defaults to text format."""
+        """Test parser for documents read defaults to markdown format."""
         parser = build_parser()
         args = parser.parse_args(["documents", "read", "doc-123"])
-        assert args.format == "text"
+        assert args.format == "markdown"
 
     def test_parser_documents_read_pdf_format(self):
         """Test parser for documents read with pdf format and output."""
