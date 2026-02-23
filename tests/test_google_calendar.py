@@ -592,6 +592,65 @@ class TestOutputFormatting:
         assert "Room A" in formatted
         assert "alice@example.com" in formatted
 
+    def test_format_event_with_response_status(self):
+        """Test event formatting includes user's response status."""
+        event = {
+            "id": "event1",
+            "summary": "Team Meeting",
+            "start": {"dateTime": "2026-01-24T10:00:00Z"},
+            "end": {"dateTime": "2026-01-24T11:00:00Z"},
+            "attendees": [
+                {"email": "alice@example.com", "self": True, "responseStatus": "accepted"},
+                {"email": "bob@example.com", "responseStatus": "tentative"},
+            ],
+        }
+
+        formatted = format_event(event)
+        assert "**Your response:** Accepted" in formatted
+        assert "alice@example.com" in formatted
+
+    def test_format_event_response_status_declined(self):
+        """Test event formatting shows declined status."""
+        event = {
+            "id": "event1",
+            "summary": "Skipped Meeting",
+            "start": {"dateTime": "2026-01-24T10:00:00Z"},
+            "end": {"dateTime": "2026-01-24T11:00:00Z"},
+            "attendees": [
+                {"email": "me@example.com", "self": True, "responseStatus": "declined"},
+            ],
+        }
+
+        formatted = format_event(event)
+        assert "**Your response:** Declined" in formatted
+
+    def test_format_event_response_status_needs_action(self):
+        """Test event formatting shows not responded status."""
+        event = {
+            "id": "event1",
+            "summary": "New Invite",
+            "start": {"dateTime": "2026-01-24T10:00:00Z"},
+            "end": {"dateTime": "2026-01-24T11:00:00Z"},
+            "attendees": [
+                {"email": "me@example.com", "self": True, "responseStatus": "needsAction"},
+            ],
+        }
+
+        formatted = format_event(event)
+        assert "**Your response:** Not responded" in formatted
+
+    def test_format_event_no_response_status_without_attendees(self):
+        """Test no response status line for events without attendees."""
+        event = {
+            "id": "event1",
+            "summary": "Personal Event",
+            "start": {"dateTime": "2026-01-24T10:00:00Z"},
+            "end": {"dateTime": "2026-01-24T11:00:00Z"},
+        }
+
+        formatted = format_event(event)
+        assert "Your response" not in formatted
+
 
 # ============================================================================
 # CLI COMMAND TESTS
@@ -718,6 +777,7 @@ class TestCLICommands:
 
         args = Mock()
         args.json = True
+        args.include_declined = False
         args.calendar = "primary"
         args.time_min = None
         args.time_max = None
@@ -1078,6 +1138,7 @@ class TestEdgeCases:
 
         args = Mock()
         args.json = False
+        args.include_declined = False
         args.calendar = "primary"
         args.time_min = None
         args.time_max = None
@@ -1089,6 +1150,80 @@ class TestEdgeCases:
 
         captured = capsys.readouterr()
         assert "No events found" in captured.out
+
+    @patch.object(google_calendar, "build_calendar_service")
+    @patch.object(google_calendar, "list_events")
+    def test_cmd_events_list_filters_declined(self, mock_list, _mock_service, capsys):
+        """Test events list filters declined events by default."""
+        mock_list.return_value = [
+            {
+                "id": "event1",
+                "summary": "Accepted Meeting",
+                "start": {"dateTime": "2026-01-24T10:00:00Z"},
+                "end": {"dateTime": "2026-01-24T11:00:00Z"},
+                "attendees": [
+                    {"email": "me@example.com", "self": True, "responseStatus": "accepted"},
+                ],
+            },
+            {
+                "id": "event2",
+                "summary": "Declined Meeting",
+                "start": {"dateTime": "2026-01-24T12:00:00Z"},
+                "end": {"dateTime": "2026-01-24T13:00:00Z"},
+                "attendees": [
+                    {"email": "me@example.com", "self": True, "responseStatus": "declined"},
+                ],
+            },
+        ]
+
+        args = Mock()
+        args.json = False
+        args.include_declined = False
+        args.calendar = "primary"
+        args.time_min = None
+        args.time_max = None
+        args.max_results = 10
+        args.query = None
+
+        result = cmd_events_list(args)
+        assert result == 0
+
+        captured = capsys.readouterr()
+        assert "Accepted Meeting" in captured.out
+        assert "Declined Meeting" not in captured.out
+        assert "1 declined invitation(s) not shown" in captured.out
+
+    @patch.object(google_calendar, "build_calendar_service")
+    @patch.object(google_calendar, "list_events")
+    def test_cmd_events_list_include_declined(self, mock_list, _mock_service, capsys):
+        """Test events list includes declined events when flag is set."""
+        mock_list.return_value = [
+            {
+                "id": "event1",
+                "summary": "Declined Meeting",
+                "start": {"dateTime": "2026-01-24T10:00:00Z"},
+                "end": {"dateTime": "2026-01-24T11:00:00Z"},
+                "attendees": [
+                    {"email": "me@example.com", "self": True, "responseStatus": "declined"},
+                ],
+            },
+        ]
+
+        args = Mock()
+        args.json = False
+        args.include_declined = True
+        args.calendar = "primary"
+        args.time_min = None
+        args.time_max = None
+        args.max_results = 10
+        args.query = None
+
+        result = cmd_events_list(args)
+        assert result == 0
+
+        captured = capsys.readouterr()
+        assert "Declined Meeting" in captured.out
+        assert "declined invitation(s) not shown" not in captured.out
 
     @patch.object(google_calendar, "build_calendar_service")
     @patch.object(google_calendar, "create_event")

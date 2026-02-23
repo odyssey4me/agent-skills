@@ -754,9 +754,22 @@ def format_event(event: dict[str, Any]) -> str:
         output += f"\n- **Description:** {desc_preview}"
 
     attendees = event.get("attendees", [])
+    my_status = None
     if attendees:
+        for a in attendees:
+            if a.get("self"):
+                my_status = a.get("responseStatus")
+                break
         emails = [a.get("email", "") for a in attendees]
         output += f"\n- **Attendees:** {', '.join(emails)}"
+    if my_status:
+        status_display = {
+            "accepted": "Accepted",
+            "declined": "Declined",
+            "tentative": "Tentative",
+            "needsAction": "Not responded",
+        }
+        output += f"\n- **Your response:** {status_display.get(my_status, my_status)}"
 
     return output
 
@@ -983,6 +996,19 @@ def cmd_events_list(args):
         query=args.query,
     )
 
+    if not args.include_declined:
+        declined = [
+            e
+            for e in events
+            if any(
+                a.get("self") and a.get("responseStatus") == "declined"
+                for a in e.get("attendees", [])
+            )
+        ]
+        events = [e for e in events if e not in declined]
+    else:
+        declined = []
+
     if args.json:
         print(json.dumps(events, indent=2))
     else:
@@ -993,6 +1019,11 @@ def cmd_events_list(args):
             for event in events:
                 print(format_event(event))
                 print()
+
+    if declined:
+        print(
+            f"*({len(declined)} declined invitation(s) not shown — use --include-declined to include)*"
+        )
 
     return 0
 
@@ -1164,6 +1195,11 @@ def build_parser() -> argparse.ArgumentParser:
     events_list_parser.add_argument("--max-results", type=int, default=10, help="Maximum results")
     events_list_parser.add_argument("--query", help="Search query")
     events_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    events_list_parser.add_argument(
+        "--include-declined",
+        action="store_true",
+        help="Include events you have declined (excluded by default)",
+    )
 
     events_get_parser = events_subparsers.add_parser("get", help="Get event by ID")
     events_get_parser.add_argument("event_id", help="Event ID")

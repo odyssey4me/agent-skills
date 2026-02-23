@@ -125,15 +125,8 @@ Displays: whether a token is stored, granted scopes, refresh token presence, tok
 List all calendars for the authenticated user.
 
 ```bash
-# List calendars
 python scripts/google-calendar.py calendars list
-
-# Output as JSON
-python scripts/google-calendar.py calendars list --json
 ```
-
-**Arguments:**
-- `--json`: Output as JSON
 
 ### calendars get
 
@@ -145,14 +138,10 @@ python scripts/google-calendar.py calendars get primary
 
 # Get specific calendar by ID
 python scripts/google-calendar.py calendars get CALENDAR_ID
-
-# Output as JSON
-python scripts/google-calendar.py calendars get primary --json
 ```
 
 **Arguments:**
 - `calendar_id`: Calendar ID or "primary" (required)
-- `--json`: Output as JSON
 
 ### events list
 
@@ -175,9 +164,6 @@ python scripts/google-calendar.py events list --query "meeting"
 
 # List with custom max results
 python scripts/google-calendar.py events list --max-results 20
-
-# Output as JSON
-python scripts/google-calendar.py events list --json
 ```
 
 **Arguments:**
@@ -186,7 +172,7 @@ python scripts/google-calendar.py events list --json
 - `--time-max`: End time (RFC3339 timestamp)
 - `--max-results`: Maximum number of results (default: 10)
 - `--query`: Free text search query
-- `--json`: Output as JSON
+- `--include-declined`: Include events you have declined (excluded by default)
 
 **Time Format Examples:**
 - UTC: `2026-01-24T10:00:00Z`
@@ -203,15 +189,11 @@ python scripts/google-calendar.py events get EVENT_ID
 
 # Get event from specific calendar
 python scripts/google-calendar.py events get EVENT_ID --calendar CALENDAR_ID
-
-# Output as JSON
-python scripts/google-calendar.py events get EVENT_ID --json
 ```
 
 **Arguments:**
 - `event_id`: Event ID (required)
 - `--calendar`: Calendar ID (default: "primary")
-- `--json`: Output as JSON
 
 ### events create
 
@@ -246,13 +228,6 @@ python scripts/google-calendar.py events create \
   --summary "Event" \
   --start "2026-01-24T10:00:00Z" \
   --end "2026-01-24T11:00:00Z"
-
-# Output as JSON
-python scripts/google-calendar.py events create \
-  --summary "Meeting" \
-  --start "2026-01-24T10:00:00Z" \
-  --end "2026-01-24T11:00:00Z" \
-  --json
 ```
 
 **Arguments:**
@@ -264,7 +239,6 @@ python scripts/google-calendar.py events create \
 - `--location`: Event location
 - `--attendees`: Comma-separated list of attendee email addresses
 - `--timezone`: Timezone for all-day events (e.g., "America/New_York")
-- `--json`: Output as JSON
 
 ### events update
 
@@ -290,11 +264,6 @@ python scripts/google-calendar.py events update EVENT_ID \
 python scripts/google-calendar.py events update EVENT_ID \
   --calendar CALENDAR_ID \
   --summary "New Title"
-
-# Output as JSON
-python scripts/google-calendar.py events update EVENT_ID \
-  --summary "Meeting" \
-  --json
 ```
 
 **Arguments:**
@@ -305,7 +274,6 @@ python scripts/google-calendar.py events update EVENT_ID \
 - `--end`: New end time (RFC3339 or YYYY-MM-DD)
 - `--description`: New description
 - `--location`: New location
-- `--json`: Output as JSON
 
 ### events delete
 
@@ -322,7 +290,6 @@ python scripts/google-calendar.py events delete EVENT_ID --calendar CALENDAR_ID
 **Arguments:**
 - `event_id`: Event ID (required)
 - `--calendar`: Calendar ID (default: "primary")
-- `--json`: Output as JSON (for consistency, no output on success)
 
 ### freebusy
 
@@ -339,19 +306,12 @@ python scripts/google-calendar.py freebusy \
   --start "2026-01-24T08:00:00Z" \
   --end "2026-01-24T17:00:00Z" \
   --calendars "primary,calendar1@example.com,calendar2@example.com"
-
-# Output as JSON
-python scripts/google-calendar.py freebusy \
-  --start "2026-01-24T00:00:00Z" \
-  --end "2026-01-25T00:00:00Z" \
-  --json
 ```
 
 **Arguments:**
 - `--start`: Start time (RFC3339 timestamp, required)
 - `--end`: End time (RFC3339 timestamp, required)
 - `--calendars`: Comma-separated calendar IDs (default: "primary")
-- `--json`: Output as JSON
 
 ## Examples
 
@@ -446,6 +406,10 @@ Use date format (YYYY-MM-DD):
 ```
 
 For all-day events, you can specify a timezone using the `--timezone` argument.
+
+## Agent Guidance — Declined Events
+
+When listing events, declined meetings are excluded by default. The script output will indicate if declined invitations were filtered out (e.g. "3 declined invitation(s) not shown"). When this notice appears, inform the user that there are declined invitations and offer to show them if desired. To include declined events, re-run with `--include-declined`.
 
 ## Error Handling
 
