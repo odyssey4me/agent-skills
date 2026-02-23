@@ -135,7 +135,6 @@ python scripts/google-sheets.py spreadsheets create --title "My Spreadsheet"
 **Options:**
 - `--title` - Spreadsheet title (required)
 - `--sheets` - Comma-separated sheet names (optional)
-- `--json` - Output as JSON
 
 **Example:**
 ```bash
@@ -166,9 +165,6 @@ python scripts/google-sheets.py spreadsheets get SPREADSHEET_ID
 **Arguments:**
 - `spreadsheet_id` - The Google Sheets spreadsheet ID
 
-**Options:**
-- `--json` - Output full spreadsheet structure as JSON
-
 **Example:**
 ```bash
 python scripts/google-sheets.py spreadsheets get 1abc...xyz
@@ -194,7 +190,6 @@ python scripts/google-sheets.py values read SPREADSHEET_ID --range "Sheet1!A1:D5
 **Options:**
 - `--range` - Range in A1 notation (required, e.g., "Sheet1!A1:D5")
 - `--format` - Value format: FORMATTED_VALUE (default), UNFORMATTED_VALUE, or FORMULA
-- `--json` - Output as JSON
 
 **Example:**
 ```bash
@@ -230,7 +225,6 @@ python scripts/google-sheets.py values write SPREADSHEET_ID \
 **Options:**
 - `--range` - Starting range in A1 notation (required)
 - `--values` - Values as JSON 2D array (required)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -268,7 +262,6 @@ python scripts/google-sheets.py values append SPREADSHEET_ID \
 **Options:**
 - `--range` - Sheet name or range (required)
 - `--values` - Values as JSON 2D array (required)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -301,7 +294,6 @@ python scripts/google-sheets.py values clear SPREADSHEET_ID --range "Sheet1!A1:D
 
 **Options:**
 - `--range` - Range in A1 notation (required)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -328,7 +320,6 @@ python scripts/google-sheets.py sheets create SPREADSHEET_ID --title "New Sheet"
 
 **Options:**
 - `--title` - Sheet title (required)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -353,12 +344,11 @@ python scripts/google-sheets.py sheets delete SPREADSHEET_ID --sheet-id 12345678
 
 **Options:**
 - `--sheet-id` - Sheet ID (required, not the title!)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
 # Get sheet IDs first
-python scripts/google-sheets.py spreadsheets get 1abc...xyz --json | jq '.sheets[].properties | {title, sheetId}'
+python scripts/google-sheets.py spreadsheets get 1abc...xyz
 
 # Delete a sheet
 python scripts/google-sheets.py sheets delete 1abc...xyz --sheet-id 123456789
@@ -375,10 +365,9 @@ python scripts/google-sheets.py sheets delete 1abc...xyz --sheet-id 123456789
 
 ```bash
 # Create spreadsheet
-SS_ID=$(python scripts/google-sheets.py spreadsheets create \
-  --title "Employee Data" --json | jq -r '.spreadsheetId')
+python scripts/google-sheets.py spreadsheets create --title "Employee Data"
 
-# Write headers
+# Write headers (use the spreadsheet ID from the output above)
 python scripts/google-sheets.py values write $SS_ID \
   --range "Sheet1!A1" \
   --values '[["Name","Department","Salary","Start Date"]]'
@@ -499,7 +488,7 @@ Ensure proper JSON escaping:
 Commands use different identifiers:
 - `sheets create` - Uses title (string)
 - `sheets delete` - Uses sheet ID (number)
-- Use `spreadsheets get --json` to find sheet IDs
+- Use `spreadsheets get` to find sheet IDs
 
 ### Dependencies not found
 

@@ -135,7 +135,6 @@ python scripts/google-docs.py documents create --title "My Document"
 
 **Options:**
 - `--title` - Document title (required)
-- `--json` - Output as JSON
 
 **Example:**
 ```bash
@@ -159,9 +158,6 @@ python scripts/google-docs.py documents get DOCUMENT_ID
 
 **Arguments:**
 - `document_id` - The Google Docs document ID
-
-**Options:**
-- `--json` - Output full document structure as JSON
 
 **Example:**
 ```bash
@@ -189,7 +185,6 @@ python scripts/google-docs.py documents read DOCUMENT_ID
 **Options:**
 - `--format` - Output format: `text` (default), `markdown` (preserves tables and headings), or `pdf`
 - `--output`, `-o` - Output file path (used with pdf format)
-- `--json` - Output as JSON with content field (for text/markdown formats)
 
 **Example:**
 ```bash
@@ -227,7 +222,6 @@ python scripts/google-docs.py content append DOCUMENT_ID --text "Additional cont
 
 **Options:**
 - `--text` - Text to append (required)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -252,7 +246,6 @@ python scripts/google-docs.py content insert DOCUMENT_ID --text "Insert this" --
 **Options:**
 - `--text` - Text to insert (required)
 - `--index` - Position to insert at, 0-based (required)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -279,7 +272,6 @@ python scripts/google-docs.py content delete DOCUMENT_ID --start-index 10 --end-
 **Options:**
 - `--start-index` - Start position, inclusive (required)
 - `--end-index` - End position, exclusive (required)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -311,7 +303,6 @@ python scripts/google-docs.py formatting apply DOCUMENT_ID \
 - `--italic` - Apply italic formatting
 - `--underline` - Apply underline formatting
 - `--font-size SIZE` - Set font size in points
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -333,7 +324,7 @@ python scripts/google-docs.py formatting apply 1abc...xyz \
 
 ```bash
 # Create a new document
-DOC_ID=$(python scripts/google-docs.py documents create --title "Weekly Report" --json | jq -r '.documentId')
+python scripts/google-docs.py documents create --title "Weekly Report"
 
 # Add content
 python scripts/google-docs.py content append $DOC_ID --text "Weekly Report\n\n"
@@ -355,8 +346,8 @@ python scripts/google-docs.py documents get 1abc...xyz
 # Extract plain text
 python scripts/google-docs.py documents read 1abc...xyz > document.txt
 
-# Get full JSON structure
-python scripts/google-docs.py documents get 1abc...xyz --json > document.json
+# Get document structure
+python scripts/google-docs.py documents get 1abc...xyz
 ```
 
 ### Edit existing content
@@ -418,7 +409,7 @@ Make sure you're using the correct document ID from the URL:
 
 ### Index errors when inserting/deleting
 
-Use `documents get --json` to see the document structure and valid index ranges. Remember:
+Use `documents get` to see the document structure and valid index ranges. Remember:
 - Index 0 is before any content
 - Index 1 is at the start of document body
 - The last index is the document length

@@ -201,8 +201,6 @@ python skills/gitlab/scripts/gitlab.py pipelines list --repo GROUP/REPO
 python skills/gerrit/scripts/gerrit.py changes view <change-number>
 ```
 
-> **Tip:** Use `--json` flag on any wrapper command for raw JSON if needed.
-
 ### Step 3: Assess CI/Test Status
 
 Before reviewing, check whether CI/tests have passed:

@@ -48,7 +48,7 @@ See [GitLab CLI Authentication](https://docs.gitlab.com/cli/#authentication) for
 
 ## Script Usage
 
-The wrapper script (`scripts/gitlab.py`) calls `glab --output json` and formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `glab` directly for action commands (create, merge, close, comment).
+The wrapper script (`scripts/gitlab.py`) formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `glab` directly for action commands (create, merge, close, comment).
 
 ```bash
 # Check glab CLI is installed and authenticated
@@ -71,7 +71,7 @@ python scripts/gitlab.py repos list
 python scripts/gitlab.py repos view GROUP/REPO
 ```
 
-All commands support `--json` for raw JSON output and `--limit N` for list commands (default 30).
+All commands support `--limit N` for list commands (default 30).
 
 ## Commands (Direct glab Usage)
 

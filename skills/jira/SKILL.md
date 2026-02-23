@@ -190,7 +190,6 @@ python scripts/jira.py search 'issue in hasLinkType("Dependency")'
 - `jql`: JQL query string (required) - supports ScriptRunner functions if installed
 - `--max-results`: Maximum number of results (default: 50)
 - `--fields`: Comma-separated list of fields to include
-- `--json`: Output as JSON
 
 **ScriptRunner Support:**
 
@@ -233,7 +232,6 @@ python scripts/jira.py issue comment DEMO-123 "Internal note" --security-level "
 **Arguments for `issue get`:**
 - `issue_key`: Issue key (required)
 - `--fields`: Comma-separated list of fields to include (uses config default if not specified)
-- `--json`: Output as JSON
 
 ### transitions
 
@@ -278,15 +276,11 @@ python scripts/jira.py fields
 
 # List fields for specific project and issue type
 python scripts/jira.py fields --project DEMO --issue-type Task
-
-# Output as JSON
-python scripts/jira.py fields --json
 ```
 
 **Arguments:**
 - `--project`: Project key for context-specific fields
 - `--issue-type`: Issue type name (requires --project)
-- `--json`: Output as JSON
 
 **Note:** Fields vary by project and issue type. When creating or searching issues, use `--project` and `--issue-type` to see only the fields available in that context.
 
@@ -300,14 +294,10 @@ python scripts/jira.py statuses
 
 # List status categories (To Do, In Progress, Done)
 python scripts/jira.py statuses --categories
-
-# Output as JSON
-python scripts/jira.py statuses --json
 ```
 
 **Arguments:**
 - `--categories`: Show status categories instead of individual statuses
-- `--json`: Output as JSON
 
 **Recommendation:** Use `statusCategory` in JQL queries for more portable queries:
 - `statusCategory = "To Do"` - matches all statuses in the To Do category

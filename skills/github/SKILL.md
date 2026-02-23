@@ -47,7 +47,7 @@ See [GitHub CLI Authentication](https://cli.github.com/manual/gh_auth_login) for
 
 ## Script Usage
 
-The wrapper script (`scripts/github.py`) calls `gh --json` and formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `gh` directly for action commands (create, merge, close, comment).
+The wrapper script (`scripts/github.py`) formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `gh` directly for action commands (create, merge, close, comment).
 
 ```bash
 # Check gh CLI is installed and authenticated
@@ -77,7 +77,7 @@ python scripts/github.py search issues "label:bug is:open"
 python scripts/github.py search prs "is:open review:required"
 ```
 
-All commands support `--json` for raw JSON output and `--limit N` for list commands (default 30).
+All commands support `--limit N` for list commands (default 30).
 
 ## Commands (Direct gh Usage)
 

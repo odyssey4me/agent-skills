@@ -135,7 +135,6 @@ python scripts/google-slides.py presentations create --title "My Presentation"
 
 **Options:**
 - `--title` - Presentation title (required)
-- `--json` - Output as JSON
 
 **Example:**
 ```bash
@@ -159,9 +158,6 @@ python scripts/google-slides.py presentations get PRESENTATION_ID
 
 **Arguments:**
 - `presentation_id` - The Google Slides presentation ID
-
-**Options:**
-- `--json` - Output full presentation structure as JSON
 
 **Example:**
 ```bash
@@ -198,7 +194,6 @@ python scripts/google-slides.py presentations read PRESENTATION_ID
 **Options:**
 - `--format` - Output format: `text` (default) or `pdf`
 - `--output`, `-o` - Output file path (used with pdf format)
-- `--json` - Output as JSON with content field (for text format)
 
 **Example:**
 ```bash
@@ -250,7 +245,6 @@ python scripts/google-slides.py slides create PRESENTATION_ID --layout BLANK
   - `MAIN_POINT` - Large centered text
   - `BIG_NUMBER` - Large number display
 - `--index` - Insert at specific position (0-based, optional)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -281,12 +275,11 @@ python scripts/google-slides.py slides delete PRESENTATION_ID --slide-id SLIDE_I
 
 **Options:**
 - `--slide-id` - Slide object ID to delete (required, not the index!)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
 # Get slide IDs first
-python scripts/google-slides.py presentations get 1abc...xyz --json | jq '.slides[].objectId'
+python scripts/google-slides.py presentations get 1abc...xyz
 
 # Delete a slide
 python scripts/google-slides.py slides delete 1abc...xyz --slide-id slide_abc123
@@ -317,7 +310,6 @@ python scripts/google-slides.py text insert PRESENTATION_ID \
 - `--y` - Y position in points (default: 100)
 - `--width` - Text box width in points (default: 400)
 - `--height` - Text box height in points (default: 100)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -366,7 +358,6 @@ python scripts/google-slides.py shapes create PRESENTATION_ID \
 - `--y` - Y position in points (default: 100)
 - `--width` - Shape width in points (default: 200)
 - `--height` - Shape height in points (default: 200)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -410,7 +401,6 @@ python scripts/google-slides.py images create PRESENTATION_ID \
 - `--y` - Y position in points (default: 100)
 - `--width` - Image width in points (default: 300)
 - `--height` - Image height in points (default: 200)
-- `--json` - Output API response as JSON
 
 **Example:**
 ```bash
@@ -433,13 +423,11 @@ python scripts/google-slides.py images create 1abc...xyz \
 ### Create a simple presentation
 
 ```bash
-# Create presentation
-PRES_ID=$(python scripts/google-slides.py presentations create \
-  --title "Team Update" --json | jq -r '.presentationId')
+# Create presentation (note the presentation ID from the output)
+python scripts/google-slides.py presentations create --title "Team Update"
 
-# Get the default slide ID
-SLIDE_ID=$(python scripts/google-slides.py presentations get $PRES_ID --json | \
-  jq -r '.slides[0].objectId')
+# Get the default slide ID (note the slide ID from the output)
+python scripts/google-slides.py presentations get $PRES_ID
 
 # Add title text
 python scripts/google-slides.py text insert $PRES_ID \
@@ -460,9 +448,8 @@ python scripts/google-slides.py text insert $PRES_ID \
 #!/bin/bash
 PRES_ID="your-presentation-id"
 
-# Add content slide
-SLIDE_ID=$(python scripts/google-slides.py slides create $PRES_ID \
-  --layout TITLE_AND_BODY --json | jq -r '.replies[0].createSlide.objectId')
+# Add content slide (note the slide ID from the output)
+python scripts/google-slides.py slides create $PRES_ID --layout TITLE_AND_BODY
 
 # Add title
 python scripts/google-slides.py text insert $PRES_ID \
@@ -476,9 +463,8 @@ python scripts/google-slides.py images create $PRES_ID \
   --image-url "https://example.com/metrics.png" \
   --x 100 --y 120 --width 500 --height 350
 
-# Add another slide with shapes
-SLIDE2_ID=$(python scripts/google-slides.py slides create $PRES_ID \
-  --layout BLANK --json | jq -r '.replies[0].createSlide.objectId')
+# Add another slide with shapes (note the slide ID from the output)
+python scripts/google-slides.py slides create $PRES_ID --layout BLANK
 
 # Add decorative shape
 python scripts/google-slides.py shapes create $PRES_ID \
@@ -492,20 +478,17 @@ python scripts/google-slides.py shapes create $PRES_ID \
 ```bash
 #!/bin/bash
 
-# Create presentation
-PRES_ID=$(python scripts/google-slides.py presentations create \
-  --title "Sales Report" --json | jq -r '.presentationId')
+# Create presentation (note the presentation ID from the output)
+python scripts/google-slides.py presentations create --title "Sales Report"
 
-# Add slide for each region
-for region in "North" "South" "East" "West"; do
-  SLIDE_ID=$(python scripts/google-slides.py slides create $PRES_ID \
-    --layout TITLE_AND_BODY --json | jq -r '.replies[0].createSlide.objectId')
+# Add a slide for each region (note the slide ID from each output)
+python scripts/google-slides.py slides create $PRES_ID --layout TITLE_AND_BODY
 
-  python scripts/google-slides.py text insert $PRES_ID \
-    --slide-id $SLIDE_ID \
-    --text "$region Region Sales" \
-    --x 50 --y 30 --width 600 --height 80
-done
+# Insert text on each slide using the slide ID from the output above
+python scripts/google-slides.py text insert $PRES_ID \
+  --slide-id $SLIDE_ID \
+  --text "North Region Sales" \
+  --x 50 --y 30 --width 600 --height 80
 ```
 
 ## Coordinate System
@@ -578,8 +561,7 @@ Make sure you're using the correct presentation ID from the URL:
 Slide IDs are object IDs, not indices. Get them with:
 
 ```bash
-python scripts/google-slides.py presentations get $PRES_ID --json | \
-  jq -r '.slides[] | "\(.objectId) (index \(.slideProperties.slideIndex))"'
+python scripts/google-slides.py presentations get $PRES_ID
 ```
 
 ### Image not appearing

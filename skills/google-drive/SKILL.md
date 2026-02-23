@@ -137,16 +137,12 @@ python scripts/google-drive.py files list --max-results 20
 
 # List sorted by name
 python scripts/google-drive.py files list --order-by "name"
-
-# Output as JSON
-python scripts/google-drive.py files list --json
 ```
 
 **Arguments:**
 - `--query`: Drive search query (optional)
 - `--max-results`: Maximum number of results (default: 10)
 - `--order-by`: Sort order (default: "modifiedTime desc")
-- `--json`: Output as JSON
 
 ### files search
 
@@ -164,16 +160,12 @@ python scripts/google-drive.py files search --folder FOLDER_ID
 
 # Combine filters
 python scripts/google-drive.py files search --name "budget" --mime-type "application/vnd.google-apps.spreadsheet"
-
-# Output as JSON
-python scripts/google-drive.py files search --name "report" --json
 ```
 
 **Arguments:**
 - `--name`: File name to search for (partial match)
 - `--mime-type`: MIME type filter
 - `--folder`: Parent folder ID
-- `--json`: Output as JSON
 
 ### files get
 
@@ -182,14 +174,10 @@ Get file metadata by ID.
 ```bash
 # Get file details
 python scripts/google-drive.py files get FILE_ID
-
-# Output as JSON
-python scripts/google-drive.py files get FILE_ID --json
 ```
 
 **Arguments:**
 - `file_id`: The file ID (required)
-- `--json`: Output as JSON
 
 ### files download
 
@@ -225,9 +213,6 @@ python scripts/google-drive.py files upload /path/to/file.pdf --name "Quarterly 
 
 # Upload with specific MIME type
 python scripts/google-drive.py files upload /path/to/file --mime-type "text/csv"
-
-# Output as JSON
-python scripts/google-drive.py files upload /path/to/file.pdf --json
 ```
 
 **Arguments:**
@@ -235,7 +220,6 @@ python scripts/google-drive.py files upload /path/to/file.pdf --json
 - `--parent`: Parent folder ID
 - `--mime-type`: MIME type (auto-detected if not provided)
 - `--name`: Name for the file in Drive
-- `--json`: Output as JSON
 
 ### files move
 
@@ -244,15 +228,11 @@ Move a file to a different folder.
 ```bash
 # Move a file to a folder
 python scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
-
-# Output as JSON
-python scripts/google-drive.py files move FILE_ID --parent FOLDER_ID --json
 ```
 
 **Arguments:**
 - `file_id`: The file ID (required)
 - `--parent`: Destination folder ID (required)
-- `--json`: Output as JSON
 
 ### folders create
 
@@ -264,15 +244,11 @@ python scripts/google-drive.py folders create "New Folder"
 
 # Create folder inside another folder
 python scripts/google-drive.py folders create "Subfolder" --parent FOLDER_ID
-
-# Output as JSON
-python scripts/google-drive.py folders create "Documents" --json
 ```
 
 **Arguments:**
 - `name`: Folder name (required)
 - `--parent`: Parent folder ID
-- `--json`: Output as JSON
 
 ### folders list
 
@@ -284,15 +260,11 @@ python scripts/google-drive.py folders list FOLDER_ID
 
 # List with max results
 python scripts/google-drive.py folders list FOLDER_ID --max-results 50
-
-# Output as JSON
-python scripts/google-drive.py folders list FOLDER_ID --json
 ```
 
 **Arguments:**
 - `folder_id`: The folder ID (required)
 - `--max-results`: Maximum number of results (default: 100)
-- `--json`: Output as JSON
 
 ### share
 
@@ -310,9 +282,6 @@ python scripts/google-drive.py share FILE_ID --email user@example.com --role com
 
 # Share without sending notification
 python scripts/google-drive.py share FILE_ID --email user@example.com --no-notify
-
-# Output as JSON
-python scripts/google-drive.py share FILE_ID --email user@example.com --json
 ```
 
 **Arguments:**
@@ -320,7 +289,6 @@ python scripts/google-drive.py share FILE_ID --email user@example.com --json
 - `--email`: Email address to share with (required)
 - `--role`: Permission role - reader, writer, commenter, owner (default: reader)
 - `--no-notify`: Don't send notification email
-- `--json`: Output as JSON
 
 ### permissions list
 
@@ -329,14 +297,10 @@ List permissions for a file.
 ```bash
 # List permissions
 python scripts/google-drive.py permissions list FILE_ID
-
-# Output as JSON
-python scripts/google-drive.py permissions list FILE_ID --json
 ```
 
 **Arguments:**
 - `file_id`: The file ID (required)
-- `--json`: Output as JSON
 
 ### permissions delete
 

@@ -135,15 +135,11 @@ python scripts/gmail.py messages list --query "is:unread"
 
 # Search with max results
 python scripts/gmail.py messages list --query "from:user@example.com" --max-results 20
-
-# Output as JSON
-python scripts/gmail.py messages list --query "subject:meeting" --json
 ```
 
 **Arguments:**
 - `--query`: Gmail search query (optional)
 - `--max-results`: Maximum number of results (default: 10)
-- `--json`: Output as JSON
 
 **Search Query Examples:**
 
@@ -167,15 +163,11 @@ python scripts/gmail.py messages get MESSAGE_ID
 
 # Get minimal format
 python scripts/gmail.py messages get MESSAGE_ID --format minimal
-
-# Output as JSON
-python scripts/gmail.py messages get MESSAGE_ID --json
 ```
 
 **Arguments:**
 - `message_id`: The message ID (required)
 - `--format`: Message format (full, minimal, raw, metadata) - default: full
-- `--json`: Output as JSON
 
 ### send
 
@@ -195,13 +187,6 @@ python scripts/gmail.py send \
   --body "Here's the update..." \
   --cc team@example.com \
   --bcc boss@example.com
-
-# Output as JSON
-python scripts/gmail.py send \
-  --to user@example.com \
-  --subject "Test" \
-  --body "Test message" \
-  --json
 ```
 
 **Arguments:**
@@ -210,7 +195,6 @@ python scripts/gmail.py send \
 - `--body`: Email body text (required)
 - `--cc`: CC recipients (comma-separated)
 - `--bcc`: BCC recipients (comma-separated)
-- `--json`: Output as JSON
 
 ### drafts list
 
@@ -222,14 +206,10 @@ python scripts/gmail.py drafts list
 
 # List with custom max results
 python scripts/gmail.py drafts list --max-results 20
-
-# Output as JSON
-python scripts/gmail.py drafts list --json
 ```
 
 **Arguments:**
 - `--max-results`: Maximum number of results (default: 10)
-- `--json`: Output as JSON
 
 ### drafts create
 
@@ -248,13 +228,6 @@ python scripts/gmail.py drafts create \
   --subject "Meeting Notes" \
   --body "Notes from today's meeting..." \
   --cc team@example.com
-
-# Output as JSON
-python scripts/gmail.py drafts create \
-  --to user@example.com \
-  --subject "Test Draft" \
-  --body "Draft body" \
-  --json
 ```
 
 **Arguments:**
@@ -263,7 +236,6 @@ python scripts/gmail.py drafts create \
 - `--body`: Email body text (required)
 - `--cc`: CC recipients (comma-separated)
 - `--bcc`: BCC recipients (comma-separated)
-- `--json`: Output as JSON
 
 ### drafts send
 
@@ -272,14 +244,10 @@ Send a draft message.
 ```bash
 # Send draft by ID
 python scripts/gmail.py drafts send DRAFT_ID
-
-# Output as JSON
-python scripts/gmail.py drafts send DRAFT_ID --json
 ```
 
 **Arguments:**
 - `draft_id`: The draft ID to send (required)
-- `--json`: Output as JSON
 
 ### labels list
 
@@ -288,13 +256,7 @@ List all Gmail labels.
 ```bash
 # List labels
 python scripts/gmail.py labels list
-
-# Output as JSON
-python scripts/gmail.py labels list --json
 ```
-
-**Arguments:**
-- `--json`: Output as JSON
 
 ### labels create
 
@@ -303,14 +265,10 @@ Create a new label.
 ```bash
 # Create label
 python scripts/gmail.py labels create "Project X"
-
-# Output as JSON
-python scripts/gmail.py labels create "Important" --json
 ```
 
 **Arguments:**
 - `name`: Label name (required)
-- `--json`: Output as JSON
 
 ## Examples
 

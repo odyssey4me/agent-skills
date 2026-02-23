@@ -136,9 +136,6 @@ python scripts/confluence.pysearch "space = DEMO" --type page
 
 # Limit results
 python scripts/confluence.pysearch "type=page" --max-results 10
-
-# JSON output
-python scripts/confluence.pysearch "type=page" --json
 ```
 
 **Arguments:**
@@ -146,7 +143,6 @@ python scripts/confluence.pysearch "type=page" --json
 - `--max-results`: Maximum number of results (default: 50)
 - `--type`: Content type filter (page, blogpost, comment)
 - `--space`: Limit to specific space
-- `--json`: Output as JSON
 
 **See also**: [CQL Reference](#cql-reference) for query syntax
 
@@ -166,16 +162,12 @@ python scripts/confluence.pypage get "My Page" --no-body
 
 # Get in original format (not Markdown)
 python scripts/confluence.pypage get "My Page" --raw
-
-# JSON output
-python scripts/confluence.pypage get 123456 --json
 ```
 
 **Output**: By default, displays page metadata and body content converted to Markdown for readability.
 
 **Arguments:**
 - `page_identifier`: Page ID or title (required)
-- `--json`: Output as JSON
 - `--markdown`: Output body as Markdown (default)
 - `--raw`: Output in original format
 - `--no-body`: Don't include body content
@@ -236,18 +228,13 @@ python scripts/confluence.pyspace list --type global
 
 # Get space details
 python scripts/confluence.pyspace get DEMO
-
-# JSON output
-python scripts/confluence.pyspace list --json
 ```
 
 **Arguments:**
 - `list`: List spaces
   - `--type`: Filter by type (global, personal)
   - `--max-results`: Maximum results
-  - `--json`: Output as JSON
 - `get <space-key>`: Get space details
-  - `--json`: Output as JSON
 
 For creating spaces, see [references/creating-content.md](references/creating-content.md).
 
@@ -322,16 +309,6 @@ python scripts/confluence.pysearch "status=current"
 # Override defaults when needed
 python scripts/confluence.pysearch "type=page" --max-results 100
 # CLI argument overrides the configured default of 25
-```
-
-### Search and Process Results
-
-```bash
-# Search and extract IDs
-python scripts/confluence.pysearch "space=DEMO" --json | jq -r '.[] | .id'
-
-# Count pages in a space
-python scripts/confluence.pysearch "type=page AND space=DEMO" --max-results 1000 --json | jq '. | length'
 ```
 
 ## CQL Reference

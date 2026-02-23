@@ -93,7 +93,7 @@ python scripts/gerrit.py changes search "status:open project:myproject"
 python scripts/gerrit.py projects list
 ```
 
-All commands support `--json` for raw JSON output and `--limit N` for list commands (default 30).
+All commands support `--limit N` for list commands (default 30).
 
 Global connection options: `--host`, `--port` (default 29418), `--username`.
 
