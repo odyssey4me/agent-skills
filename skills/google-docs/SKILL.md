@@ -8,6 +8,7 @@ metadata:
   tags: [documents, editing]
   complexity: standard
 license: MIT
+allowed-tools: Bash(python $SKILL_DIR/scripts/google-docs.py *)
 ---
 
 # Google Docs
@@ -28,7 +29,7 @@ Interact with Google Docs for document creation, editing, and content management
 After installation, verify the skill is properly configured:
 
 ```bash
-python scripts/google-docs.py check
+python $SKILL_DIR/scripts/google-docs.py check
 ```
 
 This will check:
@@ -54,7 +55,7 @@ Google Docs uses OAuth 2.0 for authentication. For complete setup instructions, 
      client_secret: your-client-secret
    ```
 
-2. Run `python scripts/google-docs.py check` to trigger OAuth flow and verify setup.
+2. Run `python $SKILL_DIR/scripts/google-docs.py check` to trigger OAuth flow and verify setup.
 
 ### OAuth Scopes
 
@@ -70,8 +71,8 @@ The skill requests granular scopes for different operations:
 
 If you encounter "insufficient scope" errors, reset your token and re-authenticate:
 
-1. Reset token: `python scripts/google-docs.py auth reset`
-2. Re-run: `python scripts/google-docs.py check`
+1. Reset token: `python $SKILL_DIR/scripts/google-docs.py auth reset`
+2. Re-run: `python $SKILL_DIR/scripts/google-docs.py check`
 
 ## Commands
 
@@ -80,7 +81,7 @@ If you encounter "insufficient scope" errors, reset your token and re-authentica
 Verify configuration and connectivity.
 
 ```bash
-python scripts/google-docs.py check
+python $SKILL_DIR/scripts/google-docs.py check
 ```
 
 This validates:
@@ -94,7 +95,7 @@ This validates:
 Store OAuth 2.0 client credentials for custom OAuth flow.
 
 ```bash
-python scripts/google-docs.py auth setup \
+python $SKILL_DIR/scripts/google-docs.py auth setup \
   --client-id YOUR_CLIENT_ID \
   --client-secret YOUR_CLIENT_SECRET
 ```
@@ -110,7 +111,7 @@ Credentials are saved to `~/.config/agent-skills/google-docs.yaml`.
 Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
 
 ```bash
-python scripts/google-docs.py auth reset
+python $SKILL_DIR/scripts/google-docs.py auth reset
 ```
 
 Use this when you encounter scope or authentication errors.
@@ -120,7 +121,7 @@ Use this when you encounter scope or authentication errors.
 Show current OAuth token information without making API calls.
 
 ```bash
-python scripts/google-docs.py auth status
+python $SKILL_DIR/scripts/google-docs.py auth status
 ```
 
 Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
@@ -130,7 +131,7 @@ Displays: whether a token is stored, granted scopes, refresh token presence, tok
 Create a new blank Google Doc.
 
 ```bash
-python scripts/google-docs.py documents create --title "My Document"
+python $SKILL_DIR/scripts/google-docs.py documents create --title "My Document"
 ```
 
 **Options:**
@@ -139,7 +140,7 @@ python scripts/google-docs.py documents create --title "My Document"
 **Example:**
 ```bash
 # Create a new document
-python scripts/google-docs.py documents create --title "Project Notes"
+python $SKILL_DIR/scripts/google-docs.py documents create --title "Project Notes"
 
 # Output:
 # ✓ Document created successfully
@@ -153,7 +154,7 @@ python scripts/google-docs.py documents create --title "Project Notes"
 Get document metadata and structure.
 
 ```bash
-python scripts/google-docs.py documents get DOCUMENT_ID
+python $SKILL_DIR/scripts/google-docs.py documents get DOCUMENT_ID
 ```
 
 **Arguments:**
@@ -162,7 +163,7 @@ python scripts/google-docs.py documents get DOCUMENT_ID
 **Example:**
 ```bash
 # Get document metadata
-python scripts/google-docs.py documents get 1abc...xyz
+python $SKILL_DIR/scripts/google-docs.py documents get 1abc...xyz
 
 # Output:
 # Title: Project Notes
@@ -176,7 +177,7 @@ python scripts/google-docs.py documents get 1abc...xyz
 Read document content as plain text, markdown, or PDF.
 
 ```bash
-python scripts/google-docs.py documents read DOCUMENT_ID
+python $SKILL_DIR/scripts/google-docs.py documents read DOCUMENT_ID
 ```
 
 **Arguments:**
@@ -189,10 +190,10 @@ python scripts/google-docs.py documents read DOCUMENT_ID
 **Example:**
 ```bash
 # Read as markdown (default, preserves tables and headings)
-python scripts/google-docs.py documents read 1abc...xyz
+python $SKILL_DIR/scripts/google-docs.py documents read 1abc...xyz
 
 # Export as PDF
-python scripts/google-docs.py documents read 1abc...xyz --format pdf --output document.pdf
+python $SKILL_DIR/scripts/google-docs.py documents read 1abc...xyz --format pdf --output document.pdf
 
 # Output as markdown:
 # # Heading
@@ -211,7 +212,7 @@ python scripts/google-docs.py documents read 1abc...xyz --format pdf --output do
 Append text to the end of a document.
 
 ```bash
-python scripts/google-docs.py content append DOCUMENT_ID --text "Additional content"
+python $SKILL_DIR/scripts/google-docs.py content append DOCUMENT_ID --text "Additional content"
 ```
 
 **Arguments:**
@@ -223,7 +224,7 @@ python scripts/google-docs.py content append DOCUMENT_ID --text "Additional cont
 **Example:**
 ```bash
 # Append text
-python scripts/google-docs.py content append 1abc...xyz --text "Meeting notes from today..."
+python $SKILL_DIR/scripts/google-docs.py content append 1abc...xyz --text "Meeting notes from today..."
 
 # Output:
 # ✓ Text appended successfully
@@ -234,7 +235,7 @@ python scripts/google-docs.py content append 1abc...xyz --text "Meeting notes fr
 Insert text at a specific position in the document.
 
 ```bash
-python scripts/google-docs.py content insert DOCUMENT_ID --text "Insert this" --index 10
+python $SKILL_DIR/scripts/google-docs.py content insert DOCUMENT_ID --text "Insert this" --index 10
 ```
 
 **Arguments:**
@@ -247,7 +248,7 @@ python scripts/google-docs.py content insert DOCUMENT_ID --text "Insert this" --
 **Example:**
 ```bash
 # Insert text at the beginning (index 1, after title)
-python scripts/google-docs.py content insert 1abc...xyz --text "Introduction\n\n" --index 1
+python $SKILL_DIR/scripts/google-docs.py content insert 1abc...xyz --text "Introduction\n\n" --index 1
 
 # Output:
 # ✓ Text inserted successfully
@@ -260,7 +261,7 @@ python scripts/google-docs.py content insert 1abc...xyz --text "Introduction\n\n
 Delete a range of content from the document.
 
 ```bash
-python scripts/google-docs.py content delete DOCUMENT_ID --start-index 10 --end-index 50
+python $SKILL_DIR/scripts/google-docs.py content delete DOCUMENT_ID --start-index 10 --end-index 50
 ```
 
 **Arguments:**
@@ -273,7 +274,7 @@ python scripts/google-docs.py content delete DOCUMENT_ID --start-index 10 --end-
 **Example:**
 ```bash
 # Delete characters 10-50
-python scripts/google-docs.py content delete 1abc...xyz --start-index 10 --end-index 50
+python $SKILL_DIR/scripts/google-docs.py content delete 1abc...xyz --start-index 10 --end-index 50
 
 # Output:
 # ✓ Content deleted successfully
@@ -281,12 +282,59 @@ python scripts/google-docs.py content delete 1abc...xyz --start-index 10 --end-i
 
 **Warning:** Be careful with indices. Deleting the wrong range can corrupt document structure.
 
+### content insert-after-anchor
+
+Insert markdown-formatted content after a structural anchor (horizontal rule, heading, or bookmark) in a document. Handles text insertion, heading styles, bullet lists, bold formatting, and links in a single operation.
+
+```bash
+python $SKILL_DIR/scripts/google-docs.py content insert-after-anchor DOCUMENT_ID \
+  --anchor-type ANCHOR_TYPE --markdown "MARKDOWN_CONTENT"
+```
+
+**Arguments:**
+- `document_id` - The Google Docs document ID
+
+**Options:**
+- `--anchor-type` - Type of anchor to find: `horizontal_rule`, `heading`, or `bookmark` (required)
+- `--anchor-value` - Anchor-specific value: heading text (for `heading`), bookmark ID (for `bookmark`), or occurrence number (for `horizontal_rule`, default 1)
+- `--markdown` - Markdown-formatted content to insert (required). Use `\n` for newlines.
+
+**Supported markdown:**
+
+| Syntax | Result |
+|--------|--------|
+| `## Heading` | Heading (levels 1-6) |
+| `**text**` | Bold text |
+| `[text](url)` | Hyperlink |
+| `- item` | Bullet list |
+| `  - item` | Nested bullet (indent 2 spaces per level) |
+
+**Examples:**
+```bash
+# Insert after the first horizontal rule
+python $SKILL_DIR/scripts/google-docs.py content insert-after-anchor 1abc...xyz \
+  --anchor-type horizontal_rule \
+  --markdown '## Status Update\n\n**Summary:**\n- Task completed\n  - Sub-task done\n- [Details](https://example.com)'
+
+# Insert after a specific heading
+python $SKILL_DIR/scripts/google-docs.py content insert-after-anchor 1abc...xyz \
+  --anchor-type heading \
+  --anchor-value "Notes" \
+  --markdown '- New note item\n- Another item'
+
+# Insert after the second horizontal rule
+python $SKILL_DIR/scripts/google-docs.py content insert-after-anchor 1abc...xyz \
+  --anchor-type horizontal_rule \
+  --anchor-value 2 \
+  --markdown '## New Section\n\nParagraph text here.'
+```
+
 ### formatting apply
 
 Apply text formatting to a range of text.
 
 ```bash
-python scripts/google-docs.py formatting apply DOCUMENT_ID \
+python $SKILL_DIR/scripts/google-docs.py formatting apply DOCUMENT_ID \
   --start-index 1 --end-index 20 --bold --italic
 ```
 
@@ -304,11 +352,11 @@ python scripts/google-docs.py formatting apply DOCUMENT_ID \
 **Example:**
 ```bash
 # Make title bold and larger
-python scripts/google-docs.py formatting apply 1abc...xyz \
+python $SKILL_DIR/scripts/google-docs.py formatting apply 1abc...xyz \
   --start-index 1 --end-index 20 --bold --font-size 18
 
 # Apply italic to a section
-python scripts/google-docs.py formatting apply 1abc...xyz \
+python $SKILL_DIR/scripts/google-docs.py formatting apply 1abc...xyz \
   --start-index 50 --end-index 100 --italic
 
 # Output:
@@ -321,45 +369,54 @@ python scripts/google-docs.py formatting apply 1abc...xyz \
 
 ```bash
 # Create a new document
-python scripts/google-docs.py documents create --title "Weekly Report"
+python $SKILL_DIR/scripts/google-docs.py documents create --title "Weekly Report"
 
 # Add content
-python scripts/google-docs.py content append $DOC_ID --text "Weekly Report\n\n"
-python scripts/google-docs.py content append $DOC_ID --text "Summary: This week's accomplishments...\n"
+python $SKILL_DIR/scripts/google-docs.py content append $DOC_ID --text "Weekly Report\n\n"
+python $SKILL_DIR/scripts/google-docs.py content append $DOC_ID --text "Summary: This week's accomplishments...\n"
 
 # Format the title
-python scripts/google-docs.py formatting apply $DOC_ID --start-index 1 --end-index 14 --bold --font-size 18
+python $SKILL_DIR/scripts/google-docs.py formatting apply $DOC_ID --start-index 1 --end-index 14 --bold --font-size 18
 
 # Read it back
-python scripts/google-docs.py documents read $DOC_ID
+python $SKILL_DIR/scripts/google-docs.py documents read $DOC_ID
 ```
 
 ### Read and extract content
 
 ```bash
 # Get document info
-python scripts/google-docs.py documents get 1abc...xyz
+python $SKILL_DIR/scripts/google-docs.py documents get 1abc...xyz
 
 # Extract plain text
-python scripts/google-docs.py documents read 1abc...xyz > document.txt
+python $SKILL_DIR/scripts/google-docs.py documents read 1abc...xyz > document.txt
 
 # Get document structure
-python scripts/google-docs.py documents get 1abc...xyz
+python $SKILL_DIR/scripts/google-docs.py documents get 1abc...xyz
+```
+
+### Insert formatted content after an anchor
+
+```bash
+# Insert a formatted status update after a horizontal rule
+python $SKILL_DIR/scripts/google-docs.py content insert-after-anchor $DOC_ID \
+  --anchor-type horizontal_rule \
+  --markdown '## Weekly Update\n\n**Completed:**\n- Feature implementation\n  - Backend API\n  - Frontend UI\n- [Project board](https://example.com/board)'
 ```
 
 ### Edit existing content
 
 ```bash
 # Insert a new section
-python scripts/google-docs.py content insert 1abc...xyz \
+python $SKILL_DIR/scripts/google-docs.py content insert 1abc...xyz \
   --text "\n\nNew Section\n" --index 100
 
 # Format the new section header
-python scripts/google-docs.py formatting apply 1abc...xyz \
+python $SKILL_DIR/scripts/google-docs.py formatting apply 1abc...xyz \
   --start-index 102 --end-index 113 --bold
 
 # Append more content
-python scripts/google-docs.py content append 1abc...xyz \
+python $SKILL_DIR/scripts/google-docs.py content append 1abc...xyz \
   --text "Additional details about the new section..."
 ```
 
@@ -368,8 +425,8 @@ python scripts/google-docs.py content append 1abc...xyz \
 **Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:
 
 1. Inform the user about the error
-2. Run `python scripts/google-docs.py auth status` to check the current token state
-3. Suggest the user run `python scripts/google-docs.py auth reset` followed by `python scripts/google-docs.py check` to re-authenticate
+2. Run `python $SKILL_DIR/scripts/google-docs.py auth status` to check the current token state
+3. Suggest the user run `python $SKILL_DIR/scripts/google-docs.py auth reset` followed by `python $SKILL_DIR/scripts/google-docs.py check` to re-authenticate
 4. The `auth reset` and `check` commands require user interaction (browser-based OAuth consent) and cannot be completed autonomously
 
 **Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
@@ -385,8 +442,8 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/google-docs.yaml`
 2. Token expired or corrupted — reset and re-authenticate:
    ```bash
-   python scripts/google-docs.py auth reset
-   python scripts/google-docs.py check
+   python $SKILL_DIR/scripts/google-docs.py auth reset
+   python $SKILL_DIR/scripts/google-docs.py check
    ```
 
 ### Permission denied
@@ -394,8 +451,8 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 Your OAuth token may not have the necessary scopes. Reset your token and re-authenticate:
 
 ```bash
-python scripts/google-docs.py auth reset
-python scripts/google-docs.py check
+python $SKILL_DIR/scripts/google-docs.py auth reset
+python $SKILL_DIR/scripts/google-docs.py check
 ```
 
 ### Cannot find document

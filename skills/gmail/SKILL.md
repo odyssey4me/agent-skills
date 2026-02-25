@@ -8,6 +8,7 @@ metadata:
   tags: [email, drafts, labels]
   complexity: standard
 license: MIT
+allowed-tools: Bash(python $SKILL_DIR/scripts/gmail.py *)
 ---
 
 # Gmail
@@ -28,7 +29,7 @@ Interact with Gmail for email management, search, and organization.
 After installation, verify the skill is properly configured:
 
 ```bash
-python scripts/gmail.py check
+python $SKILL_DIR/scripts/gmail.py check
 ```
 
 This will check:
@@ -54,7 +55,7 @@ Gmail uses OAuth 2.0 for authentication. For complete setup instructions, see:
      client_secret: your-client-secret
    ```
 
-2. Run `python scripts/gmail.py check` to trigger OAuth flow and verify setup.
+2. Run `python $SKILL_DIR/scripts/gmail.py check` to trigger OAuth flow and verify setup.
 
 ### OAuth Scopes
 
@@ -71,8 +72,8 @@ The skill requests granular scopes for different operations:
 
 If you encounter "insufficient scope" errors, reset your token and re-authenticate:
 
-1. Reset token: `python scripts/gmail.py auth reset`
-2. Re-run: `python scripts/gmail.py check`
+1. Reset token: `python $SKILL_DIR/scripts/gmail.py auth reset`
+2. Re-run: `python $SKILL_DIR/scripts/gmail.py check`
 
 ## Commands
 
@@ -81,7 +82,7 @@ If you encounter "insufficient scope" errors, reset your token and re-authentica
 Verify configuration and connectivity.
 
 ```bash
-python scripts/gmail.py check
+python $SKILL_DIR/scripts/gmail.py check
 ```
 
 This validates:
@@ -95,7 +96,7 @@ This validates:
 Store OAuth 2.0 client credentials for custom OAuth flow.
 
 ```bash
-python scripts/gmail.py auth setup \
+python $SKILL_DIR/scripts/gmail.py auth setup \
   --client-id YOUR_CLIENT_ID \
   --client-secret YOUR_CLIENT_SECRET
 ```
@@ -107,7 +108,7 @@ Credentials are saved to `~/.config/agent-skills/gmail.yaml`.
 Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
 
 ```bash
-python scripts/gmail.py auth reset
+python $SKILL_DIR/scripts/gmail.py auth reset
 ```
 
 Use this when you encounter scope or authentication errors.
@@ -117,7 +118,7 @@ Use this when you encounter scope or authentication errors.
 Show current OAuth token information without making API calls.
 
 ```bash
-python scripts/gmail.py auth status
+python $SKILL_DIR/scripts/gmail.py auth status
 ```
 
 Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
@@ -128,13 +129,13 @@ List messages matching a query.
 
 ```bash
 # List recent messages
-python scripts/gmail.py messages list
+python $SKILL_DIR/scripts/gmail.py messages list
 
 # Search for unread messages
-python scripts/gmail.py messages list --query "is:unread"
+python $SKILL_DIR/scripts/gmail.py messages list --query "is:unread"
 
 # Search with max results
-python scripts/gmail.py messages list --query "from:user@example.com" --max-results 20
+python $SKILL_DIR/scripts/gmail.py messages list --query "from:user@example.com" --max-results 20
 ```
 
 **Arguments:**
@@ -159,10 +160,10 @@ Get a message by ID.
 
 ```bash
 # Get full message
-python scripts/gmail.py messages get MESSAGE_ID
+python $SKILL_DIR/scripts/gmail.py messages get MESSAGE_ID
 
 # Get minimal format
-python scripts/gmail.py messages get MESSAGE_ID --format minimal
+python $SKILL_DIR/scripts/gmail.py messages get MESSAGE_ID --format minimal
 ```
 
 **Arguments:**
@@ -175,13 +176,13 @@ Send an email message.
 
 ```bash
 # Send simple email
-python scripts/gmail.py send \
+python $SKILL_DIR/scripts/gmail.py send \
   --to recipient@example.com \
   --subject "Hello" \
   --body "This is the message body"
 
 # Send with CC and BCC
-python scripts/gmail.py send \
+python $SKILL_DIR/scripts/gmail.py send \
   --to recipient@example.com \
   --subject "Team Update" \
   --body "Here's the update..." \
@@ -202,10 +203,10 @@ List draft messages.
 
 ```bash
 # List drafts
-python scripts/gmail.py drafts list
+python $SKILL_DIR/scripts/gmail.py drafts list
 
 # List with custom max results
-python scripts/gmail.py drafts list --max-results 20
+python $SKILL_DIR/scripts/gmail.py drafts list --max-results 20
 ```
 
 **Arguments:**
@@ -217,13 +218,13 @@ Create a draft email.
 
 ```bash
 # Create draft
-python scripts/gmail.py drafts create \
+python $SKILL_DIR/scripts/gmail.py drafts create \
   --to recipient@example.com \
   --subject "Draft Subject" \
   --body "This is a draft message"
 
 # Create draft with CC
-python scripts/gmail.py drafts create \
+python $SKILL_DIR/scripts/gmail.py drafts create \
   --to recipient@example.com \
   --subject "Meeting Notes" \
   --body "Notes from today's meeting..." \
@@ -243,7 +244,7 @@ Send a draft message.
 
 ```bash
 # Send draft by ID
-python scripts/gmail.py drafts send DRAFT_ID
+python $SKILL_DIR/scripts/gmail.py drafts send DRAFT_ID
 ```
 
 **Arguments:**
@@ -255,7 +256,7 @@ List all Gmail labels.
 
 ```bash
 # List labels
-python scripts/gmail.py labels list
+python $SKILL_DIR/scripts/gmail.py labels list
 ```
 
 ### labels create
@@ -264,7 +265,7 @@ Create a new label.
 
 ```bash
 # Create label
-python scripts/gmail.py labels create "Project X"
+python $SKILL_DIR/scripts/gmail.py labels create "Project X"
 ```
 
 **Arguments:**
@@ -275,25 +276,25 @@ python scripts/gmail.py labels create "Project X"
 ### Verify Setup
 
 ```bash
-python scripts/gmail.py check
+python $SKILL_DIR/scripts/gmail.py check
 ```
 
 ### Find unread emails
 
 ```bash
-python scripts/gmail.py messages list --query "is:unread"
+python $SKILL_DIR/scripts/gmail.py messages list --query "is:unread"
 ```
 
 ### Search for emails from a sender
 
 ```bash
-python scripts/gmail.py messages list --query "from:boss@example.com" --max-results 5
+python $SKILL_DIR/scripts/gmail.py messages list --query "from:boss@example.com" --max-results 5
 ```
 
 ### Send a quick email
 
 ```bash
-python scripts/gmail.py send \
+python $SKILL_DIR/scripts/gmail.py send \
   --to colleague@example.com \
   --subject "Quick Question" \
   --body "Do you have time for a meeting tomorrow?"
@@ -303,39 +304,39 @@ python scripts/gmail.py send \
 
 ```bash
 # Create draft
-python scripts/gmail.py drafts create \
+python $SKILL_DIR/scripts/gmail.py drafts create \
   --to team@example.com \
   --subject "Weekly Update" \
   --body "Here's this week's update..."
 
 # List drafts to get the ID
-python scripts/gmail.py drafts list
+python $SKILL_DIR/scripts/gmail.py drafts list
 
 # Send the draft
-python scripts/gmail.py drafts send DRAFT_ID
+python $SKILL_DIR/scripts/gmail.py drafts send DRAFT_ID
 ```
 
 ### Organize with labels
 
 ```bash
 # Create a label
-python scripts/gmail.py labels create "Project Alpha"
+python $SKILL_DIR/scripts/gmail.py labels create "Project Alpha"
 
 # List all labels
-python scripts/gmail.py labels list
+python $SKILL_DIR/scripts/gmail.py labels list
 ```
 
 ### Advanced searches
 
 ```bash
 # Find emails with attachments from last week
-python scripts/gmail.py messages list --query "has:attachment newer_than:7d"
+python $SKILL_DIR/scripts/gmail.py messages list --query "has:attachment newer_than:7d"
 
 # Find important emails from specific sender
-python scripts/gmail.py messages list --query "from:ceo@example.com is:important"
+python $SKILL_DIR/scripts/gmail.py messages list --query "from:ceo@example.com is:important"
 
 # Find emails in a conversation
-python scripts/gmail.py messages list --query "subject:project-alpha"
+python $SKILL_DIR/scripts/gmail.py messages list --query "subject:project-alpha"
 ```
 
 ## Gmail Search Query Syntax
@@ -376,8 +377,8 @@ For the complete reference, see [gmail-queries.md](references/gmail-queries.md).
 **Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:
 
 1. Inform the user about the error
-2. Run `python scripts/gmail.py auth status` to check the current token state
-3. Suggest the user run `python scripts/gmail.py auth reset` followed by `python scripts/gmail.py check` to re-authenticate
+2. Run `python $SKILL_DIR/scripts/gmail.py auth status` to check the current token state
+3. Suggest the user run `python $SKILL_DIR/scripts/gmail.py auth reset` followed by `python $SKILL_DIR/scripts/gmail.py check` to re-authenticate
 4. The `auth reset` and `check` commands require user interaction (browser-based OAuth consent) and cannot be completed autonomously
 
 **Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
@@ -390,15 +391,15 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ### Check command fails
 
-Run `python scripts/gmail.py check` to diagnose issues. It will provide specific error messages and setup instructions.
+Run `python $SKILL_DIR/scripts/gmail.py check` to diagnose issues. It will provide specific error messages and setup instructions.
 
 ### Authentication failed
 
 1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/gmail.yaml`
 2. Token expired or corrupted — reset and re-authenticate:
    ```bash
-   python scripts/gmail.py auth reset
-   python scripts/gmail.py check
+   python $SKILL_DIR/scripts/gmail.py auth reset
+   python $SKILL_DIR/scripts/gmail.py check
    ```
 
 ### Permission denied
@@ -406,8 +407,8 @@ Run `python scripts/gmail.py check` to diagnose issues. It will provide specific
 Your OAuth token may not have the necessary scopes. Reset your token and re-authenticate:
 
 ```bash
-python scripts/gmail.py auth reset
-python scripts/gmail.py check
+python $SKILL_DIR/scripts/gmail.py auth reset
+python $SKILL_DIR/scripts/gmail.py check
 ```
 
 ### Import errors

@@ -8,6 +8,7 @@ metadata:
   tags: [code-review, patches]
   complexity: lightweight
 license: MIT
+allowed-tools: Bash(python $SKILL_DIR/scripts/gerrit.py *)
 ---
 
 # Gerrit Skill
@@ -82,15 +83,15 @@ The wrapper script (`scripts/gerrit.py`) uses Gerrit SSH query commands and form
 
 ```bash
 # Check Gerrit SSH access
-python scripts/gerrit.py check
+python $SKILL_DIR/scripts/gerrit.py check
 
 # Changes
-python scripts/gerrit.py changes list
-python scripts/gerrit.py changes view 12345
-python scripts/gerrit.py changes search "status:open project:myproject"
+python $SKILL_DIR/scripts/gerrit.py changes list
+python $SKILL_DIR/scripts/gerrit.py changes view 12345
+python $SKILL_DIR/scripts/gerrit.py changes search "status:open project:myproject"
 
 # Projects
-python scripts/gerrit.py projects list
+python $SKILL_DIR/scripts/gerrit.py projects list
 ```
 
 All commands support `--limit N` for list commands (default 30).
@@ -332,8 +333,8 @@ The Gerrit skill uses `git-review` with a Python wrapper for markdown-formatted 
 **Quick start:**
 1. Install: `pip install git-review`
 2. Setup: `git review -s` (in repository)
-3. Verify: `python scripts/gerrit.py check`
-4. Read: `python scripts/gerrit.py changes list`
+3. Verify: `python $SKILL_DIR/scripts/gerrit.py check`
+4. Read: `python $SKILL_DIR/scripts/gerrit.py changes list`
 5. Write: `git review`, `git review -d 12345`, etc. (use `git-review` directly)
 
 For detailed command reference, use `git review --help` or visit <https://docs.opendev.org/opendev/git-review/latest/>.

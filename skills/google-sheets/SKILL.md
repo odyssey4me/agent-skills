@@ -8,6 +8,7 @@ metadata:
   tags: [spreadsheets, data, formulas]
   complexity: standard
 license: MIT
+allowed-tools: Bash(python $SKILL_DIR/scripts/google-sheets.py *)
 ---
 
 # Google Sheets
@@ -28,7 +29,7 @@ Interact with Google Sheets for spreadsheet management, data manipulation, and f
 After installation, verify the skill is properly configured:
 
 ```bash
-python scripts/google-sheets.py check
+python $SKILL_DIR/scripts/google-sheets.py check
 ```
 
 This will check:
@@ -54,7 +55,7 @@ Google Sheets uses OAuth 2.0 for authentication. For complete setup instructions
      client_secret: your-client-secret
    ```
 
-2. Run `python scripts/google-sheets.py check` to trigger OAuth flow and verify setup.
+2. Run `python $SKILL_DIR/scripts/google-sheets.py check` to trigger OAuth flow and verify setup.
 
 ### OAuth Scopes
 
@@ -69,8 +70,8 @@ The skill requests granular scopes for different operations:
 
 If you encounter "insufficient scope" errors, reset your token and re-authenticate:
 
-1. Reset token: `python scripts/google-sheets.py auth reset`
-2. Re-run: `python scripts/google-sheets.py check`
+1. Reset token: `python $SKILL_DIR/scripts/google-sheets.py auth reset`
+2. Re-run: `python $SKILL_DIR/scripts/google-sheets.py check`
 
 ## Commands
 
@@ -79,7 +80,7 @@ If you encounter "insufficient scope" errors, reset your token and re-authentica
 Verify configuration and connectivity.
 
 ```bash
-python scripts/google-sheets.py check
+python $SKILL_DIR/scripts/google-sheets.py check
 ```
 
 This validates:
@@ -93,7 +94,7 @@ This validates:
 Store OAuth 2.0 client credentials for custom OAuth flow.
 
 ```bash
-python scripts/google-sheets.py auth setup \
+python $SKILL_DIR/scripts/google-sheets.py auth setup \
   --client-id YOUR_CLIENT_ID \
   --client-secret YOUR_CLIENT_SECRET
 ```
@@ -109,7 +110,7 @@ Credentials are saved to `~/.config/agent-skills/google-sheets.yaml`.
 Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
 
 ```bash
-python scripts/google-sheets.py auth reset
+python $SKILL_DIR/scripts/google-sheets.py auth reset
 ```
 
 Use this when you encounter scope or authentication errors.
@@ -119,7 +120,7 @@ Use this when you encounter scope or authentication errors.
 Show current OAuth token information without making API calls.
 
 ```bash
-python scripts/google-sheets.py auth status
+python $SKILL_DIR/scripts/google-sheets.py auth status
 ```
 
 Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
@@ -129,7 +130,7 @@ Displays: whether a token is stored, granted scopes, refresh token presence, tok
 Create a new Google Sheets spreadsheet.
 
 ```bash
-python scripts/google-sheets.py spreadsheets create --title "My Spreadsheet"
+python $SKILL_DIR/scripts/google-sheets.py spreadsheets create --title "My Spreadsheet"
 ```
 
 **Options:**
@@ -139,10 +140,10 @@ python scripts/google-sheets.py spreadsheets create --title "My Spreadsheet"
 **Example:**
 ```bash
 # Create with default Sheet1
-python scripts/google-sheets.py spreadsheets create --title "Sales Data"
+python $SKILL_DIR/scripts/google-sheets.py spreadsheets create --title "Sales Data"
 
 # Create with custom sheets
-python scripts/google-sheets.py spreadsheets create \
+python $SKILL_DIR/scripts/google-sheets.py spreadsheets create \
   --title "Q1 Report" \
   --sheets "Summary,January,February,March"
 
@@ -159,7 +160,7 @@ python scripts/google-sheets.py spreadsheets create \
 Get spreadsheet metadata and structure.
 
 ```bash
-python scripts/google-sheets.py spreadsheets get SPREADSHEET_ID
+python $SKILL_DIR/scripts/google-sheets.py spreadsheets get SPREADSHEET_ID
 ```
 
 **Arguments:**
@@ -167,7 +168,7 @@ python scripts/google-sheets.py spreadsheets get SPREADSHEET_ID
 
 **Example:**
 ```bash
-python scripts/google-sheets.py spreadsheets get 1abc...xyz
+python $SKILL_DIR/scripts/google-sheets.py spreadsheets get 1abc...xyz
 
 # Output:
 # Title: Sales Data
@@ -181,7 +182,7 @@ python scripts/google-sheets.py spreadsheets get 1abc...xyz
 Read cell values from a range.
 
 ```bash
-python scripts/google-sheets.py values read SPREADSHEET_ID --range "Sheet1!A1:D5"
+python $SKILL_DIR/scripts/google-sheets.py values read SPREADSHEET_ID --range "Sheet1!A1:D5"
 ```
 
 **Arguments:**
@@ -194,7 +195,7 @@ python scripts/google-sheets.py values read SPREADSHEET_ID --range "Sheet1!A1:D5
 **Example:**
 ```bash
 # Read a range
-python scripts/google-sheets.py values read 1abc...xyz --range "Sheet1!A1:C3"
+python $SKILL_DIR/scripts/google-sheets.py values read 1abc...xyz --range "Sheet1!A1:C3"
 
 # Output (formatted as table):
 # Name      | Age | City
@@ -202,7 +203,7 @@ python scripts/google-sheets.py values read 1abc...xyz --range "Sheet1!A1:C3"
 # Bob       | 25  | LA
 
 # Read formulas
-python scripts/google-sheets.py values read 1abc...xyz \
+python $SKILL_DIR/scripts/google-sheets.py values read 1abc...xyz \
   --range "Sheet1!D1:D10" \
   --format FORMULA
 ```
@@ -214,7 +215,7 @@ See [references/range-notation.md](references/range-notation.md) for A1 notation
 Write values to a range.
 
 ```bash
-python scripts/google-sheets.py values write SPREADSHEET_ID \
+python $SKILL_DIR/scripts/google-sheets.py values write SPREADSHEET_ID \
   --range "Sheet1!A1" \
   --values '[[\"Name\",\"Age\"],[\"Alice\",30]]'
 ```
@@ -229,12 +230,12 @@ python scripts/google-sheets.py values write SPREADSHEET_ID \
 **Example:**
 ```bash
 # Write data starting at A1
-python scripts/google-sheets.py values write 1abc...xyz \
+python $SKILL_DIR/scripts/google-sheets.py values write 1abc...xyz \
   --range "Sheet1!A1" \
   --values '[[\"Product\",\"Price\",\"Quantity\"],[\"Widget\",9.99,100]]'
 
 # Write a single row
-python scripts/google-sheets.py values write 1abc...xyz \
+python $SKILL_DIR/scripts/google-sheets.py values write 1abc...xyz \
   --range "Sheet1!A5" \
   --values '[[\"Total\",999,50]]'
 
@@ -251,7 +252,7 @@ python scripts/google-sheets.py values write 1abc...xyz \
 Append rows to the end of a sheet.
 
 ```bash
-python scripts/google-sheets.py values append SPREADSHEET_ID \
+python $SKILL_DIR/scripts/google-sheets.py values append SPREADSHEET_ID \
   --range "Sheet1" \
   --values '[[\"New\",\"Row\",\"Data\"]]'
 ```
@@ -266,12 +267,12 @@ python scripts/google-sheets.py values append SPREADSHEET_ID \
 **Example:**
 ```bash
 # Append a single row
-python scripts/google-sheets.py values append 1abc...xyz \
+python $SKILL_DIR/scripts/google-sheets.py values append 1abc...xyz \
   --range "Sheet1" \
   --values '[[\"Charlie\",35,\"Chicago\"]]'
 
 # Append multiple rows
-python scripts/google-sheets.py values append 1abc...xyz \
+python $SKILL_DIR/scripts/google-sheets.py values append 1abc...xyz \
   --range "Sheet1" \
   --values '[[\"David\",28,\"Boston\"],[\"Eve\",32,\"Seattle\"]]'
 
@@ -286,7 +287,7 @@ python scripts/google-sheets.py values append 1abc...xyz \
 Clear values in a range.
 
 ```bash
-python scripts/google-sheets.py values clear SPREADSHEET_ID --range "Sheet1!A1:D10"
+python $SKILL_DIR/scripts/google-sheets.py values clear SPREADSHEET_ID --range "Sheet1!A1:D10"
 ```
 
 **Arguments:**
@@ -298,7 +299,7 @@ python scripts/google-sheets.py values clear SPREADSHEET_ID --range "Sheet1!A1:D
 **Example:**
 ```bash
 # Clear a range
-python scripts/google-sheets.py values clear 1abc...xyz --range "Sheet1!A1:Z100"
+python $SKILL_DIR/scripts/google-sheets.py values clear 1abc...xyz --range "Sheet1!A1:Z100"
 
 # Output:
 # ✓ Values cleared successfully
@@ -312,7 +313,7 @@ python scripts/google-sheets.py values clear 1abc...xyz --range "Sheet1!A1:Z100"
 Add a new sheet to a spreadsheet.
 
 ```bash
-python scripts/google-sheets.py sheets create SPREADSHEET_ID --title "New Sheet"
+python $SKILL_DIR/scripts/google-sheets.py sheets create SPREADSHEET_ID --title "New Sheet"
 ```
 
 **Arguments:**
@@ -323,7 +324,7 @@ python scripts/google-sheets.py sheets create SPREADSHEET_ID --title "New Sheet"
 
 **Example:**
 ```bash
-python scripts/google-sheets.py sheets create 1abc...xyz --title "Q2 Data"
+python $SKILL_DIR/scripts/google-sheets.py sheets create 1abc...xyz --title "Q2 Data"
 
 # Output:
 # ✓ Sheet created successfully
@@ -336,7 +337,7 @@ python scripts/google-sheets.py sheets create 1abc...xyz --title "Q2 Data"
 Delete a sheet from a spreadsheet.
 
 ```bash
-python scripts/google-sheets.py sheets delete SPREADSHEET_ID --sheet-id 123456789
+python $SKILL_DIR/scripts/google-sheets.py sheets delete SPREADSHEET_ID --sheet-id 123456789
 ```
 
 **Arguments:**
@@ -348,10 +349,10 @@ python scripts/google-sheets.py sheets delete SPREADSHEET_ID --sheet-id 12345678
 **Example:**
 ```bash
 # Get sheet IDs first
-python scripts/google-sheets.py spreadsheets get 1abc...xyz
+python $SKILL_DIR/scripts/google-sheets.py spreadsheets get 1abc...xyz
 
 # Delete a sheet
-python scripts/google-sheets.py sheets delete 1abc...xyz --sheet-id 123456789
+python $SKILL_DIR/scripts/google-sheets.py sheets delete 1abc...xyz --sheet-id 123456789
 
 # Output:
 # ✓ Sheet deleted successfully
@@ -365,40 +366,40 @@ python scripts/google-sheets.py sheets delete 1abc...xyz --sheet-id 123456789
 
 ```bash
 # Create spreadsheet
-python scripts/google-sheets.py spreadsheets create --title "Employee Data"
+python $SKILL_DIR/scripts/google-sheets.py spreadsheets create --title "Employee Data"
 
 # Write headers (use the spreadsheet ID from the output above)
-python scripts/google-sheets.py values write $SS_ID \
+python $SKILL_DIR/scripts/google-sheets.py values write $SS_ID \
   --range "Sheet1!A1" \
   --values '[["Name","Department","Salary","Start Date"]]'
 
 # Append employee records
-python scripts/google-sheets.py values append $SS_ID \
+python $SKILL_DIR/scripts/google-sheets.py values append $SS_ID \
   --range "Sheet1" \
   --values '[["Alice","Engineering",120000,"2023-01-15"],["Bob","Sales",95000,"2023-03-01"]]'
 
 # Add a summary sheet
-python scripts/google-sheets.py sheets create $SS_ID --title "Summary"
+python $SKILL_DIR/scripts/google-sheets.py sheets create $SS_ID --title "Summary"
 
 # Read the data
-python scripts/google-sheets.py values read $SS_ID --range "Sheet1!A1:D10"
+python $SKILL_DIR/scripts/google-sheets.py values read $SS_ID --range "Sheet1!A1:D10"
 ```
 
 ### Work with formulas
 
 ```bash
 # Write data with formulas
-python scripts/google-sheets.py values write $SS_ID \
+python $SKILL_DIR/scripts/google-sheets.py values write $SS_ID \
   --range "Sheet1!A1" \
   --values '[["Item","Price","Qty","Total"],["Widget",10,5,"=B2*C2"],["Gadget",20,3,"=B3*C3"]]'
 
 # Read formulas
-python scripts/google-sheets.py values read $SS_ID \
+python $SKILL_DIR/scripts/google-sheets.py values read $SS_ID \
   --range "Sheet1!D2:D3" \
   --format FORMULA
 
 # Read calculated values
-python scripts/google-sheets.py values read $SS_ID \
+python $SKILL_DIR/scripts/google-sheets.py values read $SS_ID \
   --range "Sheet1!D2:D3" \
   --format FORMATTED_VALUE
 ```
@@ -410,15 +411,15 @@ python scripts/google-sheets.py values read $SS_ID \
 SS_ID="your-spreadsheet-id"
 
 # Clear old data
-python scripts/google-sheets.py values clear $SS_ID --range "Sheet1!A1:Z1000"
+python $SKILL_DIR/scripts/google-sheets.py values clear $SS_ID --range "Sheet1!A1:Z1000"
 
 # Write new data in batches
-python scripts/google-sheets.py values write $SS_ID \
+python $SKILL_DIR/scripts/google-sheets.py values write $SS_ID \
   --range "Sheet1!A1" \
   --values '[["Date","Revenue","Expenses","Profit"]]'
 
 for month in Jan Feb Mar; do
-  python scripts/google-sheets.py values append $SS_ID \
+  python $SKILL_DIR/scripts/google-sheets.py values append $SS_ID \
     --range "Sheet1" \
     --values "[[\"\$month\",10000,7000,\"=B${ROW}-C${ROW}\"]]"
 done
@@ -429,8 +430,8 @@ done
 **Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:
 
 1. Inform the user about the error
-2. Run `python scripts/google-sheets.py auth status` to check the current token state
-3. Suggest the user run `python scripts/google-sheets.py auth reset` followed by `python scripts/google-sheets.py check` to re-authenticate
+2. Run `python $SKILL_DIR/scripts/google-sheets.py auth status` to check the current token state
+3. Suggest the user run `python $SKILL_DIR/scripts/google-sheets.py auth reset` followed by `python $SKILL_DIR/scripts/google-sheets.py check` to re-authenticate
 4. The `auth reset` and `check` commands require user interaction (browser-based OAuth consent) and cannot be completed autonomously
 
 **Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
@@ -446,8 +447,8 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/google-sheets.yaml`
 2. Token expired or corrupted — reset and re-authenticate:
    ```bash
-   python scripts/google-sheets.py auth reset
-   python scripts/google-sheets.py check
+   python $SKILL_DIR/scripts/google-sheets.py auth reset
+   python $SKILL_DIR/scripts/google-sheets.py check
    ```
 
 ### Permission denied
@@ -455,8 +456,8 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 Your OAuth token may not have the necessary scopes. Reset your token and re-authenticate:
 
 ```bash
-python scripts/google-sheets.py auth reset
-python scripts/google-sheets.py check
+python $SKILL_DIR/scripts/google-sheets.py auth reset
+python $SKILL_DIR/scripts/google-sheets.py check
 ```
 
 ### Cannot find spreadsheet

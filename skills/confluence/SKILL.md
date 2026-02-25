@@ -8,6 +8,7 @@ metadata:
   tags: [wiki, pages, spaces]
   complexity: standard
 license: MIT
+allowed-tools: Bash(python $SKILL_DIR/scripts/confluence.py *)
 ---
 
 # Confluence
@@ -30,7 +31,7 @@ Interact with Confluence for content search, viewing pages, and space management
 After installation, verify the skill is properly configured:
 
 ```bash
-python scripts/confluence.pycheck
+python $SKILL_DIR/scripts/confluence.py check
 ```
 
 This will check:
@@ -100,10 +101,10 @@ defaults:
 
 ```bash
 # Show all configuration
-python scripts/confluence.pyconfig show
+python $SKILL_DIR/scripts/confluence.py config show
 
 # Show space-specific defaults
-python scripts/confluence.pyconfig show --space DEMO
+python $SKILL_DIR/scripts/confluence.py config show --space DEMO
 ```
 
 ## Commands
@@ -113,7 +114,7 @@ python scripts/confluence.pyconfig show --space DEMO
 Verify configuration and connectivity.
 
 ```bash
-python scripts/confluence.pycheck
+python $SKILL_DIR/scripts/confluence.py check
 ```
 
 This validates:
@@ -128,14 +129,14 @@ Search for content using CQL (Confluence Query Language).
 
 ```bash
 # Basic search
-python scripts/confluence.pysearch "type=page AND space = DEMO"
-python scripts/confluence.pysearch "title~login" --space DEMO
+python $SKILL_DIR/scripts/confluence.py search "type=page AND space = DEMO"
+python $SKILL_DIR/scripts/confluence.py search "title~login" --space DEMO
 
 # Filter by type
-python scripts/confluence.pysearch "space = DEMO" --type page
+python $SKILL_DIR/scripts/confluence.py search "space = DEMO" --type page
 
 # Limit results
-python scripts/confluence.pysearch "type=page" --max-results 10
+python $SKILL_DIR/scripts/confluence.py search "type=page" --max-results 10
 ```
 
 **Arguments:**
@@ -152,16 +153,16 @@ Get page content by ID or title.
 
 ```bash
 # Get by title (returns Markdown by default)
-python scripts/confluence.pypage get "My Page Title"
+python $SKILL_DIR/scripts/confluence.py page get "My Page Title"
 
 # Get by ID
-python scripts/confluence.pypage get 123456
+python $SKILL_DIR/scripts/confluence.py page get 123456
 
 # Get without body content
-python scripts/confluence.pypage get "My Page" --no-body
+python $SKILL_DIR/scripts/confluence.py page get "My Page" --no-body
 
 # Get in original format (not Markdown)
-python scripts/confluence.pypage get "My Page" --raw
+python $SKILL_DIR/scripts/confluence.py page get "My Page" --raw
 ```
 
 **Output**: By default, displays page metadata and body content converted to Markdown for readability.
@@ -175,7 +176,7 @@ python scripts/confluence.pypage get "My Page" --raw
 #### Example Output
 
 ```bash
-$ python scripts/confluence.pypage get "API Documentation"
+$ python $SKILL_DIR/scripts/confluence.py page get "API Documentation"
 
 Page ID: 123456
 Title: API Documentation
@@ -205,11 +206,11 @@ For creating and updating pages with Markdown support, see [references/creating-
 Quick examples:
 ```bash
 # Create page from Markdown file
-python scripts/confluence.pypage create --space DEMO --title "Documentation" \
+python $SKILL_DIR/scripts/confluence.py page create --space DEMO --title "Documentation" \
   --body-file README.md
 
 # Update page from file
-python scripts/confluence.pypage update 123456 --body-file updated.md
+python $SKILL_DIR/scripts/confluence.py page update 123456 --body-file updated.md
 ```
 
 ### space
@@ -218,16 +219,16 @@ Manage spaces.
 
 ```bash
 # List all spaces
-python scripts/confluence.pyspace list
+python $SKILL_DIR/scripts/confluence.py space list
 
 # List with limit
-python scripts/confluence.pyspace list --max-results 10
+python $SKILL_DIR/scripts/confluence.py space list --max-results 10
 
 # Filter by type
-python scripts/confluence.pyspace list --type global
+python $SKILL_DIR/scripts/confluence.py space list --type global
 
 # Get space details
-python scripts/confluence.pyspace get DEMO
+python $SKILL_DIR/scripts/confluence.py space get DEMO
 ```
 
 **Arguments:**
@@ -244,10 +245,10 @@ Show configuration and defaults.
 
 ```bash
 # Show all configuration
-python scripts/confluence.pyconfig show
+python $SKILL_DIR/scripts/confluence.py config show
 
 # Show space-specific defaults
-python scripts/confluence.pyconfig show --space DEMO
+python $SKILL_DIR/scripts/confluence.py config show --space DEMO
 ```
 
 This displays:
@@ -261,36 +262,36 @@ This displays:
 
 ```bash
 # Find pages in a space
-python scripts/confluence.pysearch "type=page AND space = DEMO"
+python $SKILL_DIR/scripts/confluence.py search "type=page AND space = DEMO"
 
 # Search by title
-python scripts/confluence.pysearch "title~login"
+python $SKILL_DIR/scripts/confluence.py search "title~login"
 
 # Find recent pages
-python scripts/confluence.pysearch "type=page AND created >= now('-7d')"
+python $SKILL_DIR/scripts/confluence.py search "type=page AND created >= now('-7d')"
 ```
 
 ### View Page Content
 
 ```bash
 # View page as Markdown
-python scripts/confluence.pypage get "My Page Title"
+python $SKILL_DIR/scripts/confluence.py page get "My Page Title"
 
 # View page metadata only
-python scripts/confluence.pypage get 123456 --no-body
+python $SKILL_DIR/scripts/confluence.py page get 123456 --no-body
 
 # Export to file
-python scripts/confluence.pypage get "My Page" > exported-page.md
+python $SKILL_DIR/scripts/confluence.py page get "My Page" > exported-page.md
 ```
 
 ### List and Explore Spaces
 
 ```bash
 # List all spaces
-python scripts/confluence.pyspace list
+python $SKILL_DIR/scripts/confluence.py space list
 
 # Get details about a space
-python scripts/confluence.pyspace get DEMO
+python $SKILL_DIR/scripts/confluence.py space get DEMO
 ```
 
 ### Using Configuration Defaults
@@ -299,15 +300,15 @@ With defaults configured as shown in the [Configuration Defaults](#configuration
 
 ```bash
 # Search uses CQL scope automatically
-python scripts/confluence.pysearch "type=page"
+python $SKILL_DIR/scripts/confluence.py search "type=page"
 # Becomes: (space = DEMO) AND (type=page)
 
 # Search with automatic max_results from config
-python scripts/confluence.pysearch "status=current"
+python $SKILL_DIR/scripts/confluence.py search "status=current"
 # Uses configured max_results (25) automatically
 
 # Override defaults when needed
-python scripts/confluence.pysearch "type=page" --max-results 100
+python $SKILL_DIR/scripts/confluence.py search "type=page" --max-results 100
 # CLI argument overrides the configured default of 25
 ```
 
@@ -331,7 +332,7 @@ Common CQL (Confluence Query Language) queries:
 Combine with `AND`, `OR`, and use `ORDER BY` for sorting:
 
 ```bash
-python scripts/confluence.pysearch "type=page AND space=DEMO AND created >= now('-30d') ORDER BY created DESC"
+python $SKILL_DIR/scripts/confluence.py search "type=page AND space=DEMO AND created >= now('-30d') ORDER BY created DESC"
 ```
 
 ## Model Guidance
@@ -342,7 +343,7 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ### Check command fails
 
-Run `python scripts/confluence.pycheck` to diagnose issues. It will provide specific error messages and setup instructions.
+Run `python $SKILL_DIR/scripts/confluence.py check` to diagnose issues. It will provide specific error messages and setup instructions.
 
 ### Authentication failed
 
@@ -362,8 +363,8 @@ Test your CQL query in the Confluence web interface search before using it in th
 ### Page not found
 
 When searching by title, ensure the title is exact (case-sensitive). You can use:
-- Exact title: `python scripts/confluence.pypage get "Exact Page Title"`
-- Page ID: `python scripts/confluence.pypage get 123456`
+- Exact title: `python $SKILL_DIR/scripts/confluence.py page get "Exact Page Title"`
+- Page ID: `python $SKILL_DIR/scripts/confluence.py page get 123456`
 
 ### Import errors
 

@@ -8,6 +8,7 @@ metadata:
   tags: [issues, agile, sprints]
   complexity: standard
 license: MIT
+allowed-tools: Bash(python $SKILL_DIR/scripts/jira.py *)
 ---
 
 # Jira
@@ -28,7 +29,7 @@ Interact with Jira for issue tracking, search, and workflow management.
 After installation, verify the skill is properly configured:
 
 ```bash
-python scripts/jira.py check
+python $SKILL_DIR/scripts/jira.py check
 ```
 
 This will check:
@@ -136,10 +137,10 @@ projects:
 
 ```bash
 # Show all configuration
-python scripts/jira.py config show
+python $SKILL_DIR/scripts/jira.py config show
 
 # Show project-specific defaults
-python scripts/jira.py config show --project DEMO
+python $SKILL_DIR/scripts/jira.py config show --project DEMO
 ```
 
 ## Commands
@@ -149,7 +150,7 @@ python scripts/jira.py config show --project DEMO
 Verify configuration and connectivity.
 
 ```bash
-python scripts/jira.py check
+python $SKILL_DIR/scripts/jira.py check
 ```
 
 This validates:
@@ -164,26 +165,26 @@ Search for issues using JQL (Jira Query Language).
 
 ```bash
 # Standard JQL
-python scripts/jira.py search "project = DEMO AND status = Open"
-python scripts/jira.py search "assignee = currentUser() ORDER BY updated DESC" --max-results 20
+python $SKILL_DIR/scripts/jira.py search "project = DEMO AND status = Open"
+python $SKILL_DIR/scripts/jira.py search "assignee = currentUser() ORDER BY updated DESC" --max-results 20
 
 # ScriptRunner Enhanced Search (if available)
 # Find issues linked to a specific issue
-python scripts/jira.py search 'issue in linkedIssuesOf("DEMO-123")'
+python $SKILL_DIR/scripts/jira.py search 'issue in linkedIssuesOf("DEMO-123")'
 
 # Find parent/child relationships
-python scripts/jira.py search 'issue in parentsOf("DEMO-123")'
-python scripts/jira.py search 'issue in subtasksOf("DEMO-123")'
+python $SKILL_DIR/scripts/jira.py search 'issue in parentsOf("DEMO-123")'
+python $SKILL_DIR/scripts/jira.py search 'issue in subtasksOf("DEMO-123")'
 
 # Find issues commented on by a specific user
-python scripts/jira.py search 'issue in commentedByUser("username")'
+python $SKILL_DIR/scripts/jira.py search 'issue in commentedByUser("username")'
 
 # Find epics and their issues
-python scripts/jira.py search 'issue in epicsOf("DEMO-123")'
-python scripts/jira.py search 'issue in issuesInEpics("EPIC-123")'
+python $SKILL_DIR/scripts/jira.py search 'issue in epicsOf("DEMO-123")'
+python $SKILL_DIR/scripts/jira.py search 'issue in issuesInEpics("EPIC-123")'
 
 # Find issues with specific link types (dependencies, blocks, etc.)
-python scripts/jira.py search 'issue in hasLinkType("Dependency")'
+python $SKILL_DIR/scripts/jira.py search 'issue in hasLinkType("Dependency")'
 ```
 
 **Arguments:**
@@ -211,22 +212,22 @@ Get, create, update, or comment on issues.
 
 ```bash
 # Get issue details
-python scripts/jira.py issue get DEMO-123
+python $SKILL_DIR/scripts/jira.py issue get DEMO-123
 
 # Get issue with specific fields only
-python scripts/jira.py issue get DEMO-123 --fields "summary,status,assignee"
+python $SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status,assignee"
 
 # Create new issue
-python scripts/jira.py issue create --project DEMO --type Task --summary "New task"
+python $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task"
 
 # Update issue
-python scripts/jira.py issue update DEMO-123 --summary "Updated summary"
+python $SKILL_DIR/scripts/jira.py issue update DEMO-123 --summary "Updated summary"
 
 # Add comment
-python scripts/jira.py issue comment DEMO-123 "This is a comment"
+python $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
 
 # Add private comment with security level
-python scripts/jira.py issue comment DEMO-123 "Internal note" --security-level "Red Hat Internal"
+python $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "Internal note" --security-level "Red Hat Internal"
 ```
 
 **Arguments for `issue get`:**
@@ -239,14 +240,14 @@ Manage issue workflow transitions.
 
 ```bash
 # List available transitions
-python scripts/jira.py transitions list DEMO-123
+python $SKILL_DIR/scripts/jira.py transitions list DEMO-123
 
 # Transition issue
-python scripts/jira.py transitions do DEMO-123 "In Progress"
-python scripts/jira.py transitions do DEMO-123 "Done" --comment "Completed"
+python $SKILL_DIR/scripts/jira.py transitions do DEMO-123 "In Progress"
+python $SKILL_DIR/scripts/jira.py transitions do DEMO-123 "Done" --comment "Completed"
 
 # Transition with private comment
-python scripts/jira.py transitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Red Hat Internal"
+python $SKILL_DIR/scripts/jira.py transitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Red Hat Internal"
 ```
 
 ### config
@@ -255,10 +256,10 @@ Manage configuration and view effective defaults.
 
 ```bash
 # Show all configuration and defaults
-python scripts/jira.py config show
+python $SKILL_DIR/scripts/jira.py config show
 
 # Show project-specific defaults
-python scripts/jira.py config show --project DEMO
+python $SKILL_DIR/scripts/jira.py config show --project DEMO
 ```
 
 This displays:
@@ -272,10 +273,10 @@ List available fields in your Jira instance.
 
 ```bash
 # List all global fields
-python scripts/jira.py fields
+python $SKILL_DIR/scripts/jira.py fields
 
 # List fields for specific project and issue type
-python scripts/jira.py fields --project DEMO --issue-type Task
+python $SKILL_DIR/scripts/jira.py fields --project DEMO --issue-type Task
 ```
 
 **Arguments:**
@@ -290,10 +291,10 @@ List available statuses and status categories.
 
 ```bash
 # List all statuses
-python scripts/jira.py statuses
+python $SKILL_DIR/scripts/jira.py statuses
 
 # List status categories (To Do, In Progress, Done)
-python scripts/jira.py statuses --categories
+python $SKILL_DIR/scripts/jira.py statuses --categories
 ```
 
 **Arguments:**
@@ -311,19 +312,19 @@ This is more reliable than using specific status names, which vary between proje
 ### Verify Setup
 
 ```bash
-python scripts/jira.py check
+python $SKILL_DIR/scripts/jira.py check
 ```
 
 ### Find my open issues
 
 ```bash
-python scripts/jira.py search "assignee = currentUser() AND status != Done ORDER BY priority DESC"
+python $SKILL_DIR/scripts/jira.py search "assignee = currentUser() AND status != Done ORDER BY priority DESC"
 ```
 
 ### Create a bug report
 
 ```bash
-python scripts/jira.py issue create \
+python $SKILL_DIR/scripts/jira.py issue create \
   --project DEMO \
   --type Bug \
   --summary "Login button not working" \
@@ -334,17 +335,17 @@ python scripts/jira.py issue create \
 
 ```bash
 # Start work on an issue
-python scripts/jira.py transitions do DEMO-123 "In Progress"
+python $SKILL_DIR/scripts/jira.py transitions do DEMO-123 "In Progress"
 
 # Complete the issue
-python scripts/jira.py transitions do DEMO-123 "Done" --comment "Implemented and tested"
+python $SKILL_DIR/scripts/jira.py transitions do DEMO-123 "Done" --comment "Implemented and tested"
 ```
 
 ### Add private comment
 
 ```bash
 # Add comment visible only to specific security level
-python scripts/jira.py issue comment DEMO-123 \
+python $SKILL_DIR/scripts/jira.py issue comment DEMO-123 \
   "This is sensitive internal information" \
   --security-level "Red Hat Internal"
 ```
@@ -352,7 +353,7 @@ python scripts/jira.py issue comment DEMO-123 \
 ### Search with specific fields
 
 ```bash
-python scripts/jira.py search \
+python $SKILL_DIR/scripts/jira.py search \
   "project = DEMO AND created >= -7d" \
   --fields "key,summary,status,assignee,created"
 ```
@@ -363,23 +364,23 @@ With defaults configured as shown in the [Configuration Defaults](#configuration
 
 ```bash
 # Search uses JQL scope automatically
-python scripts/jira.py search "status = Open"
+python $SKILL_DIR/scripts/jira.py search "status = Open"
 # Becomes: (project = DEMO AND assignee = currentUser()) AND (status = Open)
 
 # Search with automatic max_results and fields from config
-python scripts/jira.py search "priority = High"
+python $SKILL_DIR/scripts/jira.py search "priority = High"
 # Uses configured max_results (25) and fields automatically
 
 # Create issue uses project defaults
-python scripts/jira.py issue create --project DEMO --summary "Fix login bug"
+python $SKILL_DIR/scripts/jira.py issue create --project DEMO --summary "Fix login bug"
 # Automatically uses issue_type="Task" and priority="Medium" from DEMO project defaults
 
 # Comments use default security level
-python scripts/jira.py issue comment DEMO-123 "Internal note"
+python $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "Internal note"
 # Automatically applies security_level="Red Hat Internal"
 
 # Override defaults when needed
-python scripts/jira.py search "status = Open" --max-results 100
+python $SKILL_DIR/scripts/jira.py search "status = Open" --max-results 100
 # CLI argument overrides the configured default of 25
 ```
 
@@ -411,7 +412,7 @@ Jira organizes all statuses into three categories. Use `statusCategory` for quer
 
 **Example:** Instead of `status = "Open" OR status = "Backlog"`, use `statusCategory = "To Do"`.
 
-Use `python scripts/jira.py statuses --categories` to see all status categories in your Jira instance.
+Use `python $SKILL_DIR/scripts/jira.py statuses --categories` to see all status categories in your Jira instance.
 
 ## Model Guidance
 
@@ -421,7 +422,7 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ### Check command fails
 
-Run `python scripts/jira.py check` to diagnose issues. It will provide specific error messages and setup instructions.
+Run `python $SKILL_DIR/scripts/jira.py check` to diagnose issues. It will provide specific error messages and setup instructions.
 
 ### Authentication failed
 

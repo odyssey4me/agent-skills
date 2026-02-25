@@ -8,6 +8,7 @@ metadata:
   tags: [issues, merge-requests, pipelines]
   complexity: lightweight
 license: MIT
+allowed-tools: Bash(python $SKILL_DIR/scripts/gitlab.py *)
 ---
 
 # GitLab Skill
@@ -52,23 +53,23 @@ The wrapper script (`scripts/gitlab.py`) formats output as markdown. Use it for 
 
 ```bash
 # Check glab CLI is installed and authenticated
-python scripts/gitlab.py check
+python $SKILL_DIR/scripts/gitlab.py check
 
 # Issues
-python scripts/gitlab.py issues list --repo GROUP/REPO
-python scripts/gitlab.py issues view 123 --repo GROUP/REPO
+python $SKILL_DIR/scripts/gitlab.py issues list --repo GROUP/REPO
+python $SKILL_DIR/scripts/gitlab.py issues view 123 --repo GROUP/REPO
 
 # Merge Requests
-python scripts/gitlab.py mrs list --repo GROUP/REPO
-python scripts/gitlab.py mrs view 456 --repo GROUP/REPO
+python $SKILL_DIR/scripts/gitlab.py mrs list --repo GROUP/REPO
+python $SKILL_DIR/scripts/gitlab.py mrs view 456 --repo GROUP/REPO
 
 # Pipelines
-python scripts/gitlab.py pipelines list --repo GROUP/REPO
-python scripts/gitlab.py pipelines view 123456 --repo GROUP/REPO
+python $SKILL_DIR/scripts/gitlab.py pipelines list --repo GROUP/REPO
+python $SKILL_DIR/scripts/gitlab.py pipelines view 123456 --repo GROUP/REPO
 
 # Repositories
-python scripts/gitlab.py repos list
-python scripts/gitlab.py repos view GROUP/REPO
+python $SKILL_DIR/scripts/gitlab.py repos list
+python $SKILL_DIR/scripts/gitlab.py repos view GROUP/REPO
 ```
 
 All commands support `--limit N` for list commands (default 30).
@@ -274,8 +275,8 @@ The GitLab skill uses the official `glab` CLI with a Python wrapper for markdown
 **Quick start:**
 1. Install: `brew install glab` (or equivalent for your OS)
 2. Authenticate: `glab auth login`
-3. Verify: `python scripts/gitlab.py check`
-4. Read: `python scripts/gitlab.py issues list --repo GROUP/REPO`
+3. Verify: `python $SKILL_DIR/scripts/gitlab.py check`
+4. Read: `python $SKILL_DIR/scripts/gitlab.py issues list --repo GROUP/REPO`
 5. Write: `glab issue create`, `glab mr create`, etc. (use `glab` directly)
 
 For detailed command reference, use `glab <command> --help` or visit <https://docs.gitlab.com/cli/>.

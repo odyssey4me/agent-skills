@@ -8,6 +8,7 @@ metadata:
   tags: [events, scheduling, availability]
   complexity: standard
 license: MIT
+allowed-tools: Bash(python $SKILL_DIR/scripts/google-calendar.py *)
 ---
 
 # Google Calendar
@@ -28,7 +29,7 @@ Interact with Google Calendar for event management, scheduling, and availability
 After installation, verify the skill is properly configured:
 
 ```bash
-python scripts/google-calendar.py check
+python $SKILL_DIR/scripts/google-calendar.py check
 ```
 
 This will check:
@@ -54,7 +55,7 @@ Google Calendar uses OAuth 2.0 for authentication. For complete setup instructio
      client_secret: your-client-secret
    ```
 
-2. Run `python scripts/google-calendar.py check` to trigger OAuth flow and verify setup.
+2. Run `python $SKILL_DIR/scripts/google-calendar.py check` to trigger OAuth flow and verify setup.
 
 ### OAuth Scopes
 
@@ -69,8 +70,8 @@ The skill requests granular scopes for different operations:
 
 If you encounter "insufficient scope" errors, reset your token and re-authenticate:
 
-1. Reset token: `python scripts/google-calendar.py auth reset`
-2. Re-run: `python scripts/google-calendar.py check`
+1. Reset token: `python $SKILL_DIR/scripts/google-calendar.py auth reset`
+2. Re-run: `python $SKILL_DIR/scripts/google-calendar.py check`
 
 ## Commands
 
@@ -79,7 +80,7 @@ If you encounter "insufficient scope" errors, reset your token and re-authentica
 Verify configuration and connectivity.
 
 ```bash
-python scripts/google-calendar.py check
+python $SKILL_DIR/scripts/google-calendar.py check
 ```
 
 This validates:
@@ -93,7 +94,7 @@ This validates:
 Store OAuth 2.0 client credentials for custom OAuth flow.
 
 ```bash
-python scripts/google-calendar.py auth setup \
+python $SKILL_DIR/scripts/google-calendar.py auth setup \
   --client-id YOUR_CLIENT_ID \
   --client-secret YOUR_CLIENT_SECRET
 ```
@@ -105,7 +106,7 @@ Credentials are saved to `~/.config/agent-skills/google-calendar.yaml`.
 Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
 
 ```bash
-python scripts/google-calendar.py auth reset
+python $SKILL_DIR/scripts/google-calendar.py auth reset
 ```
 
 Use this when you encounter scope or authentication errors.
@@ -115,7 +116,7 @@ Use this when you encounter scope or authentication errors.
 Show current OAuth token information without making API calls.
 
 ```bash
-python scripts/google-calendar.py auth status
+python $SKILL_DIR/scripts/google-calendar.py auth status
 ```
 
 Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
@@ -125,7 +126,7 @@ Displays: whether a token is stored, granted scopes, refresh token presence, tok
 List all calendars for the authenticated user.
 
 ```bash
-python scripts/google-calendar.py calendars list
+python $SKILL_DIR/scripts/google-calendar.py calendars list
 ```
 
 ### calendars get
@@ -134,10 +135,10 @@ Get details for a specific calendar.
 
 ```bash
 # Get primary calendar
-python scripts/google-calendar.py calendars get primary
+python $SKILL_DIR/scripts/google-calendar.py calendars get primary
 
 # Get specific calendar by ID
-python scripts/google-calendar.py calendars get CALENDAR_ID
+python $SKILL_DIR/scripts/google-calendar.py calendars get CALENDAR_ID
 ```
 
 **Arguments:**
@@ -149,21 +150,21 @@ List calendar events.
 
 ```bash
 # List upcoming events
-python scripts/google-calendar.py events list
+python $SKILL_DIR/scripts/google-calendar.py events list
 
 # List events in specific time range
-python scripts/google-calendar.py events list \
+python $SKILL_DIR/scripts/google-calendar.py events list \
   --time-min "2026-01-24T00:00:00Z" \
   --time-max "2026-01-31T23:59:59Z"
 
 # List events from specific calendar
-python scripts/google-calendar.py events list --calendar CALENDAR_ID
+python $SKILL_DIR/scripts/google-calendar.py events list --calendar CALENDAR_ID
 
 # Search events
-python scripts/google-calendar.py events list --query "meeting"
+python $SKILL_DIR/scripts/google-calendar.py events list --query "meeting"
 
 # List with custom max results
-python scripts/google-calendar.py events list --max-results 20
+python $SKILL_DIR/scripts/google-calendar.py events list --max-results 20
 ```
 
 **Arguments:**
@@ -185,10 +186,10 @@ Get details for a specific event.
 
 ```bash
 # Get event from primary calendar
-python scripts/google-calendar.py events get EVENT_ID
+python $SKILL_DIR/scripts/google-calendar.py events get EVENT_ID
 
 # Get event from specific calendar
-python scripts/google-calendar.py events get EVENT_ID --calendar CALENDAR_ID
+python $SKILL_DIR/scripts/google-calendar.py events get EVENT_ID --calendar CALENDAR_ID
 ```
 
 **Arguments:**
@@ -201,20 +202,20 @@ Create a new calendar event.
 
 ```bash
 # Create simple event with time
-python scripts/google-calendar.py events create \
+python $SKILL_DIR/scripts/google-calendar.py events create \
   --summary "Team Meeting" \
   --start "2026-01-24T10:00:00-05:00" \
   --end "2026-01-24T11:00:00-05:00"
 
 # Create all-day event
-python scripts/google-calendar.py events create \
+python $SKILL_DIR/scripts/google-calendar.py events create \
   --summary "Conference" \
   --start "2026-01-24" \
   --end "2026-01-25" \
   --timezone "America/New_York"
 
 # Create event with details
-python scripts/google-calendar.py events create \
+python $SKILL_DIR/scripts/google-calendar.py events create \
   --summary "Project Review" \
   --start "2026-01-24T14:00:00Z" \
   --end "2026-01-24T15:00:00Z" \
@@ -223,7 +224,7 @@ python scripts/google-calendar.py events create \
   --attendees "alice@example.com,bob@example.com"
 
 # Create on specific calendar
-python scripts/google-calendar.py events create \
+python $SKILL_DIR/scripts/google-calendar.py events create \
   --calendar CALENDAR_ID \
   --summary "Event" \
   --start "2026-01-24T10:00:00Z" \
@@ -246,22 +247,22 @@ Update an existing event.
 
 ```bash
 # Update event summary
-python scripts/google-calendar.py events update EVENT_ID \
+python $SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
   --summary "Updated Meeting Title"
 
 # Update event time
-python scripts/google-calendar.py events update EVENT_ID \
+python $SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
   --start "2026-01-24T15:00:00Z" \
   --end "2026-01-24T16:00:00Z"
 
 # Update multiple fields
-python scripts/google-calendar.py events update EVENT_ID \
+python $SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
   --summary "Project Sync" \
   --location "Room B" \
   --description "Updated agenda"
 
 # Update event on specific calendar
-python scripts/google-calendar.py events update EVENT_ID \
+python $SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
   --calendar CALENDAR_ID \
   --summary "New Title"
 ```
@@ -281,10 +282,10 @@ Delete a calendar event.
 
 ```bash
 # Delete event from primary calendar
-python scripts/google-calendar.py events delete EVENT_ID
+python $SKILL_DIR/scripts/google-calendar.py events delete EVENT_ID
 
 # Delete event from specific calendar
-python scripts/google-calendar.py events delete EVENT_ID --calendar CALENDAR_ID
+python $SKILL_DIR/scripts/google-calendar.py events delete EVENT_ID --calendar CALENDAR_ID
 ```
 
 **Arguments:**
@@ -297,12 +298,12 @@ Check free/busy information for calendars.
 
 ```bash
 # Check availability for primary calendar
-python scripts/google-calendar.py freebusy \
+python $SKILL_DIR/scripts/google-calendar.py freebusy \
   --start "2026-01-24T00:00:00Z" \
   --end "2026-01-25T00:00:00Z"
 
 # Check multiple calendars
-python scripts/google-calendar.py freebusy \
+python $SKILL_DIR/scripts/google-calendar.py freebusy \
   --start "2026-01-24T08:00:00Z" \
   --end "2026-01-24T17:00:00Z" \
   --calendars "primary,calendar1@example.com,calendar2@example.com"
@@ -318,17 +319,17 @@ python scripts/google-calendar.py freebusy \
 ### Verify Setup
 
 ```bash
-python scripts/google-calendar.py check
+python $SKILL_DIR/scripts/google-calendar.py check
 ```
 
 ### View upcoming events
 
 ```bash
 # Next 10 events
-python scripts/google-calendar.py events list
+python $SKILL_DIR/scripts/google-calendar.py events list
 
 # This week's events
-python scripts/google-calendar.py events list \
+python $SKILL_DIR/scripts/google-calendar.py events list \
   --time-min "2026-01-24T00:00:00Z" \
   --time-max "2026-01-31T23:59:59Z"
 ```
@@ -336,7 +337,7 @@ python scripts/google-calendar.py events list \
 ### Create a meeting
 
 ```bash
-python scripts/google-calendar.py events create \
+python $SKILL_DIR/scripts/google-calendar.py events create \
   --summary "Team Standup" \
   --start "2026-01-25T09:00:00-05:00" \
   --end "2026-01-25T09:30:00-05:00" \
@@ -347,7 +348,7 @@ python scripts/google-calendar.py events create \
 ### Schedule an all-day event
 
 ```bash
-python scripts/google-calendar.py events create \
+python $SKILL_DIR/scripts/google-calendar.py events create \
   --summary "Company Holiday" \
   --start "2026-12-25" \
   --end "2026-12-26" \
@@ -357,7 +358,7 @@ python scripts/google-calendar.py events create \
 ### Reschedule an event
 
 ```bash
-python scripts/google-calendar.py events update EVENT_ID \
+python $SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
   --start "2026-01-24T14:00:00Z" \
   --end "2026-01-24T15:00:00Z"
 ```
@@ -365,7 +366,7 @@ python scripts/google-calendar.py events update EVENT_ID \
 ### Find available time slots
 
 ```bash
-python scripts/google-calendar.py freebusy \
+python $SKILL_DIR/scripts/google-calendar.py freebusy \
   --start "2026-01-24T08:00:00-05:00" \
   --end "2026-01-24T17:00:00-05:00" \
   --calendars "primary,colleague@example.com"
@@ -374,13 +375,13 @@ python scripts/google-calendar.py freebusy \
 ### Search for events
 
 ```bash
-python scripts/google-calendar.py events list --query "project review"
+python $SKILL_DIR/scripts/google-calendar.py events list --query "project review"
 ```
 
 ### Cancel an event
 
 ```bash
-python scripts/google-calendar.py events delete EVENT_ID
+python $SKILL_DIR/scripts/google-calendar.py events delete EVENT_ID
 ```
 
 ## Date and Time Format
@@ -416,8 +417,8 @@ When listing events, declined meetings are excluded by default. The script outpu
 **Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:
 
 1. Inform the user about the error
-2. Run `python scripts/google-calendar.py auth status` to check the current token state
-3. Suggest the user run `python scripts/google-calendar.py auth reset` followed by `python scripts/google-calendar.py check` to re-authenticate
+2. Run `python $SKILL_DIR/scripts/google-calendar.py auth status` to check the current token state
+3. Suggest the user run `python $SKILL_DIR/scripts/google-calendar.py auth reset` followed by `python $SKILL_DIR/scripts/google-calendar.py check` to re-authenticate
 4. The `auth reset` and `check` commands require user interaction (browser-based OAuth consent) and cannot be completed autonomously
 
 **Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
@@ -430,15 +431,15 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ### Check command fails
 
-Run `python scripts/google-calendar.py check` to diagnose issues. It will provide specific error messages and setup instructions.
+Run `python $SKILL_DIR/scripts/google-calendar.py check` to diagnose issues. It will provide specific error messages and setup instructions.
 
 ### Authentication failed
 
 1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/google-calendar.yaml`
 2. Token expired or corrupted — reset and re-authenticate:
    ```bash
-   python scripts/google-calendar.py auth reset
-   python scripts/google-calendar.py check
+   python $SKILL_DIR/scripts/google-calendar.py auth reset
+   python $SKILL_DIR/scripts/google-calendar.py check
    ```
 
 ### Permission denied
@@ -446,8 +447,8 @@ Run `python scripts/google-calendar.py check` to diagnose issues. It will provid
 Your OAuth token may not have the necessary scopes. Reset your token and re-authenticate:
 
 ```bash
-python scripts/google-calendar.py auth reset
-python scripts/google-calendar.py check
+python $SKILL_DIR/scripts/google-calendar.py auth reset
+python $SKILL_DIR/scripts/google-calendar.py check
 ```
 
 ### Import errors
