@@ -14,13 +14,16 @@ from skills.jira.scripts.jira import (
     JiraDefaults,
     JiraDetectionError,
     ProjectDefaults,
+    _build_epic_children_jql,
     _deployment_cache,
+    _extract_text_from_adf,
     _make_detection_request,
     _truncate,
     add_comment,
     api_path,
     clear_cache,
     cmd_check,
+    cmd_collaboration,
     cmd_config,
     cmd_fields,
     cmd_issue,
@@ -31,14 +34,20 @@ from skills.jira.scripts.jira import (
     delete_credential,
     detect_deployment_type,
     do_transition,
+    extract_contributors,
+    find_collaborative_epics,
+    format_collaborative_epics,
+    format_comments,
     format_issue,
     format_issues_list,
     format_json,
     format_rich_text,
     format_table,
     get_api_version,
+    get_comments,
     get_credential,
     get_credentials,
+    get_epic_children,
     get_issue,
     get_jira_defaults,
     get_project_defaults,
@@ -49,6 +58,7 @@ from skills.jira.scripts.jira import (
     list_statuses,
     load_config,
     save_config,
+    search_by_contributor,
     search_issues,
     set_credential,
     update_issue,
@@ -1542,3 +1552,566 @@ class TestMetadataDiscovery:
         assert result == 0
         captured = capsys.readouterr()
         assert '[{"name": "Open"}]' in captured.out
+
+
+class TestComments:
+    """Tests for comment retrieval and formatting."""
+
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_comments(self, mock_get):
+        """Test fetching comments from an issue."""
+        mock_get.return_value = {
+            "comments": [
+                {"id": "1", "body": "Hello", "author": {"displayName": "Jane"}},
+                {"id": "2", "body": "World", "author": {"displayName": "John"}},
+            ]
+        }
+
+        result = get_comments("DEMO-123", max_results=10)
+
+        assert len(result) == 2
+        assert result[0]["body"] == "Hello"
+        mock_get.assert_called_once()
+
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_comments_empty(self, mock_get):
+        """Test fetching comments when there are none."""
+        mock_get.return_value = {"comments": []}
+
+        result = get_comments("DEMO-123")
+
+        assert result == []
+
+    def test_extract_text_from_adf_plain_string(self):
+        """Test ADF extraction with a plain text string (DC format)."""
+        assert _extract_text_from_adf("Hello world") == "Hello world"
+
+    def test_extract_text_from_adf_dict(self):
+        """Test ADF extraction with an ADF document node."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Hello "},
+                        {"type": "text", "text": "world"},
+                    ],
+                }
+            ],
+        }
+
+        assert _extract_text_from_adf(adf) == "Hello world"
+
+    def test_extract_text_from_adf_nested(self):
+        """Test ADF extraction with nested content."""
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Line 1"}],
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Line 2"}],
+                },
+            ],
+        }
+
+        assert _extract_text_from_adf(adf) == "Line 1Line 2"
+
+    def test_extract_text_from_adf_non_dict(self):
+        """Test ADF extraction with non-dict, non-string input."""
+        assert _extract_text_from_adf(42) == ""
+        assert _extract_text_from_adf(None) == ""
+
+    def test_format_comments(self):
+        """Test formatting comments as markdown."""
+        comments = [
+            {
+                "author": {"displayName": "Jane Doe"},
+                "created": "2026-02-20T14:30:00.000+0000",
+                "body": "Great work!",
+            },
+        ]
+
+        result = format_comments(comments, "DEMO-123")
+
+        assert "## Comments on DEMO-123" in result
+        assert "### Jane Doe (2026-02-20 14:30)" in result
+        assert "Great work!" in result
+
+    def test_format_comments_empty(self):
+        """Test formatting when no comments exist."""
+        result = format_comments([], "DEMO-123")
+
+        assert "No comments found" in result
+
+    def test_format_comments_adf_body(self):
+        """Test formatting comments with ADF body."""
+        comments = [
+            {
+                "author": {"displayName": "Bot"},
+                "created": "2026-01-01T00:00:00.000+0000",
+                "body": {
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "ADF content"}],
+                        }
+                    ],
+                },
+            },
+        ]
+
+        result = format_comments(comments, "DEMO-123")
+
+        assert "ADF content" in result
+
+
+class TestContributors:
+    """Tests for contributor extraction."""
+
+    def test_extract_contributors_full(self):
+        """Test extracting contributors from issue and comments."""
+        issue = {
+            "fields": {
+                "reporter": {"displayName": "Alice"},
+                "assignee": {"displayName": "Bob"},
+            }
+        }
+        comments = [
+            {"author": {"displayName": "Charlie"}},
+            {"author": {"displayName": "Alice"}},  # duplicate
+        ]
+
+        result = extract_contributors(issue, comments)
+
+        assert result == {"Alice", "Bob", "Charlie"}
+
+    def test_extract_contributors_no_assignee(self):
+        """Test extracting contributors when assignee is None."""
+        issue = {
+            "fields": {
+                "reporter": {"displayName": "Alice"},
+                "assignee": None,
+            }
+        }
+
+        result = extract_contributors(issue, [])
+
+        assert result == {"Alice"}
+
+    def test_extract_contributors_empty_comments(self):
+        """Test extracting contributors with no comments."""
+        issue = {
+            "fields": {
+                "reporter": {"displayName": "Alice"},
+                "assignee": {"displayName": "Bob"},
+            }
+        }
+
+        result = extract_contributors(issue, [])
+
+        assert result == {"Alice", "Bob"}
+
+    def test_extract_contributors_no_reporter(self):
+        """Test extracting contributors with no reporter."""
+        issue = {"fields": {"assignee": {"displayName": "Bob"}}}
+
+        result = extract_contributors(issue, [])
+
+        assert result == {"Bob"}
+
+    @patch("skills.jira.scripts.jira.get_comments")
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_get_with_contributors(self, mock_defaults, mock_get, mock_comments, capsys):
+        """Test issue get with --contributors flag."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_get.return_value = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test",
+                "status": {"name": "Open"},
+                "assignee": {"displayName": "Bob"},
+                "priority": {"name": "High"},
+                "reporter": {"displayName": "Alice"},
+            },
+        }
+        mock_comments.return_value = [{"author": {"displayName": "Charlie"}}]
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-123",
+            fields=None,
+            json=False,
+            contributors=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Contributors:" in captured.out
+        assert "Alice" in captured.out
+        assert "Bob" in captured.out
+        assert "Charlie" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_comments")
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.format_json")
+    def test_cmd_issue_get_with_contributors_json(
+        self, mock_format_json, mock_defaults, mock_get, mock_comments
+    ):
+        """Test issue get with --contributors and --json."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_get.return_value = {
+            "key": "DEMO-123",
+            "fields": {
+                "reporter": {"displayName": "Alice"},
+                "assignee": None,
+            },
+        }
+        mock_comments.return_value = []
+        mock_format_json.return_value = "{}"
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-123",
+            fields=None,
+            json=True,
+            contributors=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        # Verify _contributors key was added to the issue dict
+        call_args = mock_format_json.call_args[0][0]
+        assert "_contributors" in call_args
+        assert "Alice" in call_args["_contributors"]
+
+
+class TestContributorSearch:
+    """Tests for contributor search."""
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_search_by_contributor_with_scriptrunner(self, mock_search, mock_sr):
+        """Test contributor search with ScriptRunner available."""
+        mock_sr.return_value = {"available": True, "enhanced_search": True}
+        mock_search.return_value = [{"key": "DEMO-1"}]
+
+        result = search_by_contributor("jsmith")
+
+        assert len(result) == 1
+        jql = mock_search.call_args[0][0]
+        assert 'reporter = "jsmith"' in jql
+        assert 'assignee = "jsmith"' in jql
+        assert 'commentedByUser("jsmith")' in jql
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_search_by_contributor_without_scriptrunner(self, mock_search, mock_sr, capsys):
+        """Test contributor search without ScriptRunner."""
+        mock_sr.return_value = {"available": False, "enhanced_search": False}
+        mock_search.return_value = []
+
+        search_by_contributor("jsmith")
+
+        captured = capsys.readouterr()
+        assert "ScriptRunner" in captured.err
+        jql = mock_search.call_args[0][0]
+        assert "commentedByUser" not in jql
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_search_by_contributor_with_project(self, mock_search, mock_sr):
+        """Test contributor search scoped to a project."""
+        mock_sr.return_value = {"available": False, "enhanced_search": False}
+        mock_search.return_value = []
+
+        search_by_contributor("jsmith", project="DEMO")
+
+        jql = mock_search.call_args[0][0]
+        assert "project = DEMO" in jql
+
+    @patch("skills.jira.scripts.jira.search_by_contributor")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_search_contributor(self, mock_defaults, mock_contrib):
+        """Test cmd_search with --contributor."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_contrib.return_value = [
+            {
+                "key": "DEMO-1",
+                "fields": {
+                    "summary": "Test",
+                    "status": {"name": "Open"},
+                    "assignee": {"displayName": "Bob"},
+                },
+            }
+        ]
+
+        args = argparse.Namespace(
+            jql=None,
+            contributor="jsmith",
+            project="DEMO",
+            max_results=None,
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_search(args)
+
+        assert result == 0
+        mock_contrib.assert_called_once_with("jsmith", "DEMO", 50, None)
+
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_search_no_jql_no_contributor(self, mock_defaults, capsys):
+        """Test cmd_search with neither jql nor --contributor."""
+        mock_defaults.return_value = JiraDefaults()
+
+        args = argparse.Namespace(
+            jql=None,
+            contributor=None,
+            project=None,
+            max_results=None,
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_search(args)
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "either a JQL query or --contributor is required" in captured.err
+
+
+class TestCollaborativeEpics:
+    """Tests for collaborative epics discovery."""
+
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_build_epic_children_jql_cloud(self, mock_cloud):
+        """Test epic children JQL for Cloud."""
+        mock_cloud.return_value = True
+
+        jql = _build_epic_children_jql("EPIC-1")
+
+        assert '"Epic Link" = EPIC-1' in jql
+        assert "parent = EPIC-1" in jql
+
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_build_epic_children_jql_dc(self, mock_cloud):
+        """Test epic children JQL for Data Center."""
+        mock_cloud.return_value = False
+
+        jql = _build_epic_children_jql("EPIC-1")
+
+        assert '"Epic Link" = EPIC-1' in jql
+        assert "parent" not in jql
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_get_epic_children(self, mock_cloud, mock_search):
+        """Test fetching epic children."""
+        mock_cloud.return_value = False
+        mock_search.return_value = [{"key": "TASK-1"}, {"key": "TASK-2"}]
+
+        result = get_epic_children("EPIC-1", fields=["assignee"])
+
+        assert len(result) == 2
+        mock_search.assert_called_once()
+
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics(self, mock_search, mock_children):
+        """Test finding collaborative epics."""
+        mock_search.return_value = [
+            {"key": "EPIC-1", "fields": {"summary": "Epic 1", "status": {"name": "Open"}}},
+            {"key": "EPIC-2", "fields": {"summary": "Epic 2", "status": {"name": "Open"}}},
+        ]
+        mock_children.side_effect = [
+            # EPIC-1: two different assignees
+            [
+                {"fields": {"assignee": {"displayName": "Alice"}}},
+                {"fields": {"assignee": {"displayName": "Bob"}}},
+            ],
+            # EPIC-2: one assignee
+            [
+                {"fields": {"assignee": {"displayName": "Alice"}}},
+            ],
+        ]
+
+        result = find_collaborative_epics(project="DEMO", min_contributors=2)
+
+        assert len(result) == 1
+        assert result[0]["epic"]["key"] == "EPIC-1"
+        assert result[0]["children_count"] == 2
+        assert sorted(result[0]["contributors"]) == ["Alice", "Bob"]
+
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_none_found(self, mock_search, mock_children):
+        """Test when no collaborative epics are found."""
+        mock_search.return_value = [
+            {"key": "EPIC-1", "fields": {"summary": "Solo epic"}},
+        ]
+        mock_children.return_value = [
+            {"fields": {"assignee": {"displayName": "Alice"}}},
+        ]
+
+        result = find_collaborative_epics(min_contributors=2)
+
+        assert result == []
+
+    def test_format_collaborative_epics(self):
+        """Test formatting collaborative epics."""
+        results = [
+            {
+                "epic": {"key": "EPIC-1", "fields": {"summary": "My Epic"}},
+                "children_count": 5,
+                "contributors": ["Alice", "Bob"],
+            }
+        ]
+
+        output = format_collaborative_epics(results)
+
+        assert "## Collaborative Epics" in output
+        assert "EPIC-1: My Epic" in output
+        assert "Children:** 5" in output
+        assert "Alice, Bob" in output
+
+    def test_format_collaborative_epics_empty(self):
+        """Test formatting when no results."""
+        output = format_collaborative_epics([])
+
+        assert "No collaborative epics found" in output
+
+
+class TestCmdCollaboration:
+    """Tests for cmd_collaboration handler."""
+
+    @patch("skills.jira.scripts.jira.find_collaborative_epics")
+    def test_cmd_collaboration_epics(self, mock_find, capsys):
+        """Test collaboration epics command."""
+        mock_find.return_value = [
+            {
+                "epic": {"key": "EPIC-1", "fields": {"summary": "Epic"}},
+                "children_count": 3,
+                "contributors": ["Alice", "Bob"],
+            }
+        ]
+
+        args = argparse.Namespace(
+            collaboration_command="epics",
+            project="DEMO",
+            min_contributors=2,
+            max_results=50,
+            json=False,
+        )
+
+        result = cmd_collaboration(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "EPIC-1" in captured.out
+
+    @patch("skills.jira.scripts.jira.find_collaborative_epics")
+    @patch("skills.jira.scripts.jira.format_json")
+    def test_cmd_collaboration_epics_json(self, mock_format_json, mock_find, capsys):
+        """Test collaboration epics with JSON output."""
+        mock_find.return_value = [
+            {
+                "epic": {"key": "EPIC-1", "fields": {"summary": "Epic"}},
+                "children_count": 3,
+                "contributors": ["Alice", "Bob"],
+            }
+        ]
+        mock_format_json.return_value = '[{"epic": {"key": "EPIC-1"}}]'
+
+        args = argparse.Namespace(
+            collaboration_command="epics",
+            project=None,
+            min_contributors=2,
+            max_results=50,
+            json=True,
+        )
+
+        result = cmd_collaboration(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "EPIC-1" in captured.out
+
+    @patch("skills.jira.scripts.jira.find_collaborative_epics")
+    def test_cmd_collaboration_epics_error(self, mock_find, capsys):
+        """Test collaboration epics with error."""
+        mock_find.side_effect = Exception("API error")
+
+        args = argparse.Namespace(
+            collaboration_command="epics",
+            project=None,
+            min_contributors=2,
+            max_results=50,
+            json=False,
+        )
+
+        result = cmd_collaboration(args)
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "API error" in captured.err
+
+
+class TestCmdIssueComments:
+    """Tests for the issue comments subcommand handler."""
+
+    @patch("skills.jira.scripts.jira.get_comments")
+    def test_cmd_issue_comments(self, mock_comments, capsys):
+        """Test issue comments subcommand."""
+        mock_comments.return_value = [
+            {
+                "author": {"displayName": "Jane"},
+                "created": "2026-02-20T10:00:00.000+0000",
+                "body": "Test comment",
+            }
+        ]
+
+        args = argparse.Namespace(
+            issue_command="comments",
+            issue_key="DEMO-123",
+            max_results=50,
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Comments on DEMO-123" in captured.out
+        assert "Test comment" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_comments")
+    @patch("skills.jira.scripts.jira.format_json")
+    def test_cmd_issue_comments_json(self, mock_format_json, mock_comments, capsys):
+        """Test issue comments with JSON output."""
+        mock_comments.return_value = [{"id": "1", "body": "Hello"}]
+        mock_format_json.return_value = '[{"id": "1"}]'
+
+        args = argparse.Namespace(
+            issue_command="comments",
+            issue_key="DEMO-123",
+            max_results=50,
+            json=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert '[{"id": "1"}]' in captured.out

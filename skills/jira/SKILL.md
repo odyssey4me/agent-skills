@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update issues, and manage workflows. Use when working with Jira project management.
 metadata:
   author: odyssey4me
-  version: "0.2.0"
+  version: "0.3.0"
   category: project-management
   tags: [issues, agile, sprints]
   complexity: standard
@@ -188,7 +188,9 @@ python $SKILL_DIR/scripts/jira.py search 'issue in hasLinkType("Dependency")'
 ```
 
 **Arguments:**
-- `jql`: JQL query string (required) - supports ScriptRunner functions if installed
+- `jql`: JQL query string (required unless `--contributor` is used) - supports ScriptRunner functions if installed
+- `--contributor`: Search for issues where this user is a contributor (reporter, assignee, or commenter). Requires ScriptRunner for comment-based matching.
+- `--project`: Project key to scope a `--contributor` search
 - `--max-results`: Maximum number of results (default: 50)
 - `--fields`: Comma-separated list of fields to include
 
@@ -217,6 +219,13 @@ python $SKILL_DIR/scripts/jira.py issue get DEMO-123
 # Get issue with specific fields only
 python $SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status,assignee"
 
+# Get issue with contributors listed
+python $SKILL_DIR/scripts/jira.py issue get DEMO-123 --contributors
+
+# List comments on an issue
+python $SKILL_DIR/scripts/jira.py issue comments DEMO-123
+python $SKILL_DIR/scripts/jira.py issue comments DEMO-123 --max-results 10
+
 # Create new issue
 python $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task"
 
@@ -233,6 +242,11 @@ python $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "Internal note" --secur
 **Arguments for `issue get`:**
 - `issue_key`: Issue key (required)
 - `--fields`: Comma-separated list of fields to include (uses config default if not specified)
+- `--contributors`: Show unique contributors (reporter, assignee, comment authors). Opt-in; requires an extra API call.
+
+**Arguments for `issue comments`:**
+- `issue_key`: Issue key (required)
+- `--max-results`: Maximum number of comments (default: 50)
 
 ### transitions
 
@@ -350,6 +364,26 @@ python $SKILL_DIR/scripts/jira.py issue comment DEMO-123 \
   --security-level "Red Hat Internal"
 ```
 
+### View comments on an issue
+
+```bash
+python $SKILL_DIR/scripts/jira.py issue comments DEMO-123
+```
+
+### Find issues by contributor
+
+```bash
+# Find all issues where jsmith is reporter, assignee, or commenter
+python $SKILL_DIR/scripts/jira.py search --contributor "jsmith" --project DEMO
+```
+
+### Find collaborative epics
+
+```bash
+# Find epics in DEMO project with 2+ assignees on child issues
+python $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO
+```
+
 ### Search with specific fields
 
 ```bash
@@ -413,6 +447,28 @@ Jira organizes all statuses into three categories. Use `statusCategory` for quer
 **Example:** Instead of `status = "Open" OR status = "Backlog"`, use `statusCategory = "To Do"`.
 
 Use `python $SKILL_DIR/scripts/jira.py statuses --categories` to see all status categories in your Jira instance.
+
+### collaboration
+
+Discover collaboration patterns across issues and epics.
+
+```bash
+# Find epics with multiple contributors (assignees)
+python $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO
+
+# Require at least 3 contributors
+python $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO --min-contributors 3
+
+# Limit number of epics checked
+python $SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
+```
+
+**Arguments for `collaboration epics`:**
+- `--project`: Project key to scope the search
+- `--min-contributors`: Minimum unique assignees to qualify (default: 2)
+- `--max-results`: Maximum epics to check (default: 50)
+
+**Note:** This makes N+1 API calls (1 for epics + 1 per epic for children). Use `--max-results` to control cost.
 
 ## Model Guidance
 

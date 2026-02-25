@@ -224,7 +224,7 @@
     {
       "name": "jira",
       "description": "Search and manage Jira issues using JQL queries, create/update issues, and manage workflows. Use when working with Jira project management.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "category": "project-management",
       "tags": [
         "issues",

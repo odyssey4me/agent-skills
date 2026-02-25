@@ -1242,6 +1242,269 @@ def add_comment(issue_key: str, body: str, security_level: str | None = None) ->
 
 
 # ============================================================================
+# COMMENT RETRIEVAL
+# ============================================================================
+
+
+def _extract_text_from_adf(node: Any) -> str:
+    """Recursively extract plain text from an ADF (Atlassian Document Format) node.
+
+    For plain string bodies (Data Center), returns the string as-is.
+
+    Args:
+        node: ADF JSON node (dict) or plain text string.
+
+    Returns:
+        Extracted plain text.
+    """
+    if isinstance(node, str):
+        return node
+    if not isinstance(node, dict):
+        return ""
+    if node.get("type") == "text":
+        return node.get("text", "")
+    parts = []
+    for child in node.get("content", []):
+        parts.append(_extract_text_from_adf(child))
+    return "".join(parts)
+
+
+def get_comments(issue_key: str, max_results: int = 50) -> list[dict[str, Any]]:
+    """Get comments on an issue.
+
+    Args:
+        issue_key: The issue key (e.g., DEMO-123).
+        max_results: Maximum number of comments to return.
+
+    Returns:
+        List of comment dictionaries.
+    """
+    response = get(
+        "jira",
+        api_path(f"issue/{issue_key}/comment"),
+        params={"maxResults": max_results},
+    )
+    if isinstance(response, dict):
+        return response.get("comments", [])
+    return []
+
+
+def format_comments(comments: list[dict[str, Any]], issue_key: str) -> str:
+    """Format comments for display.
+
+    Args:
+        comments: List of comment dictionaries from the Jira API.
+        issue_key: The issue key for the heading.
+
+    Returns:
+        Formatted markdown string.
+    """
+    if not comments:
+        return f"## Comments on {issue_key}\n\nNo comments found."
+
+    parts = [f"## Comments on {issue_key}"]
+    for comment in comments:
+        author = comment.get("author", {})
+        display_name = author.get("displayName", "Unknown")
+        created = comment.get("created", "")
+        # Trim to date + time (YYYY-MM-DDTHH:MM)
+        if "T" in created:
+            created = created[:16].replace("T", " ")
+        body = _extract_text_from_adf(comment.get("body", ""))
+        parts.append(f"\n### {display_name} ({created})\n{body}")
+
+    return "\n".join(parts)
+
+
+# ============================================================================
+# CONTRIBUTOR EXTRACTION
+# ============================================================================
+
+
+def extract_contributors(issue: dict[str, Any], comments: list[dict[str, Any]]) -> set[str]:
+    """Extract unique contributor display names from an issue and its comments.
+
+    Contributors include: reporter, assignee, and comment authors.
+
+    Args:
+        issue: Jira issue dictionary.
+        comments: List of comment dictionaries.
+
+    Returns:
+        Set of unique display names.
+    """
+    contributors: set[str] = set()
+    fields = issue.get("fields", {})
+
+    reporter = fields.get("reporter")
+    if reporter and reporter.get("displayName"):
+        contributors.add(reporter["displayName"])
+
+    assignee = fields.get("assignee")
+    if assignee and assignee.get("displayName"):
+        contributors.add(assignee["displayName"])
+
+    for comment in comments:
+        author = comment.get("author", {})
+        if author.get("displayName"):
+            contributors.add(author["displayName"])
+
+    return contributors
+
+
+# ============================================================================
+# CONTRIBUTOR SEARCH
+# ============================================================================
+
+
+def search_by_contributor(
+    user: str,
+    project: str | None = None,
+    max_results: int = 50,
+    fields: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Search for issues where a user is a contributor.
+
+    Always searches reporter and assignee. If ScriptRunner Enhanced Search
+    is available, also searches for issues commented on by the user.
+
+    Args:
+        user: Username or accountId to search for.
+        project: Optional project key to scope the search.
+        max_results: Maximum number of results.
+        fields: Optional list of fields to include.
+
+    Returns:
+        List of issue dictionaries.
+    """
+    clauses = [f'reporter = "{user}" OR assignee = "{user}"']
+
+    scriptrunner_info = detect_scriptrunner_support()
+    if scriptrunner_info["available"] and scriptrunner_info["enhanced_search"]:
+        clauses.append(f'issue in commentedByUser("{user}")')
+    else:
+        print(
+            "Note: Comment-based contributor search requires ScriptRunner Enhanced Search. "
+            "Only reporter and assignee matches are included.",
+            file=sys.stderr,
+        )
+
+    jql = " OR ".join(clauses)
+    if project:
+        jql = f"project = {project} AND ({jql})"
+
+    return search_issues(jql, max_results, fields)
+
+
+# ============================================================================
+# COLLABORATIVE EPICS
+# ============================================================================
+
+
+def _build_epic_children_jql(epic_key: str) -> str:
+    """Build JQL to find children of an epic.
+
+    Uses is_cloud() to build the correct JQL:
+    - Cloud: "Epic Link" = KEY OR parent = KEY (covers classic and next-gen)
+    - DC: "Epic Link" = KEY only
+
+    Args:
+        epic_key: The epic issue key.
+
+    Returns:
+        JQL query string.
+    """
+    if is_cloud():
+        return f'"Epic Link" = {epic_key} OR parent = {epic_key}'
+    return f'"Epic Link" = {epic_key}'
+
+
+def get_epic_children(epic_key: str, fields: list[str] | None = None) -> list[dict[str, Any]]:
+    """Get child issues of an epic.
+
+    Args:
+        epic_key: The epic issue key.
+        fields: Optional list of fields to include.
+
+    Returns:
+        List of child issue dictionaries.
+    """
+    jql = _build_epic_children_jql(epic_key)
+    return search_issues(jql, max_results=200, fields=fields)
+
+
+def find_collaborative_epics(
+    project: str | None = None,
+    min_contributors: int = 2,
+    max_results: int = 50,
+) -> list[dict[str, Any]]:
+    """Find epics with multiple contributors (assignees of child issues).
+
+    Args:
+        project: Optional project key to scope the search.
+        min_contributors: Minimum number of unique assignees required.
+        max_results: Maximum number of epics to check.
+
+    Returns:
+        List of dicts with keys: epic, children_count, contributors.
+    """
+    jql = "issuetype = Epic AND statusCategory != Done"
+    if project:
+        jql = f"project = {project} AND {jql}"
+    jql += " ORDER BY updated DESC"
+
+    epics = search_issues(jql, max_results, ["summary", "status", "assignee"])
+
+    results = []
+    for epic in epics:
+        epic_key = epic.get("key", "")
+        children = get_epic_children(epic_key, fields=["assignee"])
+        assignees: set[str] = set()
+        for child in children:
+            child_assignee = child.get("fields", {}).get("assignee")
+            if child_assignee and child_assignee.get("displayName"):
+                assignees.add(child_assignee["displayName"])
+        if len(assignees) >= min_contributors:
+            results.append(
+                {
+                    "epic": epic,
+                    "children_count": len(children),
+                    "contributors": sorted(assignees),
+                }
+            )
+
+    return results
+
+
+def format_collaborative_epics(results: list[dict[str, Any]]) -> str:
+    """Format collaborative epics for display.
+
+    Args:
+        results: List of result dicts from find_collaborative_epics.
+
+    Returns:
+        Formatted markdown string.
+    """
+    if not results:
+        return "No collaborative epics found."
+
+    parts = ["## Collaborative Epics"]
+    for result in results:
+        epic = result["epic"]
+        key = epic.get("key", "N/A")
+        summary = epic.get("fields", {}).get("summary", "No summary")
+        children_count = result["children_count"]
+        contributors = ", ".join(result["contributors"])
+        parts.append(
+            f"\n### {key}: {summary}\n"
+            f"- **Children:** {children_count}\n"
+            f"- **Contributors:** {contributors}"
+        )
+
+    return "\n".join(parts)
+
+
+# ============================================================================
 # TRANSITION MANAGEMENT
 # ============================================================================
 
@@ -1482,8 +1745,12 @@ def cmd_search(args: argparse.Namespace) -> int:
         # Load defaults
         defaults = get_jira_defaults()
 
-        # Apply JQL scope
-        jql = merge_jql_with_scope(args.jql, defaults.jql_scope)
+        contributor = getattr(args, "contributor", None)
+        jql = getattr(args, "jql", None)
+
+        if not contributor and not jql:
+            print("Error: either a JQL query or --contributor is required", file=sys.stderr)
+            return 1
 
         # Apply max_results (detect if user explicitly provided it)
         max_results = (
@@ -1498,7 +1765,13 @@ def cmd_search(args: argparse.Namespace) -> int:
         else:
             fields = None
 
-        issues = search_issues(jql, max_results, fields)
+        if contributor:
+            project = getattr(args, "project", None)
+            issues = search_by_contributor(contributor, project, max_results, fields)
+        else:
+            # Apply JQL scope
+            jql = merge_jql_with_scope(jql, defaults.jql_scope)
+            issues = search_issues(jql, max_results, fields)
 
         if args.json:
             print(format_json(issues))
@@ -1525,10 +1798,29 @@ def cmd_issue(args: argparse.Namespace) -> int:
             else:
                 fields = None
             issue = get_issue(args.issue_key, fields=fields)
-            if args.json:
+
+            if getattr(args, "contributors", False):
+                comments = get_comments(args.issue_key)
+                contributor_names = extract_contributors(issue, comments)
+                if args.json:
+                    issue["_contributors"] = sorted(contributor_names)
+                    print(format_json(issue))
+                else:
+                    output = format_issue(issue)
+                    output += f"\n- **Contributors:** {', '.join(sorted(contributor_names))}"
+                    print(output)
+            elif args.json:
                 print(format_json(issue))
             else:
                 print(format_issue(issue))
+
+        elif args.issue_command == "comments":
+            max_results = getattr(args, "max_results", 50) or 50
+            comments = get_comments(args.issue_key, max_results=max_results)
+            if args.json:
+                print(format_json(comments))
+            else:
+                print(format_comments(comments, args.issue_key))
 
         elif args.issue_command == "create":
             # Load project-specific defaults
@@ -1759,6 +2051,41 @@ def cmd_statuses(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_collaboration(args: argparse.Namespace) -> int:
+    """Handle collaboration command."""
+    try:
+        if args.collaboration_command == "epics":
+            project = getattr(args, "project", None)
+            min_contributors = getattr(args, "min_contributors", 2)
+            max_results = getattr(args, "max_results", 50) or 50
+
+            results = find_collaborative_epics(
+                project=project,
+                min_contributors=min_contributors,
+                max_results=max_results,
+            )
+
+            if args.json:
+                json_results = []
+                for r in results:
+                    json_results.append(
+                        {
+                            "epic": r["epic"],
+                            "children_count": r["children_count"],
+                            "contributors": r["contributors"],
+                        }
+                    )
+                print(format_json(json_results))
+            else:
+                print(format_collaborative_epics(results))
+
+        return 0
+
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
 # ============================================================================
 # MAIN CLI
 # ============================================================================
@@ -1787,7 +2114,15 @@ def main() -> int:
         "search",
         help="Search for issues using JQL",
     )
-    search_parser.add_argument("jql", help="JQL query string")
+    search_parser.add_argument("jql", nargs="?", default=None, help="JQL query string")
+    search_parser.add_argument(
+        "--contributor",
+        help="Search for issues where this user is a contributor (reporter, assignee, or commenter)",
+    )
+    search_parser.add_argument(
+        "--project",
+        help="Project key to scope contributor search",
+    )
     search_parser.add_argument(
         "--max-results",
         type=int,
@@ -1821,6 +2156,22 @@ def main() -> int:
         help="Comma-separated list of fields to include",
     )
     get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    get_parser.add_argument(
+        "--contributors",
+        action="store_true",
+        help="Show contributors (reporter, assignee, commenters) — requires extra API call",
+    )
+
+    # Comments subcommand
+    comments_parser = issue_subparsers.add_parser("comments", help="List comments on an issue")
+    comments_parser.add_argument("issue_key", help="Issue key (e.g., DEMO-123)")
+    comments_parser.add_argument(
+        "--max-results",
+        type=int,
+        default=50,
+        help="Maximum number of comments (default: 50)",
+    )
+    comments_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Create subcommand
     create_parser = issue_subparsers.add_parser("create", help="Create new issue")
@@ -1935,6 +2286,36 @@ def main() -> int:
         help="Output as JSON",
     )
 
+    # ========================================================================
+    # COLLABORATION COMMAND
+    # ========================================================================
+    collaboration_parser = subparsers.add_parser(
+        "collaboration",
+        help="Discover collaboration patterns",
+    )
+    collaboration_subparsers = collaboration_parser.add_subparsers(
+        dest="collaboration_command", required=True
+    )
+
+    # Epics subcommand
+    epics_parser = collaboration_subparsers.add_parser(
+        "epics", help="Find epics with multiple contributors"
+    )
+    epics_parser.add_argument("--project", help="Project key to scope the search")
+    epics_parser.add_argument(
+        "--min-contributors",
+        type=int,
+        default=2,
+        help="Minimum number of unique assignees (default: 2)",
+    )
+    epics_parser.add_argument(
+        "--max-results",
+        type=int,
+        default=50,
+        help="Maximum number of epics to check (default: 50)",
+    )
+    epics_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # Parse and dispatch
     args = parser.parse_args()
 
@@ -1952,6 +2333,8 @@ def main() -> int:
         return cmd_fields(args)
     elif args.command == "statuses":
         return cmd_statuses(args)
+    elif args.command == "collaboration":
+        return cmd_collaboration(args)
 
     return 1
 
