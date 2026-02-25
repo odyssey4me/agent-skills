@@ -723,6 +723,379 @@ def apply_formatting(
 
 
 # ============================================================================
+# MARKDOWN PARSING
+# ============================================================================
+
+
+def _parse_inline(text: str) -> list[dict]:
+    """Parse inline markdown formatting within a single line.
+
+    Handles **bold** and [text](url) patterns.
+
+    Args:
+        text: A single line of text with possible inline formatting.
+
+    Returns:
+        List of run dicts with keys: text, bold, link.
+    """
+    runs: list[dict] = []
+    i = 0
+    n = len(text)
+
+    while i < n:
+        # Check for **bold**
+        if text[i : i + 2] == "**":
+            end = text.find("**", i + 2)
+            if end != -1:
+                bold_text = text[i + 2 : end]
+                if bold_text:
+                    runs.append({"text": bold_text, "bold": True, "link": None})
+                i = end + 2
+                continue
+
+        # Check for [text](url)
+        if text[i] == "[":
+            bracket_end = text.find("]", i + 1)
+            if bracket_end != -1 and bracket_end + 1 < n and text[bracket_end + 1] == "(":
+                paren_end = text.find(")", bracket_end + 2)
+                if paren_end != -1:
+                    link_text = text[i + 1 : bracket_end]
+                    link_url = text[bracket_end + 2 : paren_end]
+                    if link_text:
+                        runs.append({"text": link_text, "bold": False, "link": link_url})
+                    i = paren_end + 1
+                    continue
+
+        # Collect plain text until next special character
+        j = i + 1
+        while j < n:
+            if text[j : j + 2] == "**":
+                break
+            if text[j] == "[":
+                break
+            j += 1
+        runs.append({"text": text[i:j], "bold": False, "link": None})
+        i = j
+
+    return runs
+
+
+def parse_markdown(text: str) -> list[dict]:
+    """Parse markdown text into structured elements.
+
+    Supported syntax:
+    - Headings: ## Heading text
+    - Bullets: - item or * item (indent for nesting)
+    - Bold: **text**
+    - Links: [text](url)
+    - Paragraphs: any other non-blank line
+
+    Args:
+        text: Markdown-formatted text.
+
+    Returns:
+        List of element dicts with type-specific fields.
+    """
+    import re
+
+    elements: list[dict] = []
+
+    for line in text.split("\n"):
+        # Skip blank lines
+        if not line.strip():
+            continue
+
+        # Headings
+        heading_match = re.match(r"^(#{1,6})\s+(.*)", line)
+        if heading_match:
+            level = len(heading_match.group(1))
+            runs = _parse_inline(heading_match.group(2))
+            elements.append({"type": "heading", "level": level, "runs": runs})
+            continue
+
+        # Bullets
+        bullet_match = re.match(r"^(\s*)[-*]\s+(.*)", line)
+        if bullet_match:
+            indent = len(bullet_match.group(1))
+            level = indent // 2
+            runs = _parse_inline(bullet_match.group(2))
+            elements.append({"type": "bullet", "level": level, "runs": runs})
+            continue
+
+        # Paragraph
+        runs = _parse_inline(line)
+        elements.append({"type": "paragraph", "runs": runs})
+
+    return elements
+
+
+# ============================================================================
+# ANCHOR FINDING
+# ============================================================================
+
+
+def find_anchor_index(
+    doc: dict, anchor_type: str, anchor_value: str | None = None, occurrence: int = 1
+) -> int:
+    """Find the endIndex of a structural anchor in a Google Doc.
+
+    Args:
+        doc: Full document dict from Google Docs API.
+        anchor_type: One of 'horizontal_rule', 'heading', 'bookmark'.
+        anchor_value: For heading: text to match (case-insensitive).
+            For bookmark: bookmark ID. For horizontal_rule: ignored.
+        occurrence: Which occurrence to match (1-based, default 1).
+
+    Returns:
+        The endIndex of the matched anchor element.
+
+    Raises:
+        DocsAPIError: If the anchor is not found.
+    """
+    content = doc.get("body", {}).get("content", [])
+    count = 0
+
+    if anchor_type == "horizontal_rule":
+        for element in content:
+            if "paragraph" in element:
+                for para_element in element["paragraph"].get("elements", []):
+                    if "horizontalRule" in para_element:
+                        count += 1
+                        if count == occurrence:
+                            return element.get("endIndex", 0)
+
+    elif anchor_type == "heading":
+        if not anchor_value:
+            raise DocsAPIError("anchor_value is required for heading anchor type")
+        for element in content:
+            if "paragraph" in element:
+                para = element["paragraph"]
+                style_type = para.get("paragraphStyle", {}).get("namedStyleType", "")
+                if style_type.startswith("HEADING_"):
+                    # Extract text from paragraph
+                    para_text = ""
+                    for text_element in para.get("elements", []):
+                        if "textRun" in text_element:
+                            para_text += text_element["textRun"].get("content", "")
+                    para_text = para_text.strip()
+                    if para_text.lower() == anchor_value.lower():
+                        count += 1
+                        if count == occurrence:
+                            return element.get("endIndex", 0)
+
+    elif anchor_type == "bookmark":
+        if not anchor_value:
+            raise DocsAPIError("anchor_value is required for bookmark anchor type")
+        for element in content:
+            if "paragraph" in element:
+                for para_element in element["paragraph"].get("elements", []):
+                    if "bookmarkId" in para_element and para_element["bookmarkId"] == anchor_value:
+                        count += 1
+                        if count == occurrence:
+                            return element.get("endIndex", 0)
+
+    else:
+        raise DocsAPIError(f"Unknown anchor type: {anchor_type}")
+
+    raise DocsAPIError(
+        f"Anchor not found: type={anchor_type}, value={anchor_value}, occurrence={occurrence}"
+    )
+
+
+# ============================================================================
+# MARKDOWN TO DOCS REQUESTS
+# ============================================================================
+
+
+def build_insert_requests(parsed_elements: list[dict], insert_index: int) -> list[dict]:
+    """Convert parsed markdown elements to Google Docs API batchUpdate requests.
+
+    Strategy: insert all text as a single insertText request, then apply
+    formatting to known ranges. This avoids shifting-index complexity.
+
+    Args:
+        parsed_elements: Output from parse_markdown().
+        insert_index: Document index to insert at.
+
+    Returns:
+        List of Google Docs API request dicts for batchUpdate.
+    """
+    if not parsed_elements:
+        return []
+
+    # Phase 1: Assemble full text and track element/run offsets
+    full_text = ""
+    element_offsets: list[dict] = []
+
+    for elem in parsed_elements:
+        elem_start = len(full_text)
+        run_offsets: list[dict] = []
+
+        # Add tab prefixes for nested bullets
+        if elem["type"] == "bullet" and elem.get("level", 0) > 0:
+            full_text += "\t" * elem["level"]
+
+        for run in elem["runs"]:
+            run_start = len(full_text)
+            full_text += run["text"]
+            run_offsets.append(
+                {
+                    "start": run_start,
+                    "end": len(full_text),
+                    "bold": run.get("bold", False),
+                    "link": run.get("link"),
+                }
+            )
+
+        full_text += "\n"
+        element_offsets.append(
+            {
+                "type": elem["type"],
+                "level": elem.get("level", 0),
+                "start": elem_start,
+                "end": len(full_text),
+                "run_offsets": run_offsets,
+            }
+        )
+
+    # Phase 2: Build requests
+    requests: list[dict] = []
+
+    # Single insertText request
+    requests.append(
+        {
+            "insertText": {
+                "location": {"index": insert_index},
+                "text": full_text,
+            }
+        }
+    )
+
+    # Heading styles
+    for elem_info in element_offsets:
+        if elem_info["type"] == "heading":
+            requests.append(
+                {
+                    "updateParagraphStyle": {
+                        "range": {
+                            "startIndex": insert_index + elem_info["start"],
+                            "endIndex": insert_index + elem_info["end"],
+                        },
+                        "paragraphStyle": {
+                            "namedStyleType": f"HEADING_{elem_info['level']}",
+                        },
+                        "fields": "namedStyleType",
+                    }
+                }
+            )
+
+    # Bullet ranges - find consecutive bullet elements and apply as ranges
+    i = 0
+    while i < len(element_offsets):
+        if element_offsets[i]["type"] == "bullet":
+            # Find the end of consecutive bullets
+            j = i
+            while j < len(element_offsets) and element_offsets[j]["type"] == "bullet":
+                j += 1
+            # Apply bullet preset to the range
+            requests.append(
+                {
+                    "createParagraphBullets": {
+                        "range": {
+                            "startIndex": insert_index + element_offsets[i]["start"],
+                            "endIndex": insert_index + element_offsets[j - 1]["end"],
+                        },
+                        "bulletPreset": "BULLET_DISC_CIRCLE_SQUARE",
+                    }
+                }
+            )
+            i = j
+        else:
+            i += 1
+
+    # Text style formatting (bold and links)
+    for elem_info in element_offsets:
+        for run_info in elem_info["run_offsets"]:
+            if run_info["bold"]:
+                requests.append(
+                    {
+                        "updateTextStyle": {
+                            "range": {
+                                "startIndex": insert_index + run_info["start"],
+                                "endIndex": insert_index + run_info["end"],
+                            },
+                            "textStyle": {"bold": True},
+                            "fields": "bold",
+                        }
+                    }
+                )
+            if run_info["link"]:
+                requests.append(
+                    {
+                        "updateTextStyle": {
+                            "range": {
+                                "startIndex": insert_index + run_info["start"],
+                                "endIndex": insert_index + run_info["end"],
+                            },
+                            "textStyle": {"link": {"url": run_info["link"]}},
+                            "fields": "link",
+                        }
+                    }
+                )
+
+    return requests
+
+
+def insert_after_anchor(
+    service,
+    document_id: str,
+    anchor_type: str,
+    anchor_value: str | None,
+    markdown: str,
+) -> dict[str, Any]:
+    """Insert markdown-formatted content after a structural anchor.
+
+    Args:
+        service: Google Docs API service object.
+        document_id: The document ID.
+        anchor_type: One of 'horizontal_rule', 'heading', 'bookmark'.
+        anchor_value: Anchor-specific value (heading text, bookmark ID, or occurrence).
+        markdown: Markdown-formatted content to insert.
+
+    Returns:
+        Response from the batchUpdate API.
+
+    Raises:
+        DocsAPIError: If the anchor is not found or the API call fails.
+    """
+    doc = get_document(service, document_id)
+
+    # Determine occurrence for horizontal_rule
+    occurrence = 1
+    if anchor_type == "horizontal_rule" and anchor_value:
+        occurrence = int(anchor_value)
+        anchor_value = None
+
+    insert_index = find_anchor_index(doc, anchor_type, anchor_value, occurrence)
+    parsed = parse_markdown(markdown)
+    requests = build_insert_requests(parsed, insert_index)
+
+    if not requests:
+        return {}
+
+    try:
+        result = (
+            service.documents()
+            .batchUpdate(documentId=document_id, body={"requests": requests})
+            .execute()
+        )
+        return result
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
+# ============================================================================
 # OUTPUT FORMATTING
 # ============================================================================
 
@@ -1018,6 +1391,22 @@ def cmd_content_delete(args):
     return 0
 
 
+def cmd_content_insert_after_anchor(args):
+    """Handle 'content insert-after-anchor' command."""
+    service = build_docs_service(DOCS_SCOPES)
+    markdown = args.markdown.replace("\\n", "\n")
+    result = insert_after_anchor(
+        service, args.document_id, args.anchor_type, args.anchor_value, markdown
+    )
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print("✓ Content inserted after anchor successfully")
+
+    return 0
+
+
 def cmd_formatting_apply(args):
     """Handle 'formatting apply' command."""
     service = build_docs_service(DOCS_SCOPES)
@@ -1116,6 +1505,25 @@ def build_parser() -> argparse.ArgumentParser:
     delete_parser.add_argument("--end-index", type=int, required=True, help="End position")
     delete_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    insert_anchor_parser = content_subparsers.add_parser(
+        "insert-after-anchor", help="Insert markdown content after a structural anchor"
+    )
+    insert_anchor_parser.add_argument("document_id", help="Document ID")
+    insert_anchor_parser.add_argument(
+        "--anchor-type",
+        required=True,
+        choices=["horizontal_rule", "heading", "bookmark"],
+        help="Type of anchor to find",
+    )
+    insert_anchor_parser.add_argument(
+        "--anchor-value",
+        help="Heading text, bookmark ID, or occurrence number for horizontal_rule",
+    )
+    insert_anchor_parser.add_argument(
+        "--markdown", required=True, help="Markdown-formatted content to insert"
+    )
+    insert_anchor_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # formatting commands
     formatting_parser = subparsers.add_parser("formatting", help="Formatting operations")
     formatting_subparsers = formatting_parser.add_subparsers(dest="formatting_command")
@@ -1204,6 +1612,8 @@ def main():
                 return cmd_content_insert(args)
             elif args.content_command == "delete":
                 return cmd_content_delete(args)
+            elif args.content_command == "insert-after-anchor":
+                return cmd_content_insert_after_anchor(args)
         elif args.command == "formatting" and args.formatting_command == "apply":
             return cmd_formatting_apply(args)
 

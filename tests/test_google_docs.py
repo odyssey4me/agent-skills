@@ -26,8 +26,10 @@ DocsAPIError = google_docs.DocsAPIError
 DOCS_SCOPES = google_docs.DOCS_SCOPES
 DOCS_SCOPES_DEFAULT = google_docs.DOCS_SCOPES_DEFAULT
 DRIVE_SCOPES_READONLY = google_docs.DRIVE_SCOPES_READONLY
+_parse_inline = google_docs._parse_inline
 apply_formatting = google_docs.apply_formatting
 append_text = google_docs.append_text
+build_insert_requests = google_docs.build_insert_requests
 build_docs_service = google_docs.build_docs_service
 build_drive_service = google_docs.build_drive_service
 build_parser = google_docs.build_parser
@@ -39,6 +41,7 @@ cmd_check = google_docs.cmd_check
 cmd_content_append = google_docs.cmd_content_append
 cmd_content_delete = google_docs.cmd_content_delete
 cmd_content_insert = google_docs.cmd_content_insert
+cmd_content_insert_after_anchor = google_docs.cmd_content_insert_after_anchor
 cmd_documents_create = google_docs.cmd_documents_create
 cmd_documents_get = google_docs.cmd_documents_get
 cmd_documents_read = google_docs.cmd_documents_read
@@ -54,9 +57,12 @@ _run_oauth_flow = google_docs._run_oauth_flow
 get_oauth_client_config = google_docs.get_oauth_client_config
 export_document_as_markdown = google_docs.export_document_as_markdown
 export_document_as_pdf = google_docs.export_document_as_pdf
+find_anchor_index = google_docs.find_anchor_index
 handle_api_error = google_docs.handle_api_error
+insert_after_anchor = google_docs.insert_after_anchor
 insert_text = google_docs.insert_text
 load_config = google_docs.load_config
+parse_markdown = google_docs.parse_markdown
 read_document_content = google_docs.read_document_content
 save_config = google_docs.save_config
 set_credential = google_docs.set_credential
@@ -1037,3 +1043,631 @@ class TestBuildService:
         mock_get_creds.assert_called_once_with("google-docs", DRIVE_SCOPES_READONLY)
         mock_build.assert_called_once_with("drive", "v3", credentials=mock_creds)
         assert result == mock_service
+
+
+# ============================================================================
+# MARKDOWN PARSING TESTS
+# ============================================================================
+
+
+class TestParseInline:
+    """Tests for _parse_inline function."""
+
+    def test_plain_text(self):
+        """Test plain text without formatting."""
+        runs = _parse_inline("Hello world")
+        assert len(runs) == 1
+        assert runs[0] == {"text": "Hello world", "bold": False, "link": None}
+
+    def test_bold(self):
+        """Test bold text."""
+        runs = _parse_inline("Hello **bold** world")
+        assert len(runs) == 3
+        assert runs[0] == {"text": "Hello ", "bold": False, "link": None}
+        assert runs[1] == {"text": "bold", "bold": True, "link": None}
+        assert runs[2] == {"text": " world", "bold": False, "link": None}
+
+    def test_link(self):
+        """Test link formatting."""
+        runs = _parse_inline("Click [here](https://example.com) now")
+        assert len(runs) == 3
+        assert runs[0] == {"text": "Click ", "bold": False, "link": None}
+        assert runs[1] == {"text": "here", "bold": False, "link": "https://example.com"}
+        assert runs[2] == {"text": " now", "bold": False, "link": None}
+
+    def test_bold_and_link(self):
+        """Test combined bold and link."""
+        runs = _parse_inline("**Bold** and [link](https://example.com)")
+        assert len(runs) == 3
+        assert runs[0] == {"text": "Bold", "bold": True, "link": None}
+        assert runs[1] == {"text": " and ", "bold": False, "link": None}
+        assert runs[2] == {"text": "link", "bold": False, "link": "https://example.com"}
+
+    def test_empty_string(self):
+        """Test empty string."""
+        runs = _parse_inline("")
+        assert runs == []
+
+    def test_unclosed_bold(self):
+        """Test unclosed bold markers are treated as plain text."""
+        runs = _parse_inline("Hello **unclosed")
+        # All runs should be non-bold
+        assert all(not r["bold"] for r in runs)
+        combined = "".join(r["text"] for r in runs)
+        assert combined == "Hello **unclosed"
+
+    def test_multiple_bold(self):
+        """Test multiple bold sections."""
+        runs = _parse_inline("**a** and **b**")
+        assert len(runs) == 3
+        assert runs[0] == {"text": "a", "bold": True, "link": None}
+        assert runs[1] == {"text": " and ", "bold": False, "link": None}
+        assert runs[2] == {"text": "b", "bold": True, "link": None}
+
+
+class TestParseMarkdown:
+    """Tests for parse_markdown function."""
+
+    def test_heading(self):
+        """Test heading parsing."""
+        elements = parse_markdown("## My Heading")
+        assert len(elements) == 1
+        assert elements[0]["type"] == "heading"
+        assert elements[0]["level"] == 2
+        assert elements[0]["runs"][0]["text"] == "My Heading"
+
+    def test_heading_levels(self):
+        """Test different heading levels."""
+        for level in range(1, 7):
+            hashes = "#" * level
+            elements = parse_markdown(f"{hashes} Title")
+            assert elements[0]["level"] == level
+
+    def test_bullet(self):
+        """Test bullet parsing."""
+        elements = parse_markdown("- Item one\n- Item two")
+        assert len(elements) == 2
+        assert elements[0]["type"] == "bullet"
+        assert elements[0]["level"] == 0
+        assert elements[0]["runs"][0]["text"] == "Item one"
+        assert elements[1]["runs"][0]["text"] == "Item two"
+
+    def test_nested_bullets(self):
+        """Test nested bullet parsing."""
+        elements = parse_markdown("- Top level\n  - Nested\n    - Deep")
+        assert len(elements) == 3
+        assert elements[0]["level"] == 0
+        assert elements[1]["level"] == 1
+        assert elements[2]["level"] == 2
+
+    def test_asterisk_bullets(self):
+        """Test asterisk bullets."""
+        elements = parse_markdown("* Item one")
+        assert elements[0]["type"] == "bullet"
+        assert elements[0]["runs"][0]["text"] == "Item one"
+
+    def test_paragraph(self):
+        """Test paragraph parsing."""
+        elements = parse_markdown("Just a paragraph")
+        assert len(elements) == 1
+        assert elements[0]["type"] == "paragraph"
+        assert elements[0]["runs"][0]["text"] == "Just a paragraph"
+
+    def test_blank_lines_skipped(self):
+        """Test that blank lines are skipped."""
+        elements = parse_markdown("Line one\n\n\nLine two")
+        assert len(elements) == 2
+
+    def test_combined(self):
+        """Test combined markdown."""
+        md = "## Heading\n\n**Bold text:**\n- Item one\n  - Sub-item\n- [Link](https://example.com)"
+        elements = parse_markdown(md)
+        assert elements[0]["type"] == "heading"
+        assert elements[1]["type"] == "paragraph"
+        assert elements[2]["type"] == "bullet"
+        assert elements[3]["type"] == "bullet"
+        assert elements[3]["level"] == 1
+        assert elements[4]["type"] == "bullet"
+
+    def test_empty_input(self):
+        """Test empty input."""
+        elements = parse_markdown("")
+        assert elements == []
+
+    def test_inline_formatting_in_bullets(self):
+        """Test inline formatting within bullets."""
+        elements = parse_markdown("- **Bold** item")
+        assert elements[0]["type"] == "bullet"
+        assert elements[0]["runs"][0]["bold"] is True
+        assert elements[0]["runs"][0]["text"] == "Bold"
+
+
+# ============================================================================
+# ANCHOR FINDING TESTS
+# ============================================================================
+
+
+class TestFindAnchorIndex:
+    """Tests for find_anchor_index function."""
+
+    def test_horizontal_rule(self):
+        """Test finding horizontal rule anchor."""
+        doc = {
+            "body": {
+                "content": [
+                    {
+                        "paragraph": {"elements": [{"textRun": {"content": "Before\n"}}]},
+                        "endIndex": 8,
+                    },
+                    {
+                        "paragraph": {"elements": [{"horizontalRule": {}}]},
+                        "endIndex": 10,
+                    },
+                    {
+                        "paragraph": {"elements": [{"textRun": {"content": "After\n"}}]},
+                        "endIndex": 16,
+                    },
+                ]
+            }
+        }
+        assert find_anchor_index(doc, "horizontal_rule") == 10
+
+    def test_horizontal_rule_nth_occurrence(self):
+        """Test finding nth horizontal rule."""
+        doc = {
+            "body": {
+                "content": [
+                    {"paragraph": {"elements": [{"horizontalRule": {}}]}, "endIndex": 5},
+                    {"paragraph": {"elements": [{"horizontalRule": {}}]}, "endIndex": 10},
+                    {"paragraph": {"elements": [{"horizontalRule": {}}]}, "endIndex": 15},
+                ]
+            }
+        }
+        assert find_anchor_index(doc, "horizontal_rule", occurrence=2) == 10
+        assert find_anchor_index(doc, "horizontal_rule", occurrence=3) == 15
+
+    def test_heading_match(self):
+        """Test finding heading anchor by text."""
+        doc = {
+            "body": {
+                "content": [
+                    {
+                        "paragraph": {
+                            "paragraphStyle": {"namedStyleType": "HEADING_2"},
+                            "elements": [{"textRun": {"content": "My Section\n"}}],
+                        },
+                        "endIndex": 20,
+                    },
+                ]
+            }
+        }
+        assert find_anchor_index(doc, "heading", "My Section") == 20
+
+    def test_heading_case_insensitive(self):
+        """Test heading match is case-insensitive."""
+        doc = {
+            "body": {
+                "content": [
+                    {
+                        "paragraph": {
+                            "paragraphStyle": {"namedStyleType": "HEADING_1"},
+                            "elements": [{"textRun": {"content": "Title Here\n"}}],
+                        },
+                        "endIndex": 15,
+                    },
+                ]
+            }
+        }
+        assert find_anchor_index(doc, "heading", "title here") == 15
+
+    def test_bookmark(self):
+        """Test finding bookmark anchor."""
+        doc = {
+            "body": {
+                "content": [
+                    {
+                        "paragraph": {
+                            "elements": [{"bookmarkId": "bm_abc123"}],
+                        },
+                        "endIndex": 5,
+                    },
+                ]
+            }
+        }
+        assert find_anchor_index(doc, "bookmark", "bm_abc123") == 5
+
+    def test_not_found_raises_error(self):
+        """Test error when anchor not found."""
+        doc = {"body": {"content": []}}
+        with pytest.raises(DocsAPIError, match="Anchor not found"):
+            find_anchor_index(doc, "horizontal_rule")
+
+    def test_heading_requires_value(self):
+        """Test heading anchor requires anchor_value."""
+        doc = {"body": {"content": []}}
+        with pytest.raises(DocsAPIError, match="anchor_value is required"):
+            find_anchor_index(doc, "heading")
+
+    def test_bookmark_requires_value(self):
+        """Test bookmark anchor requires anchor_value."""
+        doc = {"body": {"content": []}}
+        with pytest.raises(DocsAPIError, match="anchor_value is required"):
+            find_anchor_index(doc, "bookmark")
+
+    def test_unknown_anchor_type(self):
+        """Test unknown anchor type raises error."""
+        doc = {"body": {"content": []}}
+        with pytest.raises(DocsAPIError, match="Unknown anchor type"):
+            find_anchor_index(doc, "unknown_type")
+
+
+# ============================================================================
+# BUILD INSERT REQUESTS TESTS
+# ============================================================================
+
+
+class TestBuildInsertRequests:
+    """Tests for build_insert_requests function."""
+
+    def test_empty_elements(self):
+        """Test with no elements."""
+        assert build_insert_requests([], 10) == []
+
+    def test_simple_paragraph(self):
+        """Test inserting a simple paragraph."""
+        parsed = [{"type": "paragraph", "runs": [{"text": "Hello", "bold": False, "link": None}]}]
+        requests = build_insert_requests(parsed, 10)
+        assert len(requests) == 1
+        assert requests[0]["insertText"]["text"] == "Hello\n"
+        assert requests[0]["insertText"]["location"]["index"] == 10
+
+    def test_heading_style(self):
+        """Test heading generates updateParagraphStyle."""
+        parsed = [
+            {
+                "type": "heading",
+                "level": 2,
+                "runs": [{"text": "Title", "bold": False, "link": None}],
+            }
+        ]
+        requests = build_insert_requests(parsed, 5)
+        assert len(requests) == 2
+        assert "insertText" in requests[0]
+        assert "updateParagraphStyle" in requests[1]
+        style_req = requests[1]["updateParagraphStyle"]
+        assert style_req["paragraphStyle"]["namedStyleType"] == "HEADING_2"
+        assert style_req["range"]["startIndex"] == 5
+        assert style_req["range"]["endIndex"] == 11  # 5 + len("Title\n")
+
+    def test_bullets(self):
+        """Test bullets generate createParagraphBullets."""
+        parsed = [
+            {
+                "type": "bullet",
+                "level": 0,
+                "runs": [{"text": "Item 1", "bold": False, "link": None}],
+            },
+            {
+                "type": "bullet",
+                "level": 0,
+                "runs": [{"text": "Item 2", "bold": False, "link": None}],
+            },
+        ]
+        requests = build_insert_requests(parsed, 10)
+        # insertText + createParagraphBullets
+        assert any("createParagraphBullets" in r for r in requests)
+        bullet_req = [r for r in requests if "createParagraphBullets" in r][0]
+        assert bullet_req["createParagraphBullets"]["bulletPreset"] == "BULLET_DISC_CIRCLE_SQUARE"
+
+    def test_nested_bullets_tabs(self):
+        """Test nested bullets add tab prefixes."""
+        parsed = [
+            {"type": "bullet", "level": 0, "runs": [{"text": "Top", "bold": False, "link": None}]},
+            {
+                "type": "bullet",
+                "level": 1,
+                "runs": [{"text": "Nested", "bold": False, "link": None}],
+            },
+        ]
+        requests = build_insert_requests(parsed, 0)
+        inserted_text = requests[0]["insertText"]["text"]
+        assert "\tNested\n" in inserted_text
+
+    def test_bold_formatting(self):
+        """Test bold runs generate updateTextStyle."""
+        parsed = [
+            {
+                "type": "paragraph",
+                "runs": [
+                    {"text": "Normal ", "bold": False, "link": None},
+                    {"text": "bold", "bold": True, "link": None},
+                ],
+            }
+        ]
+        requests = build_insert_requests(parsed, 0)
+        bold_reqs = [
+            r
+            for r in requests
+            if "updateTextStyle" in r and r["updateTextStyle"].get("textStyle", {}).get("bold")
+        ]
+        assert len(bold_reqs) == 1
+        assert bold_reqs[0]["updateTextStyle"]["range"]["startIndex"] == 7  # len("Normal ")
+        assert bold_reqs[0]["updateTextStyle"]["range"]["endIndex"] == 11  # len("Normal bold")
+
+    def test_link_formatting(self):
+        """Test link runs generate updateTextStyle with link."""
+        parsed = [
+            {
+                "type": "paragraph",
+                "runs": [
+                    {"text": "Click ", "bold": False, "link": None},
+                    {"text": "here", "bold": False, "link": "https://example.com"},
+                ],
+            }
+        ]
+        requests = build_insert_requests(parsed, 5)
+        link_reqs = [
+            r
+            for r in requests
+            if "updateTextStyle" in r and "link" in r["updateTextStyle"].get("textStyle", {})
+        ]
+        assert len(link_reqs) == 1
+        assert link_reqs[0]["updateTextStyle"]["textStyle"]["link"]["url"] == "https://example.com"
+        assert link_reqs[0]["updateTextStyle"]["range"]["startIndex"] == 11  # 5 + len("Click ")
+        assert link_reqs[0]["updateTextStyle"]["range"]["endIndex"] == 15  # 5 + len("Click here")
+
+    def test_index_arithmetic(self):
+        """Test that all formatting indices account for insert_index offset."""
+        parsed = [
+            {
+                "type": "heading",
+                "level": 1,
+                "runs": [{"text": "H", "bold": False, "link": None}],
+            },
+            {
+                "type": "paragraph",
+                "runs": [{"text": "P", "bold": True, "link": None}],
+            },
+        ]
+        insert_at = 100
+        requests = build_insert_requests(parsed, insert_at)
+
+        # All start/end indices should be >= insert_at
+        for req in requests:
+            for key in ("updateParagraphStyle", "updateTextStyle", "createParagraphBullets"):
+                if key in req:
+                    r = req[key].get("range", {})
+                    assert r.get("startIndex", insert_at) >= insert_at
+                    assert r.get("endIndex", insert_at) >= insert_at
+
+
+# ============================================================================
+# INSERT AFTER ANCHOR TESTS
+# ============================================================================
+
+
+class TestInsertAfterAnchor:
+    """Tests for insert_after_anchor function."""
+
+    @patch("google_docs.get_document")
+    def test_happy_path(self, mock_get_doc):
+        """Test successful insert after anchor."""
+        mock_service = Mock()
+        mock_get_doc.return_value = {
+            "body": {
+                "content": [
+                    {
+                        "paragraph": {"elements": [{"horizontalRule": {}}]},
+                        "endIndex": 10,
+                    },
+                ]
+            }
+        }
+        mock_service.documents().batchUpdate().execute.return_value = {"replies": []}
+
+        result = insert_after_anchor(
+            mock_service, "doc-123", "horizontal_rule", None, "## Heading\n\n- Item"
+        )
+
+        assert result == {"replies": []}
+        call_args = mock_service.documents().batchUpdate.call_args
+        assert call_args[1]["documentId"] == "doc-123"
+        requests = call_args[1]["body"]["requests"]
+        assert any("insertText" in r for r in requests)
+
+    @patch("google_docs.get_document")
+    def test_horizontal_rule_with_occurrence(self, mock_get_doc):
+        """Test horizontal_rule anchor with occurrence as anchor_value."""
+        mock_service = Mock()
+        mock_get_doc.return_value = {
+            "body": {
+                "content": [
+                    {"paragraph": {"elements": [{"horizontalRule": {}}]}, "endIndex": 5},
+                    {"paragraph": {"elements": [{"horizontalRule": {}}]}, "endIndex": 15},
+                ]
+            }
+        }
+        mock_service.documents().batchUpdate().execute.return_value = {}
+
+        insert_after_anchor(mock_service, "doc-123", "horizontal_rule", "2", "Hello")
+
+        call_args = mock_service.documents().batchUpdate.call_args
+        # The insert should be at index 15 (second horizontal rule)
+        requests = call_args[1]["body"]["requests"]
+        insert_req = [r for r in requests if "insertText" in r][0]
+        assert insert_req["insertText"]["location"]["index"] == 15
+
+    @patch("google_docs.get_document")
+    def test_anchor_not_found(self, mock_get_doc):
+        """Test error when anchor is not found."""
+        mock_service = Mock()
+        mock_get_doc.return_value = {"body": {"content": []}}
+
+        with pytest.raises(DocsAPIError, match="Anchor not found"):
+            insert_after_anchor(mock_service, "doc-123", "horizontal_rule", None, "## Title")
+
+    @patch("google_docs.get_document")
+    def test_empty_markdown(self, mock_get_doc):
+        """Test with empty markdown produces no requests."""
+        mock_service = Mock()
+        mock_get_doc.return_value = {
+            "body": {
+                "content": [
+                    {"paragraph": {"elements": [{"horizontalRule": {}}]}, "endIndex": 10},
+                ]
+            }
+        }
+
+        result = insert_after_anchor(mock_service, "doc-123", "horizontal_rule", None, "")
+
+        assert result == {}
+        mock_service.documents().batchUpdate.assert_not_called()
+
+
+# ============================================================================
+# CMD CONTENT INSERT AFTER ANCHOR TESTS
+# ============================================================================
+
+
+class TestCmdContentInsertAfterAnchor:
+    """Tests for cmd_content_insert_after_anchor handler."""
+
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.insert_after_anchor")
+    def test_handler_output(self, mock_insert, _mock_build, capsys):
+        """Test handler prints success message."""
+        mock_insert.return_value = {"replies": []}
+
+        args = Mock(
+            document_id="doc-123",
+            anchor_type="horizontal_rule",
+            anchor_value=None,
+            markdown="## Title",
+            json=False,
+        )
+        result = cmd_content_insert_after_anchor(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Content inserted after anchor successfully" in captured.out
+
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.insert_after_anchor")
+    def test_handler_json_mode(self, mock_insert, _mock_build, capsys):
+        """Test handler JSON output mode."""
+        mock_insert.return_value = {"replies": [{"insertText": {}}]}
+
+        args = Mock(
+            document_id="doc-123",
+            anchor_type="heading",
+            anchor_value="My Section",
+            markdown="New content",
+            json=True,
+        )
+        result = cmd_content_insert_after_anchor(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert "replies" in output
+
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.insert_after_anchor")
+    def test_handler_newline_escape(self, mock_insert, _mock_build):
+        """Test handler converts \\n to actual newlines."""
+        mock_insert.return_value = {}
+
+        args = Mock(
+            document_id="doc-123",
+            anchor_type="horizontal_rule",
+            anchor_value=None,
+            markdown="## Title\\n\\n- Item",
+            json=False,
+        )
+        cmd_content_insert_after_anchor(args)
+
+        call_args = mock_insert.call_args
+        assert call_args[0][4] == "## Title\n\n- Item"
+
+
+# ============================================================================
+# ARGUMENT PARSER TESTS (INSERT-AFTER-ANCHOR)
+# ============================================================================
+
+
+class TestArgumentParserInsertAfterAnchor:
+    """Tests for insert-after-anchor parser."""
+
+    def test_parser_insert_after_anchor(self):
+        """Test parser accepts insert-after-anchor command."""
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "content",
+                "insert-after-anchor",
+                "doc-123",
+                "--anchor-type",
+                "horizontal_rule",
+                "--markdown",
+                "## Title",
+            ]
+        )
+        assert args.command == "content"
+        assert args.content_command == "insert-after-anchor"
+        assert args.document_id == "doc-123"
+        assert args.anchor_type == "horizontal_rule"
+        assert args.markdown == "## Title"
+
+    def test_parser_insert_after_anchor_with_value(self):
+        """Test parser accepts anchor-value option."""
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "content",
+                "insert-after-anchor",
+                "doc-123",
+                "--anchor-type",
+                "heading",
+                "--anchor-value",
+                "My Section",
+                "--markdown",
+                "New content",
+            ]
+        )
+        assert args.anchor_type == "heading"
+        assert args.anchor_value == "My Section"
+
+    def test_parser_insert_after_anchor_choices(self):
+        """Test parser rejects invalid anchor types."""
+        parser = build_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(
+                [
+                    "content",
+                    "insert-after-anchor",
+                    "doc-123",
+                    "--anchor-type",
+                    "invalid_type",
+                    "--markdown",
+                    "Content",
+                ]
+            )
+
+    def test_parser_insert_after_anchor_json_flag(self):
+        """Test parser accepts --json flag."""
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "content",
+                "insert-after-anchor",
+                "doc-123",
+                "--anchor-type",
+                "bookmark",
+                "--anchor-value",
+                "bm_123",
+                "--markdown",
+                "Content",
+                "--json",
+            ]
+        )
+        assert args.json is True
