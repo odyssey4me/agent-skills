@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/google-drive",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Manage Google Drive files and folders. List, search, upload, download files, create folders, and manage sharing. Use when working with Google Drive file management.",
+  "skills": {
+    "google-drive": {
+      "path": "SKILL.md"
+    }
+  }
+}

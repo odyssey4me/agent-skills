@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/google-docs",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Create and modify Google Docs documents. Read document content and structure, manage formatting, paragraphs, and styles. Use when working with Google Docs document management.",
+  "skills": {
+    "google-docs": {
+      "path": "SKILL.md"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/confluence",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.",
+  "skills": {
+    "confluence": {
+      "path": "SKILL.md"
+    }
+  }
+}

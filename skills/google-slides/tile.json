@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/google-slides",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Manage Google Slides presentations. Create presentations, add/delete slides, insert text, shapes, and images. Use when working with Google Slides presentation management.",
+  "skills": {
+    "google-slides": {
+      "path": "SKILL.md"
+    }
+  }
+}

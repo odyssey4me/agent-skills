@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/gerrit",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Work with Gerrit code review using git-review CLI. Use when submitting changes, downloading patches, and managing code reviews in Gerrit.",
+  "skills": {
+    "gerrit": {
+      "path": "SKILL.md"
+    }
+  }
+}

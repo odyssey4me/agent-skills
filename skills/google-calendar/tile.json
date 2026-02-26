@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/google-calendar",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Manage Google Calendar events and calendars. List, create, update, and delete events, check availability, and organize schedules. Use when working with Google Calendar management.",
+  "skills": {
+    "google-calendar": {
+      "path": "SKILL.md"
+    }
+  }
+}

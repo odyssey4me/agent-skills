@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/gitlab",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Work with GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when managing GitLab projects.",
+  "skills": {
+    "gitlab": {
+      "path": "SKILL.md"
+    }
+  }
+}

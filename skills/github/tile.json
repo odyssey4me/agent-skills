@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/github",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Work with GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when managing GitHub projects.",
+  "skills": {
+    "github": {
+      "path": "SKILL.md"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/gmail",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Manage Gmail messages, drafts, and labels. Send emails, search inbox, and organize email. Use when working with Gmail email management.",
+  "skills": {
+    "gmail": {
+      "path": "SKILL.md"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/jira",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Search and manage Jira issues using JQL queries, create/update issues, and manage workflows. Use when working with Jira project management.",
+  "skills": {
+    "jira": {
+      "path": "SKILL.md"
+    }
+  }
+}

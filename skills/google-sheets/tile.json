@@ -1,0 +1,11 @@
+{
+  "name": "odyssey4me/google-sheets",
+  "version": "0.1.0",
+  "private": false,
+  "summary": "Manage Google Sheets spreadsheets. Read/write cell values and ranges, manage sheets, formatting, and formulas. Use when working with Google Sheets spreadsheet management.",
+  "skills": {
+    "google-sheets": {
+      "path": "SKILL.md"
+    }
+  }
+}
