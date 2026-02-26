@@ -291,133 +291,6 @@ $SKILL_DIR/scripts/jira.py statuses --categories
 
 This is more reliable than using specific status names, which vary between projects.
 
-## Examples
-
-### Verify Setup
-
-```bash
-$SKILL_DIR/scripts/jira.py check
-```
-
-### Find my open issues
-
-```bash
-$SKILL_DIR/scripts/jira.py search "assignee = currentUser() AND status != Done ORDER BY priority DESC"
-```
-
-### Create a bug report
-
-```bash
-$SKILL_DIR/scripts/jira.py issue create \
-  --project DEMO \
-  --type Bug \
-  --summary "Login button not working" \
-  --description "The login button on the homepage does not respond to clicks."
-```
-
-### Move issue through workflow
-
-```bash
-# Start work on an issue
-$SKILL_DIR/scripts/jira.py transitions do DEMO-123 "In Progress"
-
-# Complete the issue
-$SKILL_DIR/scripts/jira.py transitions do DEMO-123 "Done" --comment "Implemented and tested"
-```
-
-### Add private comment
-
-```bash
-# Add comment visible only to specific security level
-$SKILL_DIR/scripts/jira.py issue comment DEMO-123 \
-  "This is sensitive internal information" \
-  --security-level "Red Hat Internal"
-```
-
-### View comments on an issue
-
-```bash
-$SKILL_DIR/scripts/jira.py issue comments DEMO-123
-```
-
-### Find issues by contributor
-
-```bash
-# Find all issues where jsmith is reporter, assignee, or commenter
-$SKILL_DIR/scripts/jira.py search --contributor "jsmith" --project DEMO
-```
-
-### Find collaborative epics
-
-```bash
-# Find epics in DEMO project with 2+ assignees on child issues
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO
-```
-
-### Search with specific fields
-
-```bash
-$SKILL_DIR/scripts/jira.py search \
-  "project = DEMO AND created >= -7d" \
-  --fields "key,summary,status,assignee,created"
-```
-
-### Using Configuration Defaults
-
-With defaults configured as shown in the [Configuration Defaults](#configuration-defaults) section:
-
-```bash
-# Search uses JQL scope automatically
-$SKILL_DIR/scripts/jira.py search "status = Open"
-# Becomes: (project = DEMO AND assignee = currentUser()) AND (status = Open)
-
-# Search with automatic max_results and fields from config
-$SKILL_DIR/scripts/jira.py search "priority = High"
-# Uses configured max_results (25) and fields automatically
-
-# Create issue uses project defaults
-$SKILL_DIR/scripts/jira.py issue create --project DEMO --summary "Fix login bug"
-# Automatically uses issue_type="Task" and priority="Medium" from DEMO project defaults
-
-# Comments use default security level
-$SKILL_DIR/scripts/jira.py issue comment DEMO-123 "Internal note"
-# Automatically applies security_level="Red Hat Internal"
-
-# Override defaults when needed
-$SKILL_DIR/scripts/jira.py search "status = Open" --max-results 100
-# CLI argument overrides the configured default of 25
-```
-
-## JQL Reference
-
-Common JQL queries:
-
-| Query | Description |
-|-------|-------------|
-| `project = DEMO` | Issues in DEMO project |
-| `assignee = currentUser()` | Issues assigned to you |
-| `status = "In Progress"` | Issues in progress |
-| `created >= -7d` | Created in last 7 days |
-| `updated >= startOfDay()` | Updated today |
-| `priority = High` | High priority issues |
-| `labels = "bug"` | Issues with "bug" label |
-
-Combine with `AND`, `OR`, and use `ORDER BY` for sorting.
-
-### Status Categories
-
-Jira organizes all statuses into three categories. Use `statusCategory` for queries that work across projects:
-
-| Category | Meaning | Example Statuses |
-|----------|---------|------------------|
-| To Do | Not started | Open, Backlog, New |
-| In Progress | Being worked on | In Development, In Review |
-| Done | Completed | Closed, Resolved, Done |
-
-**Example:** Instead of `status = "Open" OR status = "Backlog"`, use `statusCategory = "To Do"`.
-
-Use `$SKILL_DIR/scripts/jira.py statuses --categories` to see all status categories in your Jira instance.
-
 ### collaboration
 
 Discover collaboration patterns across issues and epics.
@@ -439,6 +312,49 @@ $SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
 - `--max-results`: Maximum epics to check (default: 50)
 
 **Note:** This makes N+1 API calls (1 for epics + 1 per epic for children). Use `--max-results` to control cost.
+
+## Examples
+
+### Create and verify an issue
+
+```bash
+# Create the issue
+$SKILL_DIR/scripts/jira.py issue create \
+  --project DEMO \
+  --type Bug \
+  --summary "Login button not working" \
+  --description "The login button on the homepage does not respond to clicks."
+
+# Verify it was created correctly
+$SKILL_DIR/scripts/jira.py issue get DEMO-456
+```
+
+### Move issue through workflow
+
+```bash
+# Check available transitions first
+$SKILL_DIR/scripts/jira.py transitions list DEMO-123
+
+# Start work on an issue
+$SKILL_DIR/scripts/jira.py transitions do DEMO-123 "In Progress"
+
+# Verify the transition
+$SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status"
+```
+
+See [examples.md](references/examples.md) for more usage patterns.
+
+## JQL Reference
+
+Common JQL queries and patterns: see [jql-reference.md](references/jql-reference.md).
+
+Quick reference — combine with `AND`, `OR`, and `ORDER BY`:
+
+```jql
+assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC
+```
+
+Use `statusCategory` (`"To Do"`, `"In Progress"`, `Done`) for queries that work across projects.
 
 ## Model Guidance
 

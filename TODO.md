@@ -2,25 +2,6 @@
 
 This document tracks planned features for the agent-skills repository. Only pending work belongs here — remove items as they are delivered.
 
-## Tessl Review Recommendations
-
-Recommendations from `tessl skill review` to improve skill quality scores.
-Common issues flagged across multiple skills are grouped first, followed by
-per-skill items.
-
-### Per-Skill Content Improvements
-
-**google-slides** (content: 73%, overall: 75%)
-- [ ] SKILL.md is 612 lines — move content to reference files to get under 500
-- [ ] Add validation steps in multi-step workflow examples
-- [ ] Remove explanatory text Claude already knows (e.g., 'Slide IDs are
-  object IDs, not indices')
-- [ ] Consolidate troubleshooting — several items repeat the same solution
-
-**jira** (content: 65%, overall: 75%)
-- [ ] Move JQL Reference table and extensive examples to separate reference files
-- [ ] Add validation steps to multi-step workflows
-
 ## Google Drive Enhancements
 
 - [ ] **google-drive** - Add missing Drive API operations
