@@ -251,7 +251,7 @@ This displays:
 - Default CQL scope, max results, and default space
 - Space-specific defaults for parent pages and labels
 
-## Common Usage Examples
+## Examples
 
 ### Search for Pages
 
