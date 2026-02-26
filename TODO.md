@@ -10,10 +10,6 @@ per-skill items.
 
 ### Per-Skill Content Improvements
 
-**gitlab** (content: 73%, overall: 65%)
-- [ ] Add validation checkpoints to workflow examples
-- [ ] Remove the Summary section which repeats Quick Start content
-
 **gerrit** (content: 77%, overall: 76%)
 - [ ] Move Troubleshooting section to `references/troubleshooting.md`
 - [ ] Move Advanced Usage (SSH Commands, JSON Output) to a reference file

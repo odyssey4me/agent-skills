@@ -138,9 +138,12 @@ Full reference: [glab release](https://docs.gitlab.com/cli/commands/glab_release
 glab mr list --assignee=@me
 
 # Review a specific MR
-glab mr view 456
+$SKILL_DIR/scripts/gitlab.py mrs view 456
 glab mr diff 456
 glab mr approve 456
+
+# Verify approval was recorded
+$SKILL_DIR/scripts/gitlab.py mrs view 456  # check approval status
 ```
 
 ### Create Issue and Link MR
@@ -148,9 +151,12 @@ glab mr approve 456
 ```bash
 # Create issue
 glab issue create --title "Bug: Login fails" --description "Description" --label bug
+# Verify: note the issue number from output
 
-# Create MR that closes it
+# Create MR that closes it (use issue number from above)
 glab mr create --title "Fix login bug" --description "Closes #123"
+# Verify MR was created and linked
+$SKILL_DIR/scripts/gitlab.py mrs view <number>
 ```
 
 ### Monitor CI Pipeline
@@ -164,6 +170,8 @@ glab ci trace
 
 # Retry failed jobs
 glab ci retry
+# Verify pipeline restarted
+$SKILL_DIR/scripts/gitlab.py pipelines list
 ```
 
 See [common-workflows.md](references/common-workflows.md) for more examples.
@@ -252,16 +260,3 @@ glab version
 - **GitLab CLI Repository**: <https://gitlab.com/gitlab-org/cli>
 - **GitLab API Documentation**: <https://docs.gitlab.com/ee/api/>
 - **GitLab CI/CD**: <https://docs.gitlab.com/ee/ci/>
-
-## Summary
-
-The GitLab skill uses the official `glab` CLI with a Python wrapper for markdown-formatted output on read/view commands.
-
-**Quick start:**
-1. Install: `brew install glab` (or equivalent for your OS)
-2. Authenticate: `glab auth login`
-3. Verify: `$SKILL_DIR/scripts/gitlab.py check`
-4. Read: `$SKILL_DIR/scripts/gitlab.py issues list --repo GROUP/REPO`
-5. Write: `glab issue create`, `glab mr create`, etc. (use `glab` directly)
-
-For detailed command reference, use `glab <command> --help` or visit <https://docs.gitlab.com/cli/>.
