@@ -1,6 +1,6 @@
 ---
 name: gitlab
-description: Work with GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when managing GitLab projects.
+description: Create and manage GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when asked to open an MR, review a merge request, check CI/CD pipelines, list issues, or manage code review on GitLab.
 metadata:
   author: odyssey4me
   version: "0.2.0"

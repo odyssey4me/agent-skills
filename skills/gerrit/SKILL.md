@@ -1,6 +1,6 @@
 ---
 name: gerrit
-description: Work with Gerrit code review using git-review CLI. Use when submitting changes, downloading patches, and managing code reviews in Gerrit.
+description: Submit, amend, and review Gerrit changes using git-review CLI. Use when asked to submit a patchset, download a change, rebase a change request, check CR status, or manage code reviews in Gerrit.
 metadata:
   author: odyssey4me
   version: "0.2.0"

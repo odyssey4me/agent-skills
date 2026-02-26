@@ -16,26 +16,26 @@ variations users might say to each skill's description.
 - [x] **code-review** (33% → 100%) — Added `Use when...` clause with trigger
   terms: pull request, merge request, review my code, check this PR, patchset,
   code review feedback
-- [ ] **github** (67%) — Use specific action verbs instead of nouns; add
-  trigger terms 'PR', 'repo', 'actions', 'merge'
-- [ ] **gitlab** (57%) — Use specific action verbs; add 'MR', 'CI/CD',
-  'merge request', 'code review'
-- [ ] **gerrit** (75%) — Add actions like 'amend commits', 'rebase changes';
-  add terms 'patchset', 'change request', 'CR'
-- [ ] **google-docs** (75%) — Add specific actions like 'insert tables',
-  'apply heading styles'; add 'gdoc', 'Google document'
-- [ ] **google-slides** (77%) — Add trigger terms 'slides', 'slideshow',
-  'deck', 'Google presentation'
-- [ ] **gmail** (85%) — Add 'compose', 'reply', 'forward', 'attachments',
-  'mail'
-- [ ] **google-calendar** (85%) — Add 'meeting', 'appointment', 'schedule a
-  call', 'book time', 'gcal'
-- [ ] **google-drive** (85%) — Add 'gdrive', 'cloud storage', 'share a file',
-  'Drive folder'
-- [ ] **google-sheets** (85%) — Add 'gsheets', 'Google spreadsheet', 'pivot
-  tables', 'charts'
-- [ ] **jira** (85%) — Add 'tickets', 'sprints', 'backlog', 'Atlassian',
-  'bug tracking'
+- [x] **github** (67% → 100%) — Added action verbs and trigger terms: PR,
+  repo, actions, merge
+- [x] **gitlab** (57% → 100%) — Added action verbs and trigger terms: MR,
+  CI/CD, merge request, code review
+- [x] **gerrit** (75% → 100%) — Added amend, rebase, patchset, change
+  request, CR
+- [x] **google-docs** (75% → 100%) — Added insert tables, heading styles,
+  gdoc, Google document
+- [x] **google-slides** (77% → 100%) — Added slides, slideshow, deck,
+  Google presentation
+- [x] **gmail** (85% → 100%) — Added compose, reply, forward, attachments,
+  mail
+- [x] **google-calendar** (85% → 100%) — Added meeting, appointment,
+  schedule a call, book time, gcal
+- [x] **google-drive** (85% → 100%) — Added gdrive, cloud storage, share a
+  file, Drive folder
+- [x] **google-sheets** (85% → 100%) — Added gsheets, Google spreadsheet,
+  pivot tables, charts
+- [x] **jira** (85% → 100%) — Added tickets, sprints, backlog, Atlassian,
+  bug tracking
 
 ### Common: Content Conciseness
 

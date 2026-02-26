@@ -1,6 +1,6 @@
 ---
 name: google-slides
-description: Manage Google Slides presentations. Create presentations, add/delete slides, insert text, shapes, and images. Use when working with Google Slides presentation management.
+description: Create and edit Google Slides presentations. Add or delete slides, insert text, shapes, and images. Use when asked to build a deck, create a slideshow, update a Google presentation, or edit slides.
 metadata:
   author: odyssey4me
   version: "0.1.0"

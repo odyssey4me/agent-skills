@@ -1,6 +1,6 @@
 ---
 name: github
-description: Work with GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when managing GitHub projects.
+description: Create and manage GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when asked to open a PR, merge a pull request, check repo actions, list issues, create a branch, or manage GitHub projects.
 metadata:
   author: odyssey4me
   version: "0.2.0"

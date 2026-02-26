@@ -1,6 +1,6 @@
 ---
 name: gmail
-description: Manage Gmail messages, drafts, and labels. Send emails, search inbox, and organize email. Use when working with Gmail email management.
+description: Send, search, and organize Gmail messages, drafts, and labels. Use when asked to compose an email, reply to mail, forward a message, search inbox, manage attachments, or organize Gmail.
 metadata:
   author: odyssey4me
   version: "0.1.0"

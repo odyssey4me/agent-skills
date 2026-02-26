@@ -1,6 +1,6 @@
 ---
 name: google-sheets
-description: Manage Google Sheets spreadsheets. Read/write cell values and ranges, manage sheets, formatting, and formulas. Use when working with Google Sheets spreadsheet management.
+description: Read, write, and format Google Sheets spreadsheets. Manage cell values, ranges, formulas, pivot tables, and charts. Use when asked to update a gsheet, edit a Google spreadsheet, add formulas, or work with spreadsheet data.
 metadata:
   author: odyssey4me
   version: "0.1.0"

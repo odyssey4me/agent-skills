@@ -43,7 +43,7 @@
     },
     {
       "name": "gerrit",
-      "description": "Work with Gerrit code review using git-review CLI. Use when submitting changes, downloading patches, and managing code reviews in Gerrit.",
+      "description": "Submit, amend, and review Gerrit changes using git-review CLI. Use when asked to submit a patchset, download a change, rebase a change request, check CR status, or manage code reviews in Gerrit.",
       "version": "0.2.0",
       "category": "code-hosting",
       "tags": [
@@ -59,7 +59,7 @@
     },
     {
       "name": "github",
-      "description": "Work with GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when managing GitHub projects.",
+      "description": "Create and manage GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when asked to open a PR, merge a pull request, check repo actions, list issues, create a branch, or manage GitHub projects.",
       "version": "0.2.0",
       "category": "code-hosting",
       "tags": [
@@ -76,7 +76,7 @@
     },
     {
       "name": "gitlab",
-      "description": "Work with GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when managing GitLab projects.",
+      "description": "Create and manage GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when asked to open an MR, review a merge request, check CI/CD pipelines, list issues, or manage code review on GitLab.",
       "version": "0.2.0",
       "category": "code-hosting",
       "tags": [
@@ -93,7 +93,7 @@
     },
     {
       "name": "gmail",
-      "description": "Manage Gmail messages, drafts, and labels. Send emails, search inbox, and organize email. Use when working with Gmail email management.",
+      "description": "Send, search, and organize Gmail messages, drafts, and labels. Use when asked to compose an email, reply to mail, forward a message, search inbox, manage attachments, or organize Gmail.",
       "version": "0.1.0",
       "category": "communication",
       "tags": [
@@ -115,7 +115,7 @@
     },
     {
       "name": "google-calendar",
-      "description": "Manage Google Calendar events and calendars. List, create, update, and delete events, check availability, and organize schedules. Use when working with Google Calendar management.",
+      "description": "Create, update, and organize Google Calendar events and schedules. Check availability, book time, and manage calendars. Use when asked to schedule a meeting, set up an appointment, book a call, check gcal, or manage calendar events.",
       "version": "0.1.0",
       "category": "google-workspace",
       "tags": [
@@ -137,7 +137,7 @@
     },
     {
       "name": "google-docs",
-      "description": "Create and modify Google Docs documents. Read document content and structure, manage formatting, paragraphs, and styles. Use when working with Google Docs document management.",
+      "description": "Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.",
       "version": "0.1.0",
       "category": "google-workspace",
       "tags": [
@@ -158,7 +158,7 @@
     },
     {
       "name": "google-drive",
-      "description": "Manage Google Drive files and folders. List, search, upload, download files, create folders, and manage sharing. Use when working with Google Drive file management.",
+      "description": "Upload, download, search, and share files on Google Drive. Create folders and manage permissions. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, or organize Google Drive files.",
       "version": "0.1.0",
       "category": "google-workspace",
       "tags": [
@@ -180,7 +180,7 @@
     },
     {
       "name": "google-sheets",
-      "description": "Manage Google Sheets spreadsheets. Read/write cell values and ranges, manage sheets, formatting, and formulas. Use when working with Google Sheets spreadsheet management.",
+      "description": "Read, write, and format Google Sheets spreadsheets. Manage cell values, ranges, formulas, pivot tables, and charts. Use when asked to update a gsheet, edit a Google spreadsheet, add formulas, or work with spreadsheet data.",
       "version": "0.1.0",
       "category": "google-workspace",
       "tags": [
@@ -202,7 +202,7 @@
     },
     {
       "name": "google-slides",
-      "description": "Manage Google Slides presentations. Create presentations, add/delete slides, insert text, shapes, and images. Use when working with Google Slides presentation management.",
+      "description": "Create and edit Google Slides presentations. Add or delete slides, insert text, shapes, and images. Use when asked to build a deck, create a slideshow, update a Google presentation, or edit slides.",
       "version": "0.1.0",
       "category": "google-workspace",
       "tags": [
@@ -223,7 +223,7 @@
     },
     {
       "name": "jira",
-      "description": "Search and manage Jira issues using JQL queries, create/update issues, and manage workflows. Use when working with Jira project management.",
+      "description": "Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.",
       "version": "0.3.0",
       "category": "project-management",
       "tags": [

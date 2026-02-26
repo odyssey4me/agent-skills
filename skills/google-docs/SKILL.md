@@ -1,6 +1,6 @@
 ---
 name: google-docs
-description: Create and modify Google Docs documents. Read document content and structure, manage formatting, paragraphs, and styles. Use when working with Google Docs document management.
+description: Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.
 metadata:
   author: odyssey4me
   version: "0.1.0"

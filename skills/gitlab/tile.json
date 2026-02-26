@@ -2,7 +2,7 @@
   "name": "odyssey4me/gitlab",
   "version": "0.1.0",
   "private": false,
-  "summary": "Work with GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when managing GitLab projects.",
+  "summary": "Create and manage GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when asked to open an MR, review a merge request, check CI/CD pipelines, list issues, or manage code review on GitLab.",
   "skills": {
     "gitlab": {
       "path": "SKILL.md"
