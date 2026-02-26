@@ -82,9 +82,7 @@ jobs:
 
       - name: Check tile.json files are up to date
         run: |
-          for d in skills/*/; do
-            [ -f "$d/tile.json" ] && tessl skill import "$d" --workspace odyssey4me --public --force 2>/dev/null
-          done
+          scripts/sync_tile_versions.sh
           git diff --exit-code skills/*/tile.json
 
   test-skills:

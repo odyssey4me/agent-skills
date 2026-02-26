@@ -1,6 +1,6 @@
 {
   "name": "odyssey4me/gerrit",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "private": false,
   "summary": "Submit, amend, and review Gerrit changes using git-review CLI. Use when asked to submit a patchset, download a change, rebase a change request, check CR status, or manage code reviews in Gerrit.",
   "skills": {

@@ -1,6 +1,6 @@
 {
   "name": "odyssey4me/google-docs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "summary": "Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.",
   "skills": {

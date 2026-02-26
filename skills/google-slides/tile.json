@@ -1,6 +1,6 @@
 {
   "name": "odyssey4me/google-slides",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": false,
   "summary": "Create and edit Google Slides presentations. Add or delete slides, insert text, shapes, and images. Use when asked to build a deck, create a slideshow, update a Google presentation, or edit slides.",
   "skills": {

@@ -51,9 +51,7 @@ echo
 
 # --- Tessl sync (tile.json up to date) ---
 echo "=== Check tile.json files are up to date ==="
-for d in skills/*/; do
-  [ -f "$d/tile.json" ] && tessl skill import "$d" --workspace odyssey4me --public --force 2>/dev/null
-done
+scripts/sync_tile_versions.sh
 if ! git diff --exit-code skills/*/tile.json; then
   echo "tile.json files are out of date — stage the updated files."
   status=1

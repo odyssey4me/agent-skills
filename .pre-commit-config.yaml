@@ -47,7 +47,7 @@ repos:
 
       - id: tessl-sync
         name: check tile.json files are up to date
-        entry: bash -c 'for d in skills/*/; do [ -f "$d/tile.json" ] && tessl skill import "$d" --workspace odyssey4me --public --force 2>/dev/null; done; git diff --exit-code skills/*/tile.json'
+        entry: bash -c 'scripts/sync_tile_versions.sh && git diff --exit-code skills/*/tile.json'
         language: system
         files: ^skills/
         pass_filenames: false
@@ -83,7 +83,7 @@ repos:
 
       - id: tessl-sync-prepush
         name: check tile.json files are up to date (pre-push)
-        entry: bash -c 'for d in skills/*/; do [ -f "$d/tile.json" ] && tessl skill import "$d" --workspace odyssey4me --public --force 2>/dev/null; done; git diff --exit-code skills/*/tile.json'
+        entry: bash -c 'scripts/sync_tile_versions.sh && git diff --exit-code skills/*/tile.json'
         language: system
         pass_filenames: false
         stages: [pre-push]

@@ -1,6 +1,6 @@
 {
   "name": "odyssey4me/github",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "summary": "Create and manage GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when asked to open a PR, merge a pull request, check repo actions, list issues, create a branch, or manage GitHub projects.",
   "skills": {
