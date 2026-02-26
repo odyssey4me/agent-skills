@@ -65,17 +65,19 @@ Fix any issues before proceeding.
 ### 2. Push, tag, and create the release
 
 1. Push all commits to `origin/main`.
-2. Tag with the next semver version: use **minor** if any skill has a minor
-   bump, **patch** if all bumps are patch-only.
-3. Create the GitHub release **before** pushing the tag, using
-   `gh release create <tag>` with a hand-written summary including:
+2. Choose the next semver tag: use **minor** if any skill has a minor bump,
+   **patch** if all bumps are patch-only.
+3. Create the tag locally: `git tag <version>`.
+4. Create the GitHub release **before pushing the tag** using
+   `gh release create <version> --target main` with a hand-written summary
+   including:
    - Grouped changes (features, infrastructure, refactoring, fixes).
    - A skill versions table showing each changed skill's old → new version.
-4. Push the tag: `git push origin <tag>`.
+5. Push the tag: `git push origin <version>`.
 
-The release workflow will automatically package skill tarballs and upload
-them as assets to the existing release, then publish tiles to the Tessl
-Registry.
+**Order matters:** the release must exist before the tag is pushed because
+the release workflow uploads assets to the existing release. If the tag is
+pushed first, the workflow will fail with "release not found".
 
 ## TODO.md
 
