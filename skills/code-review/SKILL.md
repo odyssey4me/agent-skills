@@ -41,12 +41,7 @@ Review this MR: https://gitlab.com/org/repo/-/merge_requests/42
 Review Gerrit change 456789
 ```
 
-The agent will:
-1. Detect the platform from git remotes or the provided URL
-2. Fetch change metadata and CI/test status
-3. Fetch the diff and changed files
-4. Provide focused review feedback
-5. Optionally post review comments
+The agent follows the [Workflow](#workflow) steps: detects the platform from git remotes or the provided URL, fetches the change metadata, CI status, and diff, then provides structured review feedback. Optionally posts review comments.
 
 ### remember
 
@@ -100,9 +95,7 @@ skills/gerrit/scripts/gerrit.py check
 
 ## Repository Context
 
-The code-review skill persists per-repository context in `~/.config/agent-skills/code-review.yaml`. This allows the agent to accumulate knowledge about a repository's conventions, architecture, and review policies across sessions.
-
-### Config File Structure
+Per-repository context is persisted in `~/.config/agent-skills/code-review.yaml`, keyed by the remote fetch URL from `git remote get-url origin`. This context is loaded at the start of every review (see Step 0 in [Workflow](#workflow)).
 
 ```yaml
 # ~/.config/agent-skills/code-review.yaml
@@ -125,30 +118,7 @@ repositories:
       - "Migrating from REST to GraphQL -- new endpoints should use GraphQL"
 ```
 
-The repository key is the first remote URL from `git remote -v` (normalized to the fetch URL). Each repository entry has three lists:
-
-- **references**: URLs to external documentation, style guides, or architecture docs
-- **standards**: Coding standards, policies, or rules specific to this repo
-- **notes**: Architectural decisions, team conventions, or other contextual information
-
-### Loading Context
-
-At the start of every review, the agent checks for saved context:
-
-```bash
-# Get the repo remote URL for config lookup
-git remote get-url origin
-```
-
-If context exists for the repo, the agent loads it and applies it during the review. For example, if a standard says "API endpoints must validate input with Pydantic models," the agent checks whether new endpoints follow that rule.
-
-### Prompting to Save
-
-When the user provides out-of-repo context during a review (e.g., links to external docs, mentions of team conventions, or references to other repositories), the agent should proactively suggest:
-
-> "This seems like useful context for future reviews of this repo. Say **remember** followed by what you'd like me to save, and I'll persist it for next time."
-
-This ensures users discover the feature naturally without needing to read documentation.
+When the user provides out-of-repo context during a review, suggest using the **remember** command to persist it.
 
 ## Workflow
 

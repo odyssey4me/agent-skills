@@ -10,12 +10,6 @@ per-skill items.
 
 ### Per-Skill Content Improvements
 
-**code-review** (content: 85%, overall: 59%)
-- [ ] Consolidate platform detection logic — explained in both Workflow and
-  Commands sections
-- [ ] Trim Repository Context section — YAML example is helpful but
-  surrounding explanation is verbose
-
 **github** (content: 73%, overall: 70%)
 - [ ] Add validation/verification steps to workflows (e.g., verify PR created
   after creation commands)
