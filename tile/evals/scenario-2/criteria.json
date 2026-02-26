@@ -1,0 +1,27 @@
+{
+  "context": "Evaluates correct usage of the agent-skills Jira skill to add a public comment to an issue. The solution must call add_comment or the equivalent CLI issue comment subcommand and correctly submit the comment body to the Jira API.",
+  "type": "weighted_checklist",
+  "capability_tested": "Standard Issue Comments",
+  "checklist": [
+    {
+      "name": "Comment call made",
+      "description": "The solution calls add_comment with the issue key and comment body, or invokes jira.py with 'issue comment <key> --body <text>' to submit the comment",
+      "max_score": 40
+    },
+    {
+      "name": "No security level set",
+      "description": "For a public comment, the security_level parameter of add_comment is omitted or set to None, resulting in no visibility restriction on the posted comment",
+      "max_score": 20
+    },
+    {
+      "name": "Success confirmation",
+      "description": "The solution outputs a confirmation message including the created comment's ID or a success status after add_comment completes",
+      "max_score": 25
+    },
+    {
+      "name": "Error handling",
+      "description": "When add_comment raises an APIError due to an invalid issue key, the error is caught and a descriptive message is shown",
+      "max_score": 15
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "context": "Evaluates correct usage of the agent-skills Jira skill to create a new issue. The solution must call create_issue or the equivalent CLI issue create subcommand with all required fields and correctly return the key of the new issue.",
+  "type": "weighted_checklist",
+  "capability_tested": "Jira Issue Creation",
+  "checklist": [
+    {
+      "name": "create_issue called",
+      "description": "The solution calls create_issue with the project key, issue_type, and summary arguments, or invokes jira.py 'issue create' with the equivalent flags",
+      "max_score": 35
+    },
+    {
+      "name": "New issue key returned",
+      "description": "The key of the newly created issue (e.g. PROJECT-42) is extracted from the API response and displayed or returned to the caller",
+      "max_score": 25
+    },
+    {
+      "name": "Optional fields passed",
+      "description": "When description and priority are provided, they are forwarded as named arguments to create_issue and appear in the issue fields on retrieval",
+      "max_score": 25
+    },
+    {
+      "name": "Rich text formatting",
+      "description": "The description body is passed through format_rich_text before submission, producing ADF for Cloud or plain text for DataCenter/Server deployments",
+      "max_score": 15
+    }
+  ]
+}

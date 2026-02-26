@@ -1,0 +1,27 @@
+{
+  "context": "Evaluates correct usage of the agent-skills Confluence skill's CQL search functionality. The solution must call search_content or the equivalent CLI search subcommand and correctly display the filtered results with appropriate metadata.",
+  "type": "weighted_checklist",
+  "capability_tested": "CQL-Based Confluence Search",
+  "checklist": [
+    {
+      "name": "search_content called",
+      "description": "The solution calls search_content with the cql parameter, or invokes confluence.py with the 'search' subcommand and CQL query string",
+      "max_score": 35
+    },
+    {
+      "name": "Results include metadata",
+      "description": "Each result item in the output includes at least the page title and space key, as extracted from the search response and formatted by the output layer",
+      "max_score": 25
+    },
+    {
+      "name": "Type filter applied",
+      "description": "When a content type filter is specified (e.g. page or blogpost), it is passed as the content_type argument to search_content, which appends it to the CQL query",
+      "max_score": 20
+    },
+    {
+      "name": "Space filter applied",
+      "description": "When a space key filter is specified, it is passed as the space argument to search_content and constrains results to that space",
+      "max_score": 20
+    }
+  ]
+}

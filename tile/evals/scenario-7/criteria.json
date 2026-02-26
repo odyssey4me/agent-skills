@@ -1,0 +1,27 @@
+{
+  "context": "Evaluates correct usage of the agent-skills Jira skill's security level parameter for posting restricted comments. The solution must call add_comment with the security_level argument to restrict visibility to members of a named group or role.",
+  "type": "weighted_checklist",
+  "capability_tested": "Private and Restricted Comments",
+  "checklist": [
+    {
+      "name": "security_level argument passed",
+      "description": "The solution passes the security_level parameter by name to add_comment (or the --security-level CLI flag) with the name of the target security level group or role",
+      "max_score": 40
+    },
+    {
+      "name": "Restriction reflected in API payload",
+      "description": "The HTTP request body sent by add_comment includes the visibility object with the correct type and value corresponding to the named security level, rather than omitting the visibility field",
+      "max_score": 30
+    },
+    {
+      "name": "Public fallback when omitted",
+      "description": "When security_level is not supplied or is None, add_comment omits the visibility field from the request body, resulting in a publicly visible comment",
+      "max_score": 15
+    },
+    {
+      "name": "Invalid level error handled",
+      "description": "When the API returns an error due to an unrecognised security level name, the APIError is caught and an informative error message is printed",
+      "max_score": 15
+    }
+  ]
+}
