@@ -23,6 +23,24 @@ except ImportError:
     sys.exit(1)
 
 
+def _parse_csv(value: str | list) -> list[str]:
+    """Parse a comma-separated string into a list of trimmed values.
+
+    Also accepts a list for backwards compatibility.
+
+    Args:
+        value: Comma-separated string or list.
+
+    Returns:
+        List of stripped, non-empty strings.
+    """
+    if isinstance(value, list):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 def parse_frontmatter(skill_md: Path) -> dict | None:
     """Parse YAML frontmatter from a SKILL.md file.
 
@@ -121,8 +139,8 @@ def determine_dependencies(skill_dir: Path) -> list[str]:
     fm = parse_frontmatter(skill_md)
     if fm and isinstance(fm.get("metadata"), dict):
         requires = fm["metadata"].get("requires")
-        if isinstance(requires, list):
-            return requires
+        if requires is not None:
+            return _parse_csv(requires)
 
     content = skill_md.read_text()
 
@@ -184,7 +202,7 @@ def build_registry(skills_root: Path) -> dict:
             "description": fm.get("description", ""),
             "version": metadata.get("version", "0.1.0"),
             "category": metadata.get("category", ""),
-            "tags": metadata.get("tags", []),
+            "tags": _parse_csv(metadata.get("tags", "")),
             "type": skill_type,
             "complexity": metadata.get("complexity", "standard"),
             "auth": auth_method,

@@ -5,10 +5,10 @@ metadata:
   author: odyssey4me
   version: "0.2.0"
   category: development
-  tags: [review, security, maintainability, pr, mr]
+  tags: "review, security, maintainability, pr, mr"
   type: workflow
   complexity: orchestration
-  requires: [github, gitlab, gerrit]
+  requires: "github, gitlab, gerrit"
 license: MIT
 ---
 

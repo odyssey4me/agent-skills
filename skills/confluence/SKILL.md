@@ -5,7 +5,7 @@ metadata:
   author: odyssey4me
   version: "0.2.0"
   category: documentation
-  tags: [wiki, pages, spaces]
+  tags: "wiki, pages, spaces"
   complexity: standard
 license: MIT
 allowed-tools: Bash(python $SKILL_DIR/scripts/confluence.py *)

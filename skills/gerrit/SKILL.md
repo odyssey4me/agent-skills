@@ -5,7 +5,7 @@ metadata:
   author: odyssey4me
   version: "0.2.0"
   category: code-hosting
-  tags: [code-review, patches]
+  tags: "code-review, patches"
   complexity: lightweight
 license: MIT
 allowed-tools: Bash(python $SKILL_DIR/scripts/gerrit.py *)

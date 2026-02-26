@@ -12,7 +12,7 @@ per-skill items.
 
 All skills receive two warnings that should be investigated:
 
-- [ ] **metadata field** — `metadata` should map string keys to string values.
+- [x] **metadata field** — `metadata` should map string keys to string values.
   Tags arrays in metadata (`tags: [...]`) may be the cause. Check whether
   converting to comma-separated strings resolves the warning.
 - [ ] **allowed-tools field** — `allowed-tools` contains unusual tool name(s).

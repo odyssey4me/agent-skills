@@ -170,7 +170,7 @@ class TestDetermineDependencies:
 name: myskill
 description: test
 metadata:
-  requires: [github, gitlab]
+  requires: "github, gitlab"
 ---
 """)
         deps = determine_dependencies(skill_dir)
@@ -229,7 +229,7 @@ metadata:
   author: tester
   version: "0.1.0"
   category: testing
-  tags: [test, demo]
+  tags: "test, demo"
   complexity: standard
 license: MIT
 ---
@@ -432,7 +432,7 @@ description: Test skill
 metadata:
   version: "0.1.0"
   category: testing
-  tags: [test]
+  tags: "test"
   complexity: standard
 ---
 """)

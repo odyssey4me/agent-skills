@@ -5,7 +5,7 @@ metadata:
   author: odyssey4me
   version: "0.1.0"
   category: google-workspace
-  tags: [documents, editing]
+  tags: "documents, editing"
   complexity: standard
 license: MIT
 allowed-tools: Bash(python $SKILL_DIR/scripts/google-docs.py *)

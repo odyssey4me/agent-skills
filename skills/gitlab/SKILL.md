@@ -5,7 +5,7 @@ metadata:
   author: odyssey4me
   version: "0.2.0"
   category: code-hosting
-  tags: [issues, merge-requests, pipelines]
+  tags: "issues, merge-requests, pipelines"
   complexity: lightweight
 license: MIT
 allowed-tools: Bash(python $SKILL_DIR/scripts/gitlab.py *)

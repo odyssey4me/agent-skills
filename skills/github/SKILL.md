@@ -5,7 +5,7 @@ metadata:
   author: odyssey4me
   version: "0.2.0"
   category: code-hosting
-  tags: [issues, pull-requests, workflows]
+  tags: "issues, pull-requests, workflows"
   complexity: lightweight
 license: MIT
 allowed-tools: Bash(python $SKILL_DIR/scripts/github.py *)

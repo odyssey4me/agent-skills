@@ -5,7 +5,7 @@ metadata:
   author: odyssey4me
   version: "0.1.0"
   category: google-workspace
-  tags: [events, scheduling, availability]
+  tags: "events, scheduling, availability"
   complexity: standard
 license: MIT
 allowed-tools: Bash(python $SKILL_DIR/scripts/google-calendar.py *)

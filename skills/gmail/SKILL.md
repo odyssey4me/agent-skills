@@ -5,7 +5,7 @@ metadata:
   author: odyssey4me
   version: "0.1.0"
   category: communication
-  tags: [email, drafts, labels]
+  tags: "email, drafts, labels"
   complexity: standard
 license: MIT
 allowed-tools: Bash(python $SKILL_DIR/scripts/gmail.py *)

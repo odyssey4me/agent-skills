@@ -5,10 +5,10 @@ metadata:
   author: {{AUTHOR}}
   version: "0.1.0"
   category: {{CATEGORY}}
-  tags: [{{TAGS}}]
+  tags: "{{TAGS}}"
   type: workflow
   complexity: orchestration
-  requires: [{{REQUIRED_SKILLS}}]
+  requires: "{{REQUIRED_SKILLS}}"
 license: {{LICENSE}}
 ---
 

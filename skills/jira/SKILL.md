@@ -5,7 +5,7 @@ metadata:
   author: odyssey4me
   version: "0.3.0"
   category: project-management
-  tags: [issues, agile, sprints]
+  tags: "issues, agile, sprints"
   complexity: standard
 license: MIT
 allowed-tools: Bash(python $SKILL_DIR/scripts/jira.py *)

@@ -5,7 +5,7 @@ metadata:
   author: {{AUTHOR}}
   version: "0.1.0"
   category: {{CATEGORY}}
-  tags: [{{TAGS}}]
+  tags: "{{TAGS}}"
   complexity: standard
 license: {{LICENSE}}
 allowed-tools: Bash(python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py *)
