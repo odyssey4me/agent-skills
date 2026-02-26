@@ -33,7 +33,8 @@ Follow [Semantic Versioning](https://semver.org/) when updating it:
 
 **When to bump:** before committing changes to a skill, delegate a version
 check to a **haiku** subagent (via the Task tool with `model: "haiku"`). The
-subagent should:
+subagent should run the script, read its stdout directly, and report back
+to the parent agent — **never write output to files**. Specifically:
 
 1. Run `scripts/check_versions.sh` and report which skills need a bump.
 2. For skills that already have a bump, **validate the bump level** is
