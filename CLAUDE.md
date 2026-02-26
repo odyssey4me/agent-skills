@@ -33,9 +33,12 @@ Follow [Semantic Versioning](https://semver.org/) when updating it:
 - **Major** (0.2.0 → 1.0.0): Breaking changes — removed or renamed commands,
   changed default behaviour, restructured arguments.
 
-**When to bump:** increment the version in the same commit that changes the
-skill. If a commit modifies a skill's `SKILL.md`, scripts, or references,
-it must include a corresponding version bump.
+**When to bump:** before committing changes to a skill, compare its current
+state against the last published release to decide whether a version bump is
+needed. Use `git diff <latest-release-tag> -- skills/<skill_name>/` to see
+what changed since the last release. If the skill already has unreleased
+changes that bumped the version, an additional bump is not required — just
+ensure the existing bump level is still appropriate for the combined changes.
 
 ## TODO.md
 
