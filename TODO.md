@@ -13,8 +13,9 @@ per-skill items.
 Most skills score low on trigger term coverage. Add natural language
 variations users might say to each skill's description.
 
-- [ ] **code-review** (33%) — Add `Use when...` clause; include terms like
-  'pull request', 'merge request', 'review my code', 'check this PR'
+- [x] **code-review** (33% → 100%) — Added `Use when...` clause with trigger
+  terms: pull request, merge request, review my code, check this PR, patchset,
+  code review feedback
 - [ ] **github** (67%) — Use specific action verbs instead of nouns; add
   trigger terms 'PR', 'repo', 'actions', 'merge'
 - [ ] **gitlab** (57%) — Use specific action verbs; add 'MR', 'CI/CD',
