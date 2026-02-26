@@ -8,16 +8,6 @@ Recommendations from `tessl skill review` to improve skill quality scores.
 Common issues flagged across multiple skills are grouped first, followed by
 per-skill items.
 
-### Common: Validation Warnings
-
-All skills receive two warnings that should be investigated:
-
-- [x] **metadata field** — `metadata` should map string keys to string values.
-  Tags arrays in metadata (`tags: [...]`) may be the cause. Check whether
-  converting to comma-separated strings resolves the warning.
-- [ ] **allowed-tools field** — `allowed-tools` contains unusual tool name(s).
-  Investigate what tessl considers "usual" and adjust the format if needed.
-
 ### Common: Description Improvements
 
 Most skills score low on trigger term coverage. Add natural language
@@ -134,6 +124,17 @@ Repeated across most skills — condense or deduplicate these patterns:
   - Would reduce maintenance burden (no custom API wrapper to maintain)
   - Current custom script works well - no urgent need to migrate
   - See: https://developer.atlassian.com/cloud/acli/guides/introduction/
+
+## Remove skills.json Registry
+
+- [ ] **Remove `skills.json` and `generate_registry.py`** — The registry
+  duplicates SKILL.md frontmatter and is not consumed by any external tool
+  (`npx add-skill` reads SKILL.md directly via `gray-matter`). Replace the
+  CI drift-detection check with `tessl skill lint` or
+  `python scripts/validate_skill.py` which already validate frontmatter
+  against the source of truth. Remove `skills.json`,
+  `scripts/generate_registry.py`, `tests/test_generate_registry.py`, and
+  the pre-commit hook that runs `generate_registry.py --check`.
 
 ## Collaboration Surfacing
 
