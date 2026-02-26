@@ -27,3 +27,32 @@ jobs:
         with:
           files: dist/*.tar.gz
           generate_release_notes: true
+
+  publish-tiles:
+    runs-on: ubuntu-latest
+    needs: package-skills
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install tessl CLI
+        run: curl -fsSL https://get.tessl.io | sh
+
+      - name: Regenerate tile.json files
+        run: |
+          for d in skills/*/; do
+            [ -f "$d/tile.json" ] && tessl skill import "$d" --workspace odyssey4me --public --force 2>/dev/null
+          done
+
+      - name: Verify tiles are in sync
+        run: git diff --exit-code skills/*/tile.json
+
+      - name: Publish skills to Tessl Registry
+        env:
+          TESSL_API_KEY: ${{ secrets.TESSL_API_KEY }}
+        run: |
+          for d in skills/*/; do
+            if [ -f "$d/tile.json" ]; then
+              echo "=== Publishing $d ==="
+              tessl skill publish "$d" --public
+            fi
+          done
