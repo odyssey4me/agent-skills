@@ -3,7 +3,7 @@ name: google-drive
 description: Upload, download, search, and share files on Google Drive. Create folders and manage permissions. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, or organize Google Drive files.
 metadata:
   author: odyssey4me
-  version: "0.1.1"
+  version: "0.2.0"
   category: google-workspace
   tags: "files, folders, sharing"
   complexity: standard
@@ -54,247 +54,34 @@ Google Drive uses OAuth 2.0 for authentication. For complete setup instructions,
 
 On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
-## Commands
-
-### check
-
-Verify configuration and connectivity.
+## Script Usage
 
 ```bash
+# Setup and auth
 $SKILL_DIR/scripts/google-drive.py check
-```
-
-This validates:
-- Python dependencies are installed
-- Authentication is configured
-- Can connect to Google Drive API
-- Displays your email address and storage usage
-
-### auth setup
-
-Store OAuth 2.0 client credentials for custom OAuth flow.
-
-```bash
-$SKILL_DIR/scripts/google-drive.py auth setup \
-  --client-id YOUR_CLIENT_ID \
-  --client-secret YOUR_CLIENT_SECRET
-```
-
-Credentials are saved to `~/.config/agent-skills/google-drive.yaml`.
-
-### auth reset
-
-Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
-
-```bash
+$SKILL_DIR/scripts/google-drive.py auth setup --client-id ID --client-secret SECRET
 $SKILL_DIR/scripts/google-drive.py auth reset
-```
-
-Use this when you encounter scope or authentication errors.
-
-### auth status
-
-Show current OAuth token information without making API calls.
-
-```bash
 $SKILL_DIR/scripts/google-drive.py auth status
-```
 
-Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
-
-### files list
-
-List files in your Drive.
-
-```bash
-# List recent files
-$SKILL_DIR/scripts/google-drive.py files list
-
-# List with search query
-$SKILL_DIR/scripts/google-drive.py files list --query "name contains 'report'"
-
-# List with max results
-$SKILL_DIR/scripts/google-drive.py files list --max-results 20
-
-# List sorted by name
-$SKILL_DIR/scripts/google-drive.py files list --order-by "name"
-```
-
-**Arguments:**
-- `--query`: Drive search query (optional)
-- `--max-results`: Maximum number of results (default: 10)
-- `--order-by`: Sort order (default: "modifiedTime desc")
-
-### files search
-
-Search for files with filters.
-
-```bash
-# Search by name
-$SKILL_DIR/scripts/google-drive.py files search --name "quarterly report"
-
-# Search by MIME type
-$SKILL_DIR/scripts/google-drive.py files search --mime-type "application/pdf"
-
-# Search in a specific folder
-$SKILL_DIR/scripts/google-drive.py files search --folder FOLDER_ID
-
-# Combine filters
-$SKILL_DIR/scripts/google-drive.py files search --name "budget" --mime-type "application/vnd.google-apps.spreadsheet"
-```
-
-**Arguments:**
-- `--name`: File name to search for (partial match)
-- `--mime-type`: MIME type filter
-- `--folder`: Parent folder ID
-
-### files get
-
-Get file metadata by ID.
-
-```bash
-# Get file details
+# Files
+$SKILL_DIR/scripts/google-drive.py files list [--query QUERY] [--max-results N] [--order-by FIELD]
+$SKILL_DIR/scripts/google-drive.py files search [--name NAME] [--mime-type TYPE] [--folder ID]
 $SKILL_DIR/scripts/google-drive.py files get FILE_ID
-```
-
-**Arguments:**
-- `file_id`: The file ID (required)
-
-### files download
-
-Download a file from Google Drive.
-
-```bash
-# Download a file
-$SKILL_DIR/scripts/google-drive.py files download FILE_ID --output /path/to/local/file
-
-# Short form
-$SKILL_DIR/scripts/google-drive.py files download FILE_ID -o ./downloaded-file.pdf
-```
-
-**Arguments:**
-- `file_id`: The file ID (required)
-- `--output`, `-o`: Output file path (required)
-
-**Note:** Google Docs, Sheets, and Slides cannot be downloaded directly. Use the Google Drive web interface to export them.
-
-### files upload
-
-Upload a file to Google Drive.
-
-```bash
-# Upload a file
-$SKILL_DIR/scripts/google-drive.py files upload /path/to/file.pdf
-
-# Upload to a specific folder
-$SKILL_DIR/scripts/google-drive.py files upload /path/to/file.pdf --parent FOLDER_ID
-
-# Upload with custom name
-$SKILL_DIR/scripts/google-drive.py files upload /path/to/file.pdf --name "Quarterly Report 2024"
-
-# Upload with specific MIME type
-$SKILL_DIR/scripts/google-drive.py files upload /path/to/file --mime-type "text/csv"
-```
-
-**Arguments:**
-- `path`: Local file path (required)
-- `--parent`: Parent folder ID
-- `--mime-type`: MIME type (auto-detected if not provided)
-- `--name`: Name for the file in Drive
-
-### files move
-
-Move a file to a different folder.
-
-```bash
-# Move a file to a folder
+$SKILL_DIR/scripts/google-drive.py files download FILE_ID --output PATH
+$SKILL_DIR/scripts/google-drive.py files upload PATH [--parent ID] [--name NAME] [--mime-type TYPE]
 $SKILL_DIR/scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
-```
 
-**Arguments:**
-- `file_id`: The file ID (required)
-- `--parent`: Destination folder ID (required)
+# Folders
+$SKILL_DIR/scripts/google-drive.py folders create NAME [--parent ID]
+$SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID [--max-results N]
 
-### folders create
-
-Create a new folder.
-
-```bash
-# Create folder in root
-$SKILL_DIR/scripts/google-drive.py folders create "New Folder"
-
-# Create folder inside another folder
-$SKILL_DIR/scripts/google-drive.py folders create "Subfolder" --parent FOLDER_ID
-```
-
-**Arguments:**
-- `name`: Folder name (required)
-- `--parent`: Parent folder ID
-
-### folders list
-
-List contents of a folder.
-
-```bash
-# List folder contents
-$SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID
-
-# List with max results
-$SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID --max-results 50
-```
-
-**Arguments:**
-- `folder_id`: The folder ID (required)
-- `--max-results`: Maximum number of results (default: 100)
-
-### share
-
-Share a file with a user.
-
-```bash
-# Share as reader (default)
-$SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com
-
-# Share as writer
-$SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com --role writer
-
-# Share as commenter
-$SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com --role commenter
-
-# Share without sending notification
-$SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com --no-notify
-```
-
-**Arguments:**
-- `file_id`: File ID to share (required)
-- `--email`: Email address to share with (required)
-- `--role`: Permission role - reader, writer, commenter, owner (default: reader)
-- `--no-notify`: Don't send notification email
-
-### permissions list
-
-List permissions for a file.
-
-```bash
-# List permissions
+# Sharing and permissions
+$SKILL_DIR/scripts/google-drive.py share FILE_ID --email EMAIL [--role ROLE] [--no-notify]
 $SKILL_DIR/scripts/google-drive.py permissions list FILE_ID
-```
-
-**Arguments:**
-- `file_id`: The file ID (required)
-
-### permissions delete
-
-Remove a permission from a file.
-
-```bash
-# Delete a permission
 $SKILL_DIR/scripts/google-drive.py permissions delete FILE_ID PERMISSION_ID
 ```
 
-**Arguments:**
-- `file_id`: The file ID (required)
-- `permission_id`: The permission ID to delete (required)
+See [command-reference.md](references/command-reference.md) for full argument details and examples.
 
 ## Examples
 
@@ -352,68 +139,15 @@ $SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID
 
 ## Drive Search Query Syntax
 
-Common search operators:
-
-| Operator | Description | Example |
-|----------|-------------|---------|
-| `name contains` | Name contains string | `name contains 'report'` |
-| `name =` | Exact name match | `name = 'Budget 2024.xlsx'` |
-| `mimeType =` | File type | `mimeType = 'application/pdf'` |
-| `'ID' in parents` | In folder | `'folder_id' in parents` |
-| `modifiedTime >` | Modified after | `modifiedTime > '2024-01-01'` |
-| `trashed =` | Trashed status | `trashed = false` |
-| `starred =` | Starred status | `starred = true` |
-| `sharedWithMe` | Shared files | `sharedWithMe = true` |
-
-Combine operators with `and` or `or`:
-
-```bash
-# PDF files modified this year
-"mimeType = 'application/pdf' and modifiedTime > '2024-01-01'"
-
-# Spreadsheets containing 'budget'
-"name contains 'budget' and mimeType = 'application/vnd.google-apps.spreadsheet'"
-
-# Files in a specific folder that are not trashed
-"'folder_id' in parents and trashed = false"
-```
-
-For the complete reference, see [drive-queries.md](references/drive-queries.md).
+See [drive-queries.md](references/drive-queries.md) for operators, searchable fields, and query examples.
 
 ## Common MIME Types
 
-| Type | MIME Type |
-|------|-----------|
-| Folder | `application/vnd.google-apps.folder` |
-| Google Doc | `application/vnd.google-apps.document` |
-| Google Sheet | `application/vnd.google-apps.spreadsheet` |
-| Google Slides | `application/vnd.google-apps.presentation` |
-| PDF | `application/pdf` |
-| Word | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
-| Excel | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` |
-| PowerPoint | `application/vnd.openxmlformats-officedocument.presentationml.presentation` |
-| Text | `text/plain` |
-| CSV | `text/csv` |
-| Image (JPEG) | `image/jpeg` |
-| Image (PNG) | `image/png` |
+See [api-reference.md](references/api-reference.md) for MIME types used with `--mime-type` and search queries.
 
 ## Unsupported Operations
 
-The following Google Drive API operations are **not yet implemented** in this skill:
-
-| Operation | API Method | Alternative |
-|-----------|-----------|-------------|
-| Rename files | `files.update` (name) | Use Google Drive web interface |
-| Delete files permanently | `files.delete` | Use Google Drive web interface |
-| Trash / untrash files | `files.update` (trashed) | Use Google Drive web interface |
-| Copy files | `files.copy` | Download and re-upload as a workaround |
-| Export Google Docs/Sheets/Slides | `files.export` | Use the **google-docs**, **google-sheets**, or **google-slides** skills to work with Workspace document content |
-| Update existing permissions (change role) | `permissions.update` | Delete and re-create the permission with the new role |
-| Empty trash | `files.emptyTrash` | Use Google Drive web interface |
-| File version history | `revisions.*` | Use Google Drive web interface |
-| Comments and replies | `comments.*`, `replies.*` | Use Google Drive web interface |
-| Watch for file changes | `files.watch`, `changes.*` | Not available via any skill |
-| Shared drive management | `drives.*` | Not available via any skill |
+See [api-reference.md](references/api-reference.md#unsupported-operations) for operations not yet implemented and their alternatives.
 
 ## Error Handling
 

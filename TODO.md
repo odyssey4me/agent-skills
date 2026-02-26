@@ -10,14 +10,6 @@ per-skill items.
 
 ### Per-Skill Content Improvements
 
-**google-calendar** (content: 77%, overall: 81%)
-- [ ] Move detailed command reference to a separate reference file to reduce
-  SKILL.md length (491 lines)
-
-**google-drive** (content: 77%, overall: 81%)
-- [ ] Move MIME types table, unsupported operations table, and API scopes to
-  a reference file (SKILL.md is 511 lines, over the 500-line recommendation)
-
 **google-slides** (content: 73%, overall: 75%)
 - [ ] SKILL.md is 612 lines — move content to reference files to get under 500
 - [ ] Add validation steps in multi-step workflow examples
