@@ -10,9 +10,6 @@ per-skill items.
 
 ### Per-Skill Content Improvements
 
-**github** (content: 73%, overall: 70%)
-- [ ] Add validation/verification steps to workflows (e.g., verify PR created
-  after creation commands)
 **gitlab** (content: 73%, overall: 65%)
 - [ ] Add validation checkpoints to workflow examples
 - [ ] Remove the Summary section which repeats Quick Start content

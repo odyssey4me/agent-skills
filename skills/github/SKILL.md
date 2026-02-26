@@ -149,6 +149,9 @@ $SKILL_DIR/scripts/github.py prs view 456
 $SKILL_DIR/scripts/github.py prs checks 456
 gh pr diff 456
 gh pr review 456 --approve
+
+# Verify approval was recorded
+$SKILL_DIR/scripts/github.py prs view 456  # check review status
 ```
 
 ### Create Issue and Link PR
@@ -156,9 +159,12 @@ gh pr review 456 --approve
 ```bash
 # Create issue
 gh issue create --title "Bug: Login fails" --body "Description" --label bug
+# Verify: note the issue number from output
 
-# Create PR that fixes it (use issue number in title/body)
+# Create PR that fixes it (use issue number from above)
 gh pr create --title "Fix login bug (#123)" --body "Fixes #123"
+# Verify PR was created and linked
+$SKILL_DIR/scripts/github.py prs view <number>
 ```
 
 ### Monitor CI Pipeline
@@ -172,6 +178,8 @@ gh run list --status failure
 
 # Rerun failed jobs
 gh run rerun RUNID --failed
+# Verify rerun started
+$SKILL_DIR/scripts/github.py runs view RUNID
 ```
 
 See [common-workflows.md](references/common-workflows.md) for more examples.
