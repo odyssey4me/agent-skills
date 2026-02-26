@@ -2,7 +2,7 @@
 
 This guide covers creating and updating Confluence pages using Markdown.
 
-> **Note**: Most users primarily read from Confluence. For basic usage (search, viewing pages, listing spaces), see the main [SKILL.md](SKILL.md).
+> **Note**: Most users primarily read from Confluence. For basic usage (search, viewing pages, listing spaces), see the main [SKILL.md](../SKILL.md).
 
 ## Markdown Support
 
