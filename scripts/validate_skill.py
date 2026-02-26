@@ -158,13 +158,37 @@ def validate_skill_md(skill_md: Path, skill_name: str) -> list[ValidationError]:
                                 )
                             )
 
-                        # Check for recommended fields
+                        # Check for metadata and version
                         if "metadata" not in metadata:
                             errors.append(
                                 ValidationError(
                                     str(skill_md),
                                     "Frontmatter missing recommended field: 'metadata'",
                                     "warning",
+                                )
+                            )
+                        elif not isinstance(metadata["metadata"], dict):
+                            errors.append(
+                                ValidationError(
+                                    str(skill_md),
+                                    "Frontmatter 'metadata' must be a dictionary",
+                                )
+                            )
+                        elif "version" not in metadata["metadata"]:
+                            errors.append(
+                                ValidationError(
+                                    str(skill_md),
+                                    "Frontmatter metadata missing required field: 'version'",
+                                )
+                            )
+                        elif (
+                            not isinstance(metadata["metadata"]["version"], str)
+                            or not metadata["metadata"]["version"]
+                        ):
+                            errors.append(
+                                ValidationError(
+                                    str(skill_md),
+                                    "Frontmatter metadata 'version' must be a non-empty string",
                                 )
                             )
                         if "license" not in metadata:

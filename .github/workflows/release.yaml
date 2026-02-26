@@ -18,7 +18,12 @@ jobs:
           cd skills
           for skill in */; do
             skill_name=$(basename "$skill")
-            tar czf "../dist/${skill_name}.tar.gz" "$skill"
+            version=$(sed -n 's/^  version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$skill/SKILL.md" | head -1)
+            if [ -z "$version" ]; then
+              echo "WARNING: No version found for $skill_name, skipping"
+              continue
+            fi
+            tar czf "../dist/${skill_name}-${version}.tar.gz" "$skill"
           done
 
       - name: Create Release

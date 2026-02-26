@@ -227,6 +227,84 @@ Command.
 
         assert any("Missing YAML frontmatter" in e.message for e in errors)
 
+    def test_validate_skill_md_metadata_not_dict(self, tmp_path):
+        """Test error when metadata is not a dictionary."""
+        skill_md = tmp_path / "SKILL.md"
+        skill_md.write_text("""---
+name: test
+description: A test skill
+metadata: not-a-dict
+---
+
+# Test
+
+## Authentication
+
+Token.
+
+## Commands
+
+### cmd
+Command.
+""")
+
+        errors = validate_skill_md(skill_md, "test")
+
+        assert any("'metadata' must be a dictionary" in e.message for e in errors)
+
+    def test_validate_skill_md_missing_version(self, tmp_path):
+        """Test error when metadata.version is missing."""
+        skill_md = tmp_path / "SKILL.md"
+        skill_md.write_text("""---
+name: test
+description: A test skill
+metadata:
+  author: testauthor
+---
+
+# Test
+
+## Authentication
+
+Token.
+
+## Commands
+
+### cmd
+Command.
+""")
+
+        errors = validate_skill_md(skill_md, "test")
+
+        assert any("missing required field: 'version'" in e.message for e in errors)
+
+    def test_validate_skill_md_empty_version(self, tmp_path):
+        """Test error when metadata.version is empty."""
+        skill_md = tmp_path / "SKILL.md"
+        skill_md.write_text("""---
+name: test
+description: A test skill
+metadata:
+  author: testauthor
+  version: ""
+---
+
+# Test
+
+## Authentication
+
+Token.
+
+## Commands
+
+### cmd
+Command.
+""")
+
+        errors = validate_skill_md(skill_md, "test")
+
+        assert any("'version' must be a non-empty string" in e.message for e in errors)
+
     def test_validate_skill_md_missing_required_fields(self, tmp_path):
         """Test error for missing required frontmatter fields."""
         skill_md = tmp_path / "SKILL.md"
