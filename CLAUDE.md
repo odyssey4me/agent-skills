@@ -21,6 +21,22 @@ After the subagent completes, stage everything and commit. The `tessl-sync`
 hook will auto-update `tile.json` files — if it modifies any, stage them and
 re-commit.
 
+## Skill Versioning
+
+Each skill has a `metadata.version` field in its `SKILL.md` frontmatter.
+Follow [Semantic Versioning](https://semver.org/) when updating it:
+
+- **Patch** (0.1.0 → 0.1.1): Bug fixes, typo corrections, minor doc tweaks
+  that don't change behaviour.
+- **Minor** (0.1.1 → 0.2.0): New commands, new options, expanded
+  functionality — anything additive and backward-compatible.
+- **Major** (0.2.0 → 1.0.0): Breaking changes — removed or renamed commands,
+  changed default behaviour, restructured arguments.
+
+**When to bump:** increment the version in the same commit that changes the
+skill. If a commit modifies a skill's `SKILL.md`, scripts, or references,
+it must include a corresponding version bump.
+
 ## TODO.md
 
 When completing items from TODO.md, **remove** the finished entries entirely
