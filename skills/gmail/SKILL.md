@@ -70,10 +70,8 @@ The skill requests granular scopes for different operations:
 
 ### Scope Errors
 
-If you encounter "insufficient scope" errors, reset your token and re-authenticate:
-
-1. Reset token: `$SKILL_DIR/scripts/gmail.py auth reset`
-2. Re-run: `$SKILL_DIR/scripts/gmail.py check`
+If you encounter "insufficient scope" errors, see the
+[OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Commands
 
@@ -374,12 +372,7 @@ For the complete reference, see [gmail-queries.md](references/gmail-queries.md).
 
 ## Error Handling
 
-**Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:
-
-1. Inform the user about the error
-2. Run `$SKILL_DIR/scripts/gmail.py auth status` to check the current token state
-3. Suggest the user run `$SKILL_DIR/scripts/gmail.py auth reset` followed by `$SKILL_DIR/scripts/gmail.py check` to re-authenticate
-4. The `auth reset` and `check` commands require user interaction (browser-based OAuth consent) and cannot be completed autonomously
+**Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), **stop and inform the user**. Do not retry or attempt to fix the issue autonomously — these errors require user interaction (browser-based OAuth consent). Point the user to the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 **Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
 
@@ -393,23 +386,10 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 Run `$SKILL_DIR/scripts/gmail.py check` to diagnose issues. It will provide specific error messages and setup instructions.
 
-### Authentication failed
+### Authentication or permission errors
 
-1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/gmail.yaml`
-2. Token expired or corrupted — reset and re-authenticate:
-   ```bash
-   $SKILL_DIR/scripts/gmail.py auth reset
-   $SKILL_DIR/scripts/gmail.py check
-   ```
-
-### Permission denied
-
-Your OAuth token may not have the necessary scopes. Reset your token and re-authenticate:
-
-```bash
-$SKILL_DIR/scripts/gmail.py auth reset
-$SKILL_DIR/scripts/gmail.py check
-```
+See the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting)
+for resolving token, scope, and permission issues.
 
 ### Import errors
 
@@ -421,17 +401,6 @@ pip install --user google-auth google-auth-oauthlib google-api-python-client key
 ### Rate limiting
 
 Gmail API has quota limits. If you hit rate limits, wait a few minutes before retrying. For high-volume usage, consider requesting quota increases in the Google Cloud Console.
-
-## API Scopes
-
-This skill requests the following OAuth scopes:
-
-- `https://www.googleapis.com/auth/gmail.readonly` - Read email messages and settings
-- `https://www.googleapis.com/auth/gmail.send` - Send email messages
-- `https://www.googleapis.com/auth/gmail.modify` - Modify labels and message metadata
-- `https://www.googleapis.com/auth/gmail.labels` - Manage labels
-
-These scopes provide full email management capabilities while following the principle of least privilege.
 
 ## Security Notes
 

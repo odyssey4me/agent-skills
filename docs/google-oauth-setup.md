@@ -185,6 +185,29 @@ To revoke OAuth tokens:
 
 ## Troubleshooting
 
+### Auth reset workflow
+
+Most authentication problems (expired tokens, insufficient scopes, permission
+denied) can be resolved with the same two-step process:
+
+1. **Reset the token**: `<skill-script> auth reset`
+2. **Re-authenticate**: `<skill-script> check`
+
+The `check` command opens a browser for OAuth consent — this requires user
+interaction and cannot be completed autonomously by an agent. If you are an
+AI agent, **stop and inform the user** when you encounter auth errors rather
+than retrying or attempting to fix the issue yourself.
+
+### GCP project verification checklist
+
+If auth reset doesn't resolve the issue, verify the GCP project setup:
+
+- [ ] Required API is enabled (e.g., Gmail API, Drive API) — see [GCP Project Setup Guide](gcp-project-setup.md)
+- [ ] OAuth consent screen is configured
+- [ ] Your Google account is added as a test user (for External user type)
+- [ ] OAuth client type is "Desktop app"
+- [ ] Client ID and secret in `~/.config/agent-skills/google.yaml` match the GCP console
+
 ### "Access blocked: This app's request is invalid"
 
 - OAuth consent screen is not properly configured
@@ -203,18 +226,18 @@ To revoke OAuth tokens:
 
 ### "Token has been expired or revoked"
 
-Delete stored token and re-authenticate:
-```bash
-# Example for Gmail
-keyring del agent-skills gmail-token-json
-python scripts/gmail.py check
-```
+Run the [auth reset workflow](#auth-reset-workflow) to clear the stored token and re-authenticate.
 
 ### "insufficient_scope"
 
+Run the [auth reset workflow](#auth-reset-workflow). If that doesn't work:
+
 - Revoke access at https://myaccount.google.com/permissions
-- Delete stored token from keyring
-- Re-authenticate with the skill's `check` command
+- Then run `auth reset` and `check` again
+
+### "Permission denied"
+
+Run the [auth reset workflow](#auth-reset-workflow). If the error persists, verify your GCP project has the required API enabled using the [checklist above](#gcp-project-verification-checklist).
 
 ### Browser doesn't open
 

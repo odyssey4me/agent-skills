@@ -12,9 +12,6 @@ per-skill items.
 
 Repeated across most skills — condense or deduplicate these patterns:
 
-- [ ] **Consolidate auth reset instructions** — Several Google skills and
-  Jira repeat the same auth reset steps in multiple sections. Reference a
-  single troubleshooting section instead.
 - [ ] **Trim installation/prerequisites** — Claude knows how to install pip
   packages and CLI tools. Reduce multi-platform installation instructions to
   a single link or one-liner.
@@ -42,23 +39,14 @@ Repeated across most skills — condense or deduplicate these patterns:
 - [ ] Move Troubleshooting section to `references/troubleshooting.md`
 - [ ] Move Advanced Usage (SSH Commands, JSON Output) to a reference file
 
-**gmail** (content: 85%, overall: 85%)
-- [ ] Remove duplicate API Scopes section (already in Authentication section)
-
 **google-calendar** (content: 77%, overall: 81%)
 - [ ] Move detailed command reference to a separate reference file to reduce
   SKILL.md length (491 lines)
-
-**google-docs** (content: 85%, overall: 80%)
-- [ ] Consolidate authentication troubleshooting into a single section
 
 **google-drive** (content: 77%, overall: 81%)
 - [ ] Move MIME types table, unsupported operations table, and API scopes to
   a reference file (SKILL.md is 511 lines, over the 500-line recommendation)
 - [ ] Remove duplicate OAuth scopes information
-
-**google-sheets** (content: 85%, overall: 85%)
-- [ ] Consolidate repeated troubleshooting advice across sections
 
 **google-slides** (content: 73%, overall: 75%)
 - [ ] SKILL.md is 612 lines — move content to reference files to get under 500
