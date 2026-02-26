@@ -19,12 +19,7 @@ Interact with Confluence for content search, viewing pages, and space management
 
 ## Installation
 
-1. **Install Python dependencies**:
-   ```bash
-   pip install --user requests keyring pyyaml
-   ```
-
-2. **Download the skill** from [Releases](https://github.com/odyssey4me/agent-skills/releases) or use directly from this repository.
+**Dependencies**: `pip install --user requests keyring pyyaml`
 
 ## Setup Verification
 

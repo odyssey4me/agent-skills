@@ -17,22 +17,7 @@ This skill provides GitHub integration using the official `gh` CLI tool. A Pytho
 
 ## Prerequisites
 
-**Install gh CLI**: <https://cli.github.com/manual/installation>
-
-Quick install:
-```bash
-# macOS
-brew install gh
-
-# Linux (Debian/Ubuntu)
-sudo apt install gh
-
-# Fedora/RHEL/CentOS
-sudo dnf install gh
-
-# Windows
-winget install --id GitHub.cli
-```
+**Install gh CLI**: [installation guide](https://cli.github.com/manual/installation)
 
 ## Authentication
 

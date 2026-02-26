@@ -12,9 +12,6 @@ per-skill items.
 
 Repeated across most skills — condense or deduplicate these patterns:
 
-- [ ] **Trim installation/prerequisites** — Claude knows how to install pip
-  packages and CLI tools. Reduce multi-platform installation instructions to
-  a single link or one-liner.
 - [ ] **Remove OAuth/rate-limit explanations** — Claude understands these
   concepts. Keep to a single line or remove entirely.
 

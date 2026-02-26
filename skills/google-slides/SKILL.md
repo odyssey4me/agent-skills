@@ -17,12 +17,7 @@ Interact with Google Slides for presentation creation, slide management, and con
 
 ## Installation
 
-1. **Install Python dependencies**:
-   ```bash
-   pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
-   ```
-
-2. **Download the skill** from [Releases](https://github.com/odyssey4me/agent-skills/releases) or use directly from this repository.
+**Dependencies**: `pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml`
 
 ## Setup Verification
 

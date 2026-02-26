@@ -17,22 +17,7 @@ This skill provides GitLab integration using the official `glab` CLI tool. A Pyt
 
 ## Prerequisites
 
-**Install glab CLI**: <https://gitlab.com/gitlab-org/cli#installation>
-
-Quick install:
-```bash
-# macOS
-brew install glab
-
-# Linux (Debian/Ubuntu)
-sudo apt install glab
-
-# Fedora/RHEL/CentOS
-sudo dnf install glab
-
-# Windows
-winget install GLab.GLab
-```
+**Install glab CLI**: [installation guide](https://gitlab.com/gitlab-org/cli#installation)
 
 ## Authentication
 

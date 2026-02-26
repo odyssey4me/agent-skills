@@ -17,22 +17,7 @@ This skill provides Gerrit code review integration using `git-review` with a Pyt
 
 ## Prerequisites
 
-**Install git-review**: <https://docs.opendev.org/opendev/git-review/latest/installation.html>
-
-Quick install:
-```bash
-# Using pip (recommended)
-pip install git-review
-
-# macOS
-brew install git-review
-
-# Debian/Ubuntu
-sudo apt install git-review
-
-# Fedora/RHEL/CentOS
-sudo dnf install git-review
-```
+**Install git-review**: `pip install git-review` — [docs](https://docs.opendev.org/opendev/git-review/latest/installation.html)
 
 ## Authentication
 
