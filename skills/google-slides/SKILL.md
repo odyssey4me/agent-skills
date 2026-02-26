@@ -3,7 +3,7 @@ name: google-slides
 description: Create and edit Google Slides presentations. Add or delete slides, insert text, shapes, and images. Use when asked to build a deck, create a slideshow, update a Google presentation, or edit slides.
 metadata:
   author: odyssey4me
-  version: "0.1.0"
+  version: "0.1.1"
   category: google-workspace
   tags: "presentations, slides"
   complexity: standard

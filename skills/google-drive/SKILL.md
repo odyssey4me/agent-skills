@@ -3,7 +3,7 @@ name: google-drive
 description: Upload, download, search, and share files on Google Drive. Create folders and manage permissions. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, or organize Google Drive files.
 metadata:
   author: odyssey4me
-  version: "0.1.0"
+  version: "0.1.1"
   category: google-workspace
   tags: "files, folders, sharing"
   complexity: standard

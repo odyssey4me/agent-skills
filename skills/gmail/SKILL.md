@@ -3,7 +3,7 @@ name: gmail
 description: Send, search, and organize Gmail messages, drafts, and labels. Use when asked to compose an email, reply to mail, forward a message, search inbox, manage attachments, or organize Gmail.
 metadata:
   author: odyssey4me
-  version: "0.1.0"
+  version: "0.1.1"
   category: communication
   tags: "email, drafts, labels"
   complexity: standard

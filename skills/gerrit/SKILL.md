@@ -3,7 +3,7 @@ name: gerrit
 description: Submit, amend, and review Gerrit changes using git-review CLI. Use when asked to submit a patchset, download a change, rebase a change request, check CR status, or manage code reviews in Gerrit.
 metadata:
   author: odyssey4me
-  version: "0.2.0"
+  version: "0.2.1"
   category: code-hosting
   tags: "code-review, patches"
   complexity: lightweight

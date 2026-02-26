@@ -3,7 +3,7 @@ name: google-calendar
 description: Create, update, and organize Google Calendar events and schedules. Check availability, book time, and manage calendars. Use when asked to schedule a meeting, set up an appointment, book a call, check gcal, or manage calendar events.
 metadata:
   author: odyssey4me
-  version: "0.1.0"
+  version: "0.2.0"
   category: google-workspace
   tags: "events, scheduling, availability"
   complexity: standard
