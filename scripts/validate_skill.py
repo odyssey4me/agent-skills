@@ -188,10 +188,16 @@ def validate_skill_md(skill_md: Path, skill_name: str) -> list[ValidationError]:
             )
 
     # Check for required sections
-    required_sections = ["# ", "## Authentication", "## Commands"]
+    required_sections = ["# ", "## Authentication"]
     for section in required_sections:
         if section not in content:
             errors.append(ValidationError(str(skill_md), f"Missing required section: {section}"))
+    if "## Commands" not in content and "## Script Usage" not in content:
+        errors.append(
+            ValidationError(
+                str(skill_md), "Missing required section: ## Commands or ## Script Usage"
+            )
+        )
 
     # Check for examples section (warning only)
     if "## Examples" not in content:

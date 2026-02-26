@@ -54,268 +54,37 @@ Google Calendar uses OAuth 2.0 for authentication. For complete setup instructio
 
 On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
-## Commands
-
-### check
-
-Verify configuration and connectivity.
+## Script Usage
 
 ```bash
+# Setup and auth
 $SKILL_DIR/scripts/google-calendar.py check
-```
-
-This validates:
-- Python dependencies are installed
-- Authentication is configured
-- Can connect to Google Calendar API
-- Displays your primary calendar information
-
-### auth setup
-
-Store OAuth 2.0 client credentials for custom OAuth flow.
-
-```bash
-$SKILL_DIR/scripts/google-calendar.py auth setup \
-  --client-id YOUR_CLIENT_ID \
-  --client-secret YOUR_CLIENT_SECRET
-```
-
-Credentials are saved to `~/.config/agent-skills/google-calendar.yaml`.
-
-### auth reset
-
-Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
-
-```bash
+$SKILL_DIR/scripts/google-calendar.py auth setup --client-id ID --client-secret SECRET
 $SKILL_DIR/scripts/google-calendar.py auth reset
-```
-
-Use this when you encounter scope or authentication errors.
-
-### auth status
-
-Show current OAuth token information without making API calls.
-
-```bash
 $SKILL_DIR/scripts/google-calendar.py auth status
-```
 
-Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
-
-### calendars list
-
-List all calendars for the authenticated user.
-
-```bash
+# Calendars
 $SKILL_DIR/scripts/google-calendar.py calendars list
-```
-
-### calendars get
-
-Get details for a specific calendar.
-
-```bash
-# Get primary calendar
-$SKILL_DIR/scripts/google-calendar.py calendars get primary
-
-# Get specific calendar by ID
 $SKILL_DIR/scripts/google-calendar.py calendars get CALENDAR_ID
-```
 
-**Arguments:**
-- `calendar_id`: Calendar ID or "primary" (required)
-
-### events list
-
-List calendar events.
-
-```bash
-# List upcoming events
+# Events
 $SKILL_DIR/scripts/google-calendar.py events list
-
-# List events in specific time range
-$SKILL_DIR/scripts/google-calendar.py events list \
-  --time-min "2026-01-24T00:00:00Z" \
-  --time-max "2026-01-31T23:59:59Z"
-
-# List events from specific calendar
-$SKILL_DIR/scripts/google-calendar.py events list --calendar CALENDAR_ID
-
-# Search events
-$SKILL_DIR/scripts/google-calendar.py events list --query "meeting"
-
-# List with custom max results
-$SKILL_DIR/scripts/google-calendar.py events list --max-results 20
-```
-
-**Arguments:**
-- `--calendar`: Calendar ID (default: "primary")
-- `--time-min`: Start time (RFC3339 timestamp, e.g., "2026-01-24T00:00:00Z")
-- `--time-max`: End time (RFC3339 timestamp)
-- `--max-results`: Maximum number of results (default: 10)
-- `--query`: Free text search query
-- `--include-declined`: Include events you have declined (excluded by default)
-
-**Time Format Examples:**
-- UTC: `2026-01-24T10:00:00Z`
-- With timezone: `2026-01-24T10:00:00-05:00` (EST)
-- Date only (all-day): `2026-01-24`
-
-### events get
-
-Get details for a specific event.
-
-```bash
-# Get event from primary calendar
 $SKILL_DIR/scripts/google-calendar.py events get EVENT_ID
-
-# Get event from specific calendar
-$SKILL_DIR/scripts/google-calendar.py events get EVENT_ID --calendar CALENDAR_ID
-```
-
-**Arguments:**
-- `event_id`: Event ID (required)
-- `--calendar`: Calendar ID (default: "primary")
-
-### events create
-
-Create a new calendar event.
-
-```bash
-# Create simple event with time
-$SKILL_DIR/scripts/google-calendar.py events create \
-  --summary "Team Meeting" \
-  --start "2026-01-24T10:00:00-05:00" \
-  --end "2026-01-24T11:00:00-05:00"
-
-# Create all-day event
-$SKILL_DIR/scripts/google-calendar.py events create \
-  --summary "Conference" \
-  --start "2026-01-24" \
-  --end "2026-01-25" \
-  --timezone "America/New_York"
-
-# Create event with details
-$SKILL_DIR/scripts/google-calendar.py events create \
-  --summary "Project Review" \
-  --start "2026-01-24T14:00:00Z" \
-  --end "2026-01-24T15:00:00Z" \
-  --description "Quarterly project review meeting" \
-  --location "Conference Room A" \
-  --attendees "alice@example.com,bob@example.com"
-
-# Create on specific calendar
-$SKILL_DIR/scripts/google-calendar.py events create \
-  --calendar CALENDAR_ID \
-  --summary "Event" \
-  --start "2026-01-24T10:00:00Z" \
-  --end "2026-01-24T11:00:00Z"
-```
-
-**Arguments:**
-- `--summary`: Event title (required)
-- `--start`: Start time - RFC3339 timestamp or YYYY-MM-DD for all-day (required)
-- `--end`: End time - RFC3339 timestamp or YYYY-MM-DD for all-day (required)
-- `--calendar`: Calendar ID (default: "primary")
-- `--description`: Event description
-- `--location`: Event location
-- `--attendees`: Comma-separated list of attendee email addresses
-- `--timezone`: Timezone for all-day events (e.g., "America/New_York")
-
-### events update
-
-Update an existing event.
-
-```bash
-# Update event summary
-$SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
-  --summary "Updated Meeting Title"
-
-# Update event time
-$SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
-  --start "2026-01-24T15:00:00Z" \
-  --end "2026-01-24T16:00:00Z"
-
-# Update multiple fields
-$SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
-  --summary "Project Sync" \
-  --location "Room B" \
-  --description "Updated agenda"
-
-# Update event on specific calendar
-$SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
-  --calendar CALENDAR_ID \
-  --summary "New Title"
-```
-
-**Arguments:**
-- `event_id`: Event ID (required)
-- `--calendar`: Calendar ID (default: "primary")
-- `--summary`: New event title
-- `--start`: New start time (RFC3339 or YYYY-MM-DD)
-- `--end`: New end time (RFC3339 or YYYY-MM-DD)
-- `--description`: New description
-- `--location`: New location
-
-### events delete
-
-Delete a calendar event.
-
-```bash
-# Delete event from primary calendar
+$SKILL_DIR/scripts/google-calendar.py events create --summary TITLE --start TIME --end TIME
+$SKILL_DIR/scripts/google-calendar.py events update EVENT_ID --summary TITLE
 $SKILL_DIR/scripts/google-calendar.py events delete EVENT_ID
 
-# Delete event from specific calendar
-$SKILL_DIR/scripts/google-calendar.py events delete EVENT_ID --calendar CALENDAR_ID
+# Availability
+$SKILL_DIR/scripts/google-calendar.py freebusy --start TIME --end TIME
 ```
 
-**Arguments:**
-- `event_id`: Event ID (required)
-- `--calendar`: Calendar ID (default: "primary")
+All commands support `--calendar CALENDAR_ID` (default: "primary"). Times use RFC3339 format (e.g., `2026-01-24T10:00:00Z`) or `YYYY-MM-DD` for all-day events.
 
-### freebusy
-
-Check free/busy information for calendars.
-
-```bash
-# Check availability for primary calendar
-$SKILL_DIR/scripts/google-calendar.py freebusy \
-  --start "2026-01-24T00:00:00Z" \
-  --end "2026-01-25T00:00:00Z"
-
-# Check multiple calendars
-$SKILL_DIR/scripts/google-calendar.py freebusy \
-  --start "2026-01-24T08:00:00Z" \
-  --end "2026-01-24T17:00:00Z" \
-  --calendars "primary,calendar1@example.com,calendar2@example.com"
-```
-
-**Arguments:**
-- `--start`: Start time (RFC3339 timestamp, required)
-- `--end`: End time (RFC3339 timestamp, required)
-- `--calendars`: Comma-separated calendar IDs (default: "primary")
+See [command-reference.md](references/command-reference.md) for full argument details and examples.
 
 ## Examples
 
-### Verify Setup
-
-```bash
-$SKILL_DIR/scripts/google-calendar.py check
-```
-
-### View upcoming events
-
-```bash
-# Next 10 events
-$SKILL_DIR/scripts/google-calendar.py events list
-
-# This week's events
-$SKILL_DIR/scripts/google-calendar.py events list \
-  --time-min "2026-01-24T00:00:00Z" \
-  --time-max "2026-01-31T23:59:59Z"
-```
-
-### Create a meeting
+### Schedule a meeting with attendees
 
 ```bash
 $SKILL_DIR/scripts/google-calendar.py events create \
@@ -326,25 +95,7 @@ $SKILL_DIR/scripts/google-calendar.py events create \
   --attendees "team@example.com"
 ```
 
-### Schedule an all-day event
-
-```bash
-$SKILL_DIR/scripts/google-calendar.py events create \
-  --summary "Company Holiday" \
-  --start "2026-12-25" \
-  --end "2026-12-26" \
-  --timezone "America/New_York"
-```
-
-### Reschedule an event
-
-```bash
-$SKILL_DIR/scripts/google-calendar.py events update EVENT_ID \
-  --start "2026-01-24T14:00:00Z" \
-  --end "2026-01-24T15:00:00Z"
-```
-
-### Find available time slots
+### Find available time across calendars
 
 ```bash
 $SKILL_DIR/scripts/google-calendar.py freebusy \
@@ -353,41 +104,13 @@ $SKILL_DIR/scripts/google-calendar.py freebusy \
   --calendars "primary,colleague@example.com"
 ```
 
-### Search for events
+### List this week's events
 
 ```bash
-$SKILL_DIR/scripts/google-calendar.py events list --query "project review"
+$SKILL_DIR/scripts/google-calendar.py events list \
+  --time-min "2026-01-24T00:00:00Z" \
+  --time-max "2026-01-31T23:59:59Z"
 ```
-
-### Cancel an event
-
-```bash
-$SKILL_DIR/scripts/google-calendar.py events delete EVENT_ID
-```
-
-## Date and Time Format
-
-Google Calendar uses RFC3339 format for timestamps. See [calendar-timezones.md](references/calendar-timezones.md) for detailed timezone handling.
-
-### Timed Events
-
-Use RFC3339 format with timezone:
-
-```
-2026-01-24T10:00:00-05:00  # 10 AM EST
-2026-01-24T10:00:00Z       # 10 AM UTC
-2026-01-24T10:00:00+01:00  # 10 AM CET
-```
-
-### All-Day Events
-
-Use date format (YYYY-MM-DD):
-
-```
-2026-01-24  # All day on January 24, 2026
-```
-
-For all-day events, you can specify a timezone using the `--timezone` argument.
 
 ## Agent Guidance — Declined Events
 
