@@ -602,12 +602,6 @@ Ensure your GCP project has:
 
 See [docs/gcp-project-setup.md](https://github.com/odyssey4me/agent-skills/blob/main/docs/gcp-project-setup.md) for detailed instructions.
 
-## Related Skills
-
-- [Google Drive](https://github.com/odyssey4me/agent-skills/blob/main/skills/google-drive/SKILL.md) - File management (Drive manages file metadata, Slides manages content)
-- [Google Docs](https://github.com/odyssey4me/agent-skills/blob/main/skills/google-docs/SKILL.md) - Document creation and editing
-- [Google Sheets](https://github.com/odyssey4me/agent-skills/blob/main/skills/google-sheets/SKILL.md) - Spreadsheet management
-
 ## API Reference
 
 For advanced usage, see:
