@@ -10,10 +10,6 @@ per-skill items.
 
 ### Per-Skill Content Improvements
 
-**gerrit** (content: 77%, overall: 76%)
-- [ ] Move Troubleshooting section to `references/troubleshooting.md`
-- [ ] Move Advanced Usage (SSH Commands, JSON Output) to a reference file
-
 **google-calendar** (content: 77%, overall: 81%)
 - [ ] Move detailed command reference to a separate reference file to reduce
   SKILL.md length (491 lines)
