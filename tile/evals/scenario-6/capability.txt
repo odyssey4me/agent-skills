@@ -1,1 +1,0 @@
-CQL-Based Confluence Search
