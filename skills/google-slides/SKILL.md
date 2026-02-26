@@ -8,7 +8,7 @@ metadata:
   tags: "presentations, slides"
   complexity: standard
 license: MIT
-allowed-tools: Bash(python $SKILL_DIR/scripts/google-slides.py *)
+allowed-tools: Bash($SKILL_DIR/scripts/google-slides.py:*)
 ---
 
 # Google Slides
@@ -29,7 +29,7 @@ Interact with Google Slides for presentation creation, slide management, and con
 After installation, verify the skill is properly configured:
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py check
+$SKILL_DIR/scripts/google-slides.py check
 ```
 
 This will check:
@@ -55,7 +55,7 @@ Google Slides uses OAuth 2.0 for authentication. For complete setup instructions
      client_secret: your-client-secret
    ```
 
-2. Run `python $SKILL_DIR/scripts/google-slides.py check` to trigger OAuth flow and verify setup.
+2. Run `$SKILL_DIR/scripts/google-slides.py check` to trigger OAuth flow and verify setup.
 
 ### OAuth Scopes
 
@@ -71,8 +71,8 @@ The skill requests granular scopes for different operations:
 
 If you encounter "insufficient scope" errors, reset your token and re-authenticate:
 
-1. Reset token: `python $SKILL_DIR/scripts/google-slides.py auth reset`
-2. Re-run: `python $SKILL_DIR/scripts/google-slides.py check`
+1. Reset token: `$SKILL_DIR/scripts/google-slides.py auth reset`
+2. Re-run: `$SKILL_DIR/scripts/google-slides.py check`
 
 ## Commands
 
@@ -81,7 +81,7 @@ If you encounter "insufficient scope" errors, reset your token and re-authentica
 Verify configuration and connectivity.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py check
+$SKILL_DIR/scripts/google-slides.py check
 ```
 
 This validates:
@@ -95,7 +95,7 @@ This validates:
 Store OAuth 2.0 client credentials for custom OAuth flow.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py auth setup \
+$SKILL_DIR/scripts/google-slides.py auth setup \
   --client-id YOUR_CLIENT_ID \
   --client-secret YOUR_CLIENT_SECRET
 ```
@@ -111,7 +111,7 @@ Credentials are saved to `~/.config/agent-skills/google-slides.yaml`.
 Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py auth reset
+$SKILL_DIR/scripts/google-slides.py auth reset
 ```
 
 Use this when you encounter scope or authentication errors.
@@ -121,7 +121,7 @@ Use this when you encounter scope or authentication errors.
 Show current OAuth token information without making API calls.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py auth status
+$SKILL_DIR/scripts/google-slides.py auth status
 ```
 
 Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
@@ -131,7 +131,7 @@ Displays: whether a token is stored, granted scopes, refresh token presence, tok
 Create a new Google Slides presentation.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py presentations create --title "My Presentation"
+$SKILL_DIR/scripts/google-slides.py presentations create --title "My Presentation"
 ```
 
 **Options:**
@@ -139,7 +139,7 @@ python $SKILL_DIR/scripts/google-slides.py presentations create --title "My Pres
 
 **Example:**
 ```bash
-python $SKILL_DIR/scripts/google-slides.py presentations create --title "Q4 Review"
+$SKILL_DIR/scripts/google-slides.py presentations create --title "Q4 Review"
 
 # Output:
 # ✓ Presentation created successfully
@@ -154,7 +154,7 @@ python $SKILL_DIR/scripts/google-slides.py presentations create --title "Q4 Revi
 Get presentation metadata and structure.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py presentations get PRESENTATION_ID
+$SKILL_DIR/scripts/google-slides.py presentations get PRESENTATION_ID
 ```
 
 **Arguments:**
@@ -162,7 +162,7 @@ python $SKILL_DIR/scripts/google-slides.py presentations get PRESENTATION_ID
 
 **Example:**
 ```bash
-python $SKILL_DIR/scripts/google-slides.py presentations get 1abc...xyz
+$SKILL_DIR/scripts/google-slides.py presentations get 1abc...xyz
 
 # Output:
 # Title: Q4 Review
@@ -186,7 +186,7 @@ python $SKILL_DIR/scripts/google-slides.py presentations get 1abc...xyz
 Read presentation text content from all slides, or export as PDF.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py presentations read PRESENTATION_ID
+$SKILL_DIR/scripts/google-slides.py presentations read PRESENTATION_ID
 ```
 
 **Arguments:**
@@ -199,10 +199,10 @@ python $SKILL_DIR/scripts/google-slides.py presentations read PRESENTATION_ID
 **Example:**
 ```bash
 # Read as text (default)
-python $SKILL_DIR/scripts/google-slides.py presentations read 1abc...xyz
+$SKILL_DIR/scripts/google-slides.py presentations read 1abc...xyz
 
 # Export as PDF
-python $SKILL_DIR/scripts/google-slides.py presentations read 1abc...xyz --format pdf --output presentation.pdf
+$SKILL_DIR/scripts/google-slides.py presentations read 1abc...xyz --format pdf --output presentation.pdf
 
 # Output (text format):
 # --- Slide 1 ---
@@ -228,7 +228,7 @@ python $SKILL_DIR/scripts/google-slides.py presentations read 1abc...xyz --forma
 Add a new slide to a presentation.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py slides create PRESENTATION_ID --layout BLANK
+$SKILL_DIR/scripts/google-slides.py slides create PRESENTATION_ID --layout BLANK
 ```
 
 **Arguments:**
@@ -250,10 +250,10 @@ python $SKILL_DIR/scripts/google-slides.py slides create PRESENTATION_ID --layou
 **Example:**
 ```bash
 # Add blank slide at the end
-python $SKILL_DIR/scripts/google-slides.py slides create 1abc...xyz --layout BLANK
+$SKILL_DIR/scripts/google-slides.py slides create 1abc...xyz --layout BLANK
 
 # Add title slide at position 0
-python $SKILL_DIR/scripts/google-slides.py slides create 1abc...xyz --layout TITLE --index 0
+$SKILL_DIR/scripts/google-slides.py slides create 1abc...xyz --layout TITLE --index 0
 
 # Output:
 # ✓ Slide created successfully
@@ -268,7 +268,7 @@ See [references/layouts-guide.md](references/layouts-guide.md) for layout detail
 Delete a slide from a presentation.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py slides delete PRESENTATION_ID --slide-id SLIDE_ID
+$SKILL_DIR/scripts/google-slides.py slides delete PRESENTATION_ID --slide-id SLIDE_ID
 ```
 
 **Arguments:**
@@ -280,10 +280,10 @@ python $SKILL_DIR/scripts/google-slides.py slides delete PRESENTATION_ID --slide
 **Example:**
 ```bash
 # Get slide IDs first
-python $SKILL_DIR/scripts/google-slides.py presentations get 1abc...xyz
+$SKILL_DIR/scripts/google-slides.py presentations get 1abc...xyz
 
 # Delete a slide
-python $SKILL_DIR/scripts/google-slides.py slides delete 1abc...xyz --slide-id slide_abc123
+$SKILL_DIR/scripts/google-slides.py slides delete 1abc...xyz --slide-id slide_abc123
 
 # Output:
 # ✓ Slide deleted successfully
@@ -296,7 +296,7 @@ python $SKILL_DIR/scripts/google-slides.py slides delete 1abc...xyz --slide-id s
 Insert text into a slide.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py text insert PRESENTATION_ID \
+$SKILL_DIR/scripts/google-slides.py text insert PRESENTATION_ID \
   --slide-id SLIDE_ID \
   --text "Hello World"
 ```
@@ -315,12 +315,12 @@ python $SKILL_DIR/scripts/google-slides.py text insert PRESENTATION_ID \
 **Example:**
 ```bash
 # Insert text at default position
-python $SKILL_DIR/scripts/google-slides.py text insert 1abc...xyz \
+$SKILL_DIR/scripts/google-slides.py text insert 1abc...xyz \
   --slide-id slide_abc123 \
   --text "Hello World"
 
 # Insert text at custom position
-python $SKILL_DIR/scripts/google-slides.py text insert 1abc...xyz \
+$SKILL_DIR/scripts/google-slides.py text insert 1abc...xyz \
   --slide-id slide_abc123 \
   --text "Q4 Results" \
   --x 50 --y 50 --width 500 --height 80
@@ -339,7 +339,7 @@ python $SKILL_DIR/scripts/google-slides.py text insert 1abc...xyz \
 Create a shape on a slide.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py shapes create PRESENTATION_ID \
+$SKILL_DIR/scripts/google-slides.py shapes create PRESENTATION_ID \
   --slide-id SLIDE_ID \
   --shape-type RECTANGLE
 ```
@@ -363,12 +363,12 @@ python $SKILL_DIR/scripts/google-slides.py shapes create PRESENTATION_ID \
 **Example:**
 ```bash
 # Create rectangle
-python $SKILL_DIR/scripts/google-slides.py shapes create 1abc...xyz \
+$SKILL_DIR/scripts/google-slides.py shapes create 1abc...xyz \
   --slide-id slide_abc123 \
   --shape-type RECTANGLE
 
 # Create star with custom size
-python $SKILL_DIR/scripts/google-slides.py shapes create 1abc...xyz \
+$SKILL_DIR/scripts/google-slides.py shapes create 1abc...xyz \
   --slide-id slide_abc123 \
   --shape-type STAR_5 \
   --x 300 --y 200 --width 150 --height 150
@@ -387,7 +387,7 @@ See [references/shapes-guide.md](references/shapes-guide.md) for all shape types
 Insert an image into a slide.
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py images create PRESENTATION_ID \
+$SKILL_DIR/scripts/google-slides.py images create PRESENTATION_ID \
   --slide-id SLIDE_ID \
   --image-url "https://example.com/image.png"
 ```
@@ -405,7 +405,7 @@ python $SKILL_DIR/scripts/google-slides.py images create PRESENTATION_ID \
 
 **Example:**
 ```bash
-python $SKILL_DIR/scripts/google-slides.py images create 1abc...xyz \
+$SKILL_DIR/scripts/google-slides.py images create 1abc...xyz \
   --slide-id slide_abc123 \
   --image-url "https://example.com/chart.png" \
   --x 50 --y 150 --width 400 --height 300
@@ -425,19 +425,19 @@ python $SKILL_DIR/scripts/google-slides.py images create 1abc...xyz \
 
 ```bash
 # Create presentation (note the presentation ID from the output)
-python $SKILL_DIR/scripts/google-slides.py presentations create --title "Team Update"
+$SKILL_DIR/scripts/google-slides.py presentations create --title "Team Update"
 
 # Get the default slide ID (note the slide ID from the output)
-python $SKILL_DIR/scripts/google-slides.py presentations get $PRES_ID
+$SKILL_DIR/scripts/google-slides.py presentations get $PRES_ID
 
 # Add title text
-python $SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
+$SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
   --slide-id $SLIDE_ID \
   --text "Q4 Team Update" \
   --x 50 --y 50 --width 600 --height 100
 
 # Add subtitle
-python $SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
+$SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
   --slide-id $SLIDE_ID \
   --text "December 2024" \
   --x 50 --y 180 --width 600 --height 50
@@ -450,25 +450,25 @@ python $SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
 PRES_ID="your-presentation-id"
 
 # Add content slide (note the slide ID from the output)
-python $SKILL_DIR/scripts/google-slides.py slides create $PRES_ID --layout TITLE_AND_BODY
+$SKILL_DIR/scripts/google-slides.py slides create $PRES_ID --layout TITLE_AND_BODY
 
 # Add title
-python $SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
+$SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
   --slide-id $SLIDE_ID \
   --text "Key Metrics" \
   --x 50 --y 30 --width 600 --height 60
 
 # Add chart image
-python $SKILL_DIR/scripts/google-slides.py images create $PRES_ID \
+$SKILL_DIR/scripts/google-slides.py images create $PRES_ID \
   --slide-id $SLIDE_ID \
   --image-url "https://example.com/metrics.png" \
   --x 100 --y 120 --width 500 --height 350
 
 # Add another slide with shapes (note the slide ID from the output)
-python $SKILL_DIR/scripts/google-slides.py slides create $PRES_ID --layout BLANK
+$SKILL_DIR/scripts/google-slides.py slides create $PRES_ID --layout BLANK
 
 # Add decorative shape
-python $SKILL_DIR/scripts/google-slides.py shapes create $PRES_ID \
+$SKILL_DIR/scripts/google-slides.py shapes create $PRES_ID \
   --slide-id $SLIDE2_ID \
   --shape-type STAR_5 \
   --x 550 --y 30 --width 80 --height 80
@@ -480,13 +480,13 @@ python $SKILL_DIR/scripts/google-slides.py shapes create $PRES_ID \
 #!/bin/bash
 
 # Create presentation (note the presentation ID from the output)
-python $SKILL_DIR/scripts/google-slides.py presentations create --title "Sales Report"
+$SKILL_DIR/scripts/google-slides.py presentations create --title "Sales Report"
 
 # Add a slide for each region (note the slide ID from each output)
-python $SKILL_DIR/scripts/google-slides.py slides create $PRES_ID --layout TITLE_AND_BODY
+$SKILL_DIR/scripts/google-slides.py slides create $PRES_ID --layout TITLE_AND_BODY
 
 # Insert text on each slide using the slide ID from the output above
-python $SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
+$SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
   --slide-id $SLIDE_ID \
   --text "North Region Sales" \
   --x 50 --y 30 --width 600 --height 80
@@ -521,8 +521,8 @@ Google Slides uses **points** for positioning and sizing:
 **Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:
 
 1. Inform the user about the error
-2. Run `python $SKILL_DIR/scripts/google-slides.py auth status` to check the current token state
-3. Suggest the user run `python $SKILL_DIR/scripts/google-slides.py auth reset` followed by `python $SKILL_DIR/scripts/google-slides.py check` to re-authenticate
+2. Run `$SKILL_DIR/scripts/google-slides.py auth status` to check the current token state
+3. Suggest the user run `$SKILL_DIR/scripts/google-slides.py auth reset` followed by `$SKILL_DIR/scripts/google-slides.py check` to re-authenticate
 4. The `auth reset` and `check` commands require user interaction (browser-based OAuth consent) and cannot be completed autonomously
 
 **Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
@@ -538,8 +538,8 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/google-slides.yaml`
 2. Token expired or corrupted — reset and re-authenticate:
    ```bash
-   python $SKILL_DIR/scripts/google-slides.py auth reset
-   python $SKILL_DIR/scripts/google-slides.py check
+   $SKILL_DIR/scripts/google-slides.py auth reset
+   $SKILL_DIR/scripts/google-slides.py check
    ```
 
 ### Permission denied
@@ -547,8 +547,8 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 Your OAuth token may not have the necessary scopes. Reset your token and re-authenticate:
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py auth reset
-python $SKILL_DIR/scripts/google-slides.py check
+$SKILL_DIR/scripts/google-slides.py auth reset
+$SKILL_DIR/scripts/google-slides.py check
 ```
 
 ### Cannot find presentation
@@ -562,7 +562,7 @@ Make sure you're using the correct presentation ID from the URL:
 Slide IDs are object IDs, not indices. Get them with:
 
 ```bash
-python $SKILL_DIR/scripts/google-slides.py presentations get $PRES_ID
+$SKILL_DIR/scripts/google-slides.py presentations get $PRES_ID
 ```
 
 ### Image not appearing

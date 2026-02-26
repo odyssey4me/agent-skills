@@ -8,7 +8,7 @@ metadata:
   tags: "issues, pull-requests, workflows"
   complexity: lightweight
 license: MIT
-allowed-tools: Bash(python $SKILL_DIR/scripts/github.py *)
+allowed-tools: Bash($SKILL_DIR/scripts/github.py:*)
 ---
 
 # GitHub Skill
@@ -52,30 +52,30 @@ The wrapper script (`scripts/github.py`) formats output as markdown. Use it for 
 
 ```bash
 # Check gh CLI is installed and authenticated
-python $SKILL_DIR/scripts/github.py check
+$SKILL_DIR/scripts/github.py check
 
 # Issues
-python $SKILL_DIR/scripts/github.py issues list --repo OWNER/REPO
-python $SKILL_DIR/scripts/github.py issues view 123 --repo OWNER/REPO
+$SKILL_DIR/scripts/github.py issues list --repo OWNER/REPO
+$SKILL_DIR/scripts/github.py issues view 123 --repo OWNER/REPO
 
 # Pull Requests
-python $SKILL_DIR/scripts/github.py prs list --repo OWNER/REPO
-python $SKILL_DIR/scripts/github.py prs view 456 --repo OWNER/REPO
-python $SKILL_DIR/scripts/github.py prs checks 456 --repo OWNER/REPO
-python $SKILL_DIR/scripts/github.py prs status --repo OWNER/REPO
+$SKILL_DIR/scripts/github.py prs list --repo OWNER/REPO
+$SKILL_DIR/scripts/github.py prs view 456 --repo OWNER/REPO
+$SKILL_DIR/scripts/github.py prs checks 456 --repo OWNER/REPO
+$SKILL_DIR/scripts/github.py prs status --repo OWNER/REPO
 
 # Workflow Runs
-python $SKILL_DIR/scripts/github.py runs list --repo OWNER/REPO
-python $SKILL_DIR/scripts/github.py runs view 12345 --repo OWNER/REPO
+$SKILL_DIR/scripts/github.py runs list --repo OWNER/REPO
+$SKILL_DIR/scripts/github.py runs view 12345 --repo OWNER/REPO
 
 # Repositories
-python $SKILL_DIR/scripts/github.py repos list
-python $SKILL_DIR/scripts/github.py repos view OWNER/REPO
+$SKILL_DIR/scripts/github.py repos list
+$SKILL_DIR/scripts/github.py repos view OWNER/REPO
 
 # Search
-python $SKILL_DIR/scripts/github.py search repos "machine learning"
-python $SKILL_DIR/scripts/github.py search issues "label:bug is:open"
-python $SKILL_DIR/scripts/github.py search prs "is:open review:required"
+$SKILL_DIR/scripts/github.py search repos "machine learning"
+$SKILL_DIR/scripts/github.py search issues "label:bug is:open"
+$SKILL_DIR/scripts/github.py search prs "is:open review:required"
 ```
 
 All commands support `--limit N` for list commands (default 30).
@@ -157,11 +157,11 @@ Full reference: [gh search](https://cli.github.com/manual/gh_search)
 
 ```bash
 # Show PRs needing your attention
-python $SKILL_DIR/scripts/github.py prs status
+$SKILL_DIR/scripts/github.py prs status
 
 # Review a specific PR
-python $SKILL_DIR/scripts/github.py prs view 456
-python $SKILL_DIR/scripts/github.py prs checks 456
+$SKILL_DIR/scripts/github.py prs view 456
+$SKILL_DIR/scripts/github.py prs checks 456
 gh pr diff 456
 gh pr review 456 --approve
 ```
@@ -303,8 +303,8 @@ The GitHub skill uses the official `gh` CLI with a Python wrapper for markdown-f
 **Quick start:**
 1. Install: `brew install gh` (or equivalent for your OS)
 2. Authenticate: `gh auth login`
-3. Verify: `python $SKILL_DIR/scripts/github.py check`
-4. Read: `python $SKILL_DIR/scripts/github.py issues list --repo OWNER/REPO`
+3. Verify: `$SKILL_DIR/scripts/github.py check`
+4. Read: `$SKILL_DIR/scripts/github.py issues list --repo OWNER/REPO`
 5. Write: `gh issue create`, `gh pr create`, etc. (use `gh` directly)
 
 For detailed command reference, use `gh <command> --help` or visit <https://cli.github.com/manual/>.

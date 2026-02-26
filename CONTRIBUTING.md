@@ -121,7 +121,7 @@ See the [Developer Guide - Creating New Skills](docs/developer-guide.md#creating
 **Quick commands**:
 ```bash
 cp -r templates/api-skill skills/myskill
-python skills/myskill/scripts/myskill.py check
+skills/myskill/scripts/myskill.py check
 python scripts/validate_skill.py skills/myskill
 ```
 

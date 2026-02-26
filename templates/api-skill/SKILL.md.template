@@ -8,7 +8,7 @@ metadata:
   tags: "{{TAGS}}"
   complexity: standard
 license: {{LICENSE}}
-allowed-tools: Bash(python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py *)
+allowed-tools: Bash($SKILL_DIR/scripts/{{SERVICE_NAME}}.py:*)
 ---
 
 # {{SKILL_NAME}}
@@ -29,7 +29,7 @@ allowed-tools: Bash(python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py *)
 After installation, verify the skill is properly configured:
 
 ```bash
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py check
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py check
 ```
 
 This will check:
@@ -73,7 +73,7 @@ token: your-api-token
 Verify configuration and connectivity.
 
 ```bash
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py check
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py check
 ```
 
 This validates:
@@ -86,8 +86,8 @@ This validates:
 List resources.
 
 ```bash
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py list
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py list --max-results 20
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py list
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py list --max-results 20
 ```
 
 **Arguments:**
@@ -99,8 +99,8 @@ python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py list --max-results 20
 Get a specific resource by ID.
 
 ```bash
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py get RESOURCE_ID
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py get RESOURCE_ID --json
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py get RESOURCE_ID
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py get RESOURCE_ID --json
 ```
 
 **Arguments:**
@@ -112,7 +112,7 @@ python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py get RESOURCE_ID --json
 Create a new resource.
 
 ```bash
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py create --name "New Resource" --description "Description"
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py create --name "New Resource" --description "Description"
 ```
 
 **Arguments:**
@@ -125,25 +125,25 @@ python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py create --name "New Resource" --des
 ### Verify Setup
 
 ```bash
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py check
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py check
 ```
 
 ### List all resources
 
 ```bash
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py list
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py list
 ```
 
 ### Get resource details
 
 ```bash
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py get my-resource-id
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py get my-resource-id
 ```
 
 ### Create a new resource
 
 ```bash
-python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py create --name "My Resource" --description "A description"
+$SKILL_DIR/scripts/{{SERVICE_NAME}}.py create --name "My Resource" --description "A description"
 ```
 
 ## Error Handling
@@ -151,7 +151,7 @@ python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py create --name "My Resource" --desc
 **Authentication errors are not retryable.** If a command fails with an authentication or permission error (exit code 1), do NOT retry the same command. Instead:
 
 1. Inform the user about the error
-2. Suggest the user verify their credentials and re-run `python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py check`
+2. Suggest the user verify their credentials and re-run `$SKILL_DIR/scripts/{{SERVICE_NAME}}.py check`
 3. Authentication setup requires user interaction and cannot be completed autonomously
 
 **Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
@@ -164,7 +164,7 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ### Check command fails
 
-Run `python $SKILL_DIR/scripts/{{SERVICE_NAME}}.py check` to diagnose issues. It will provide specific error messages and setup instructions.
+Run `$SKILL_DIR/scripts/{{SERVICE_NAME}}.py check` to diagnose issues. It will provide specific error messages and setup instructions.
 
 ### Authentication failed
 

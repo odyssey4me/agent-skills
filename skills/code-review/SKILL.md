@@ -89,13 +89,13 @@ Verify that the required platform skill is available and authenticated.
 
 ```bash
 # For GitHub repos
-python skills/github/scripts/github.py check
+skills/github/scripts/github.py check
 
 # For GitLab repos
-python skills/gitlab/scripts/gitlab.py check
+skills/gitlab/scripts/gitlab.py check
 
 # For Gerrit repos
-python skills/gerrit/scripts/gerrit.py check
+skills/gerrit/scripts/gerrit.py check
 ```
 
 ## Repository Context
@@ -186,19 +186,19 @@ git remote -v
 
 **GitHub:**
 ```bash
-python skills/github/scripts/github.py prs view <number> --repo OWNER/REPO
-python skills/github/scripts/github.py prs checks <number> --repo OWNER/REPO
+skills/github/scripts/github.py prs view <number> --repo OWNER/REPO
+skills/github/scripts/github.py prs checks <number> --repo OWNER/REPO
 ```
 
 **GitLab:**
 ```bash
-python skills/gitlab/scripts/gitlab.py mrs view <number> --repo GROUP/REPO
-python skills/gitlab/scripts/gitlab.py pipelines list --repo GROUP/REPO
+skills/gitlab/scripts/gitlab.py mrs view <number> --repo GROUP/REPO
+skills/gitlab/scripts/gitlab.py pipelines list --repo GROUP/REPO
 ```
 
 **Gerrit:**
 ```bash
-python skills/gerrit/scripts/gerrit.py changes view <change-number>
+skills/gerrit/scripts/gerrit.py changes view <change-number>
 ```
 
 ### Step 3: Assess CI/Test Status
@@ -297,7 +297,7 @@ glab mr approve <number>
 Review PR #42
 ```
 
-The agent will run `git remote -v`, detect GitHub, fetch the PR with `python skills/github/scripts/github.py prs view 42`, check CI with `python skills/github/scripts/github.py prs checks 42`, fetch the diff with `gh pr diff 42`, and provide structured review feedback.
+The agent will run `git remote -v`, detect GitHub, fetch the PR with `skills/github/scripts/github.py prs view 42`, check CI with `skills/github/scripts/github.py prs checks 42`, fetch the diff with `gh pr diff 42`, and provide structured review feedback.
 
 ### Review a GitLab MR by URL
 
@@ -360,8 +360,8 @@ glab auth status
 Ensure the PR/MR number is correct and the change exists:
 ```bash
 # GitHub
-python skills/github/scripts/github.py prs view <number>
+skills/github/scripts/github.py prs view <number>
 
 # GitLab
-python skills/gitlab/scripts/gitlab.py mrs view <number>
+skills/gitlab/scripts/gitlab.py mrs view <number>
 ```

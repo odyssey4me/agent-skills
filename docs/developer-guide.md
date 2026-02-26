@@ -380,8 +380,8 @@ python scripts/validate_skill.py skills/myskill
 pytest tests/test_myskill.py -v
 
 # Test manually
-python skills/myskill/scripts/myskill.py --help
-python skills/myskill/scripts/myskill.py check
+skills/myskill/scripts/myskill.py --help
+skills/myskill/scripts/myskill.py check
 ```
 
 ## Design Guidelines
@@ -563,14 +563,14 @@ Test each command manually:
 
 ```bash
 # Help output
-python skills/myskill/scripts/myskill.py --help
-python skills/myskill/scripts/myskill.py check --help
+skills/myskill/scripts/myskill.py --help
+skills/myskill/scripts/myskill.py check --help
 
 # Check command
-python skills/myskill/scripts/myskill.py check
+skills/myskill/scripts/myskill.py check
 
 # Main operations
-python skills/myskill/scripts/myskill.py operation arg
+skills/myskill/scripts/myskill.py operation arg
 ```
 
 ### Testing with Local Dev Links

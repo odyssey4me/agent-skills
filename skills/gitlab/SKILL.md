@@ -8,7 +8,7 @@ metadata:
   tags: "issues, merge-requests, pipelines"
   complexity: lightweight
 license: MIT
-allowed-tools: Bash(python $SKILL_DIR/scripts/gitlab.py *)
+allowed-tools: Bash($SKILL_DIR/scripts/gitlab.py:*)
 ---
 
 # GitLab Skill
@@ -53,23 +53,23 @@ The wrapper script (`scripts/gitlab.py`) formats output as markdown. Use it for 
 
 ```bash
 # Check glab CLI is installed and authenticated
-python $SKILL_DIR/scripts/gitlab.py check
+$SKILL_DIR/scripts/gitlab.py check
 
 # Issues
-python $SKILL_DIR/scripts/gitlab.py issues list --repo GROUP/REPO
-python $SKILL_DIR/scripts/gitlab.py issues view 123 --repo GROUP/REPO
+$SKILL_DIR/scripts/gitlab.py issues list --repo GROUP/REPO
+$SKILL_DIR/scripts/gitlab.py issues view 123 --repo GROUP/REPO
 
 # Merge Requests
-python $SKILL_DIR/scripts/gitlab.py mrs list --repo GROUP/REPO
-python $SKILL_DIR/scripts/gitlab.py mrs view 456 --repo GROUP/REPO
+$SKILL_DIR/scripts/gitlab.py mrs list --repo GROUP/REPO
+$SKILL_DIR/scripts/gitlab.py mrs view 456 --repo GROUP/REPO
 
 # Pipelines
-python $SKILL_DIR/scripts/gitlab.py pipelines list --repo GROUP/REPO
-python $SKILL_DIR/scripts/gitlab.py pipelines view 123456 --repo GROUP/REPO
+$SKILL_DIR/scripts/gitlab.py pipelines list --repo GROUP/REPO
+$SKILL_DIR/scripts/gitlab.py pipelines view 123456 --repo GROUP/REPO
 
 # Repositories
-python $SKILL_DIR/scripts/gitlab.py repos list
-python $SKILL_DIR/scripts/gitlab.py repos view GROUP/REPO
+$SKILL_DIR/scripts/gitlab.py repos list
+$SKILL_DIR/scripts/gitlab.py repos view GROUP/REPO
 ```
 
 All commands support `--limit N` for list commands (default 30).
@@ -275,8 +275,8 @@ The GitLab skill uses the official `glab` CLI with a Python wrapper for markdown
 **Quick start:**
 1. Install: `brew install glab` (or equivalent for your OS)
 2. Authenticate: `glab auth login`
-3. Verify: `python $SKILL_DIR/scripts/gitlab.py check`
-4. Read: `python $SKILL_DIR/scripts/gitlab.py issues list --repo GROUP/REPO`
+3. Verify: `$SKILL_DIR/scripts/gitlab.py check`
+4. Read: `$SKILL_DIR/scripts/gitlab.py issues list --repo GROUP/REPO`
 5. Write: `glab issue create`, `glab mr create`, etc. (use `glab` directly)
 
 For detailed command reference, use `glab <command> --help` or visit <https://docs.gitlab.com/cli/>.

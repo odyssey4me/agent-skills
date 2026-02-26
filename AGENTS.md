@@ -68,10 +68,10 @@ When developing or testing skills, you can run them directly:
 
 ```bash
 # Run a skill command
-python skills/<skill>/scripts/<skill>.py [command] [arguments]
+skills/<skill>/scripts/<skill>.py [command] [arguments]
 
 # Verify setup
-python skills/<skill>/scripts/<skill>.py check
+skills/<skill>/scripts/<skill>.py check
 ```
 
 For user-focused testing, authentication, and troubleshooting, see the skill's SKILL.md file and [docs/user-guide.md](docs/user-guide.md).

@@ -8,7 +8,7 @@ metadata:
   tags: "files, folders, sharing"
   complexity: standard
 license: MIT
-allowed-tools: Bash(python $SKILL_DIR/scripts/google-drive.py *)
+allowed-tools: Bash($SKILL_DIR/scripts/google-drive.py:*)
 ---
 
 # Google Drive
@@ -29,7 +29,7 @@ Interact with Google Drive for file management, search, and sharing.
 After installation, verify the skill is properly configured:
 
 ```bash
-python $SKILL_DIR/scripts/google-drive.py check
+$SKILL_DIR/scripts/google-drive.py check
 ```
 
 This will check:
@@ -55,7 +55,7 @@ Google Drive uses OAuth 2.0 for authentication. For complete setup instructions,
      client_secret: your-client-secret
    ```
 
-2. Run `python $SKILL_DIR/scripts/google-drive.py check` to trigger OAuth flow and verify setup.
+2. Run `$SKILL_DIR/scripts/google-drive.py check` to trigger OAuth flow and verify setup.
 
 ### OAuth Scopes
 
@@ -71,8 +71,8 @@ The skill requests granular scopes for different operations:
 
 If you encounter "insufficient scope" errors, reset your token and re-authenticate:
 
-1. Reset token: `python $SKILL_DIR/scripts/google-drive.py auth reset`
-2. Re-run: `python $SKILL_DIR/scripts/google-drive.py check`
+1. Reset token: `$SKILL_DIR/scripts/google-drive.py auth reset`
+2. Re-run: `$SKILL_DIR/scripts/google-drive.py check`
 
 ## Commands
 
@@ -81,7 +81,7 @@ If you encounter "insufficient scope" errors, reset your token and re-authentica
 Verify configuration and connectivity.
 
 ```bash
-python $SKILL_DIR/scripts/google-drive.py check
+$SKILL_DIR/scripts/google-drive.py check
 ```
 
 This validates:
@@ -95,7 +95,7 @@ This validates:
 Store OAuth 2.0 client credentials for custom OAuth flow.
 
 ```bash
-python $SKILL_DIR/scripts/google-drive.py auth setup \
+$SKILL_DIR/scripts/google-drive.py auth setup \
   --client-id YOUR_CLIENT_ID \
   --client-secret YOUR_CLIENT_SECRET
 ```
@@ -107,7 +107,7 @@ Credentials are saved to `~/.config/agent-skills/google-drive.yaml`.
 Clear stored OAuth token. The next command that needs authentication will trigger re-authentication automatically.
 
 ```bash
-python $SKILL_DIR/scripts/google-drive.py auth reset
+$SKILL_DIR/scripts/google-drive.py auth reset
 ```
 
 Use this when you encounter scope or authentication errors.
@@ -117,7 +117,7 @@ Use this when you encounter scope or authentication errors.
 Show current OAuth token information without making API calls.
 
 ```bash
-python $SKILL_DIR/scripts/google-drive.py auth status
+$SKILL_DIR/scripts/google-drive.py auth status
 ```
 
 Displays: whether a token is stored, granted scopes, refresh token presence, token expiry, and client ID.
@@ -128,16 +128,16 @@ List files in your Drive.
 
 ```bash
 # List recent files
-python $SKILL_DIR/scripts/google-drive.py files list
+$SKILL_DIR/scripts/google-drive.py files list
 
 # List with search query
-python $SKILL_DIR/scripts/google-drive.py files list --query "name contains 'report'"
+$SKILL_DIR/scripts/google-drive.py files list --query "name contains 'report'"
 
 # List with max results
-python $SKILL_DIR/scripts/google-drive.py files list --max-results 20
+$SKILL_DIR/scripts/google-drive.py files list --max-results 20
 
 # List sorted by name
-python $SKILL_DIR/scripts/google-drive.py files list --order-by "name"
+$SKILL_DIR/scripts/google-drive.py files list --order-by "name"
 ```
 
 **Arguments:**
@@ -151,16 +151,16 @@ Search for files with filters.
 
 ```bash
 # Search by name
-python $SKILL_DIR/scripts/google-drive.py files search --name "quarterly report"
+$SKILL_DIR/scripts/google-drive.py files search --name "quarterly report"
 
 # Search by MIME type
-python $SKILL_DIR/scripts/google-drive.py files search --mime-type "application/pdf"
+$SKILL_DIR/scripts/google-drive.py files search --mime-type "application/pdf"
 
 # Search in a specific folder
-python $SKILL_DIR/scripts/google-drive.py files search --folder FOLDER_ID
+$SKILL_DIR/scripts/google-drive.py files search --folder FOLDER_ID
 
 # Combine filters
-python $SKILL_DIR/scripts/google-drive.py files search --name "budget" --mime-type "application/vnd.google-apps.spreadsheet"
+$SKILL_DIR/scripts/google-drive.py files search --name "budget" --mime-type "application/vnd.google-apps.spreadsheet"
 ```
 
 **Arguments:**
@@ -174,7 +174,7 @@ Get file metadata by ID.
 
 ```bash
 # Get file details
-python $SKILL_DIR/scripts/google-drive.py files get FILE_ID
+$SKILL_DIR/scripts/google-drive.py files get FILE_ID
 ```
 
 **Arguments:**
@@ -186,10 +186,10 @@ Download a file from Google Drive.
 
 ```bash
 # Download a file
-python $SKILL_DIR/scripts/google-drive.py files download FILE_ID --output /path/to/local/file
+$SKILL_DIR/scripts/google-drive.py files download FILE_ID --output /path/to/local/file
 
 # Short form
-python $SKILL_DIR/scripts/google-drive.py files download FILE_ID -o ./downloaded-file.pdf
+$SKILL_DIR/scripts/google-drive.py files download FILE_ID -o ./downloaded-file.pdf
 ```
 
 **Arguments:**
@@ -204,16 +204,16 @@ Upload a file to Google Drive.
 
 ```bash
 # Upload a file
-python $SKILL_DIR/scripts/google-drive.py files upload /path/to/file.pdf
+$SKILL_DIR/scripts/google-drive.py files upload /path/to/file.pdf
 
 # Upload to a specific folder
-python $SKILL_DIR/scripts/google-drive.py files upload /path/to/file.pdf --parent FOLDER_ID
+$SKILL_DIR/scripts/google-drive.py files upload /path/to/file.pdf --parent FOLDER_ID
 
 # Upload with custom name
-python $SKILL_DIR/scripts/google-drive.py files upload /path/to/file.pdf --name "Quarterly Report 2024"
+$SKILL_DIR/scripts/google-drive.py files upload /path/to/file.pdf --name "Quarterly Report 2024"
 
 # Upload with specific MIME type
-python $SKILL_DIR/scripts/google-drive.py files upload /path/to/file --mime-type "text/csv"
+$SKILL_DIR/scripts/google-drive.py files upload /path/to/file --mime-type "text/csv"
 ```
 
 **Arguments:**
@@ -228,7 +228,7 @@ Move a file to a different folder.
 
 ```bash
 # Move a file to a folder
-python $SKILL_DIR/scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
+$SKILL_DIR/scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
 ```
 
 **Arguments:**
@@ -241,10 +241,10 @@ Create a new folder.
 
 ```bash
 # Create folder in root
-python $SKILL_DIR/scripts/google-drive.py folders create "New Folder"
+$SKILL_DIR/scripts/google-drive.py folders create "New Folder"
 
 # Create folder inside another folder
-python $SKILL_DIR/scripts/google-drive.py folders create "Subfolder" --parent FOLDER_ID
+$SKILL_DIR/scripts/google-drive.py folders create "Subfolder" --parent FOLDER_ID
 ```
 
 **Arguments:**
@@ -257,10 +257,10 @@ List contents of a folder.
 
 ```bash
 # List folder contents
-python $SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID
+$SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID
 
 # List with max results
-python $SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID --max-results 50
+$SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID --max-results 50
 ```
 
 **Arguments:**
@@ -273,16 +273,16 @@ Share a file with a user.
 
 ```bash
 # Share as reader (default)
-python $SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com
+$SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com
 
 # Share as writer
-python $SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com --role writer
+$SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com --role writer
 
 # Share as commenter
-python $SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com --role commenter
+$SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com --role commenter
 
 # Share without sending notification
-python $SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com --no-notify
+$SKILL_DIR/scripts/google-drive.py share FILE_ID --email user@example.com --no-notify
 ```
 
 **Arguments:**
@@ -297,7 +297,7 @@ List permissions for a file.
 
 ```bash
 # List permissions
-python $SKILL_DIR/scripts/google-drive.py permissions list FILE_ID
+$SKILL_DIR/scripts/google-drive.py permissions list FILE_ID
 ```
 
 **Arguments:**
@@ -309,7 +309,7 @@ Remove a permission from a file.
 
 ```bash
 # Delete a permission
-python $SKILL_DIR/scripts/google-drive.py permissions delete FILE_ID PERMISSION_ID
+$SKILL_DIR/scripts/google-drive.py permissions delete FILE_ID PERMISSION_ID
 ```
 
 **Arguments:**
@@ -321,53 +321,53 @@ python $SKILL_DIR/scripts/google-drive.py permissions delete FILE_ID PERMISSION_
 ### Verify Setup
 
 ```bash
-python $SKILL_DIR/scripts/google-drive.py check
+$SKILL_DIR/scripts/google-drive.py check
 ```
 
 ### Find recent PDF files
 
 ```bash
-python $SKILL_DIR/scripts/google-drive.py files list --query "mimeType='application/pdf'" --max-results 5
+$SKILL_DIR/scripts/google-drive.py files list --query "mimeType='application/pdf'" --max-results 5
 ```
 
 ### Search for documents by name
 
 ```bash
-python $SKILL_DIR/scripts/google-drive.py files search --name "project proposal"
+$SKILL_DIR/scripts/google-drive.py files search --name "project proposal"
 ```
 
 ### Download a file
 
 ```bash
 # First, find the file ID
-python $SKILL_DIR/scripts/google-drive.py files search --name "report.pdf"
+$SKILL_DIR/scripts/google-drive.py files search --name "report.pdf"
 
 # Then download it
-python $SKILL_DIR/scripts/google-drive.py files download FILE_ID -o ./report.pdf
+$SKILL_DIR/scripts/google-drive.py files download FILE_ID -o ./report.pdf
 ```
 
 ### Upload and share a file
 
 ```bash
 # Upload the file
-python $SKILL_DIR/scripts/google-drive.py files upload ./presentation.pdf --name "Q4 Presentation"
+$SKILL_DIR/scripts/google-drive.py files upload ./presentation.pdf --name "Q4 Presentation"
 
 # Share with a colleague
-python $SKILL_DIR/scripts/google-drive.py share FILE_ID --email colleague@example.com --role writer
+$SKILL_DIR/scripts/google-drive.py share FILE_ID --email colleague@example.com --role writer
 ```
 
 ### Organize files into folders
 
 ```bash
 # Create a folder
-python $SKILL_DIR/scripts/google-drive.py folders create "Project Documents"
+$SKILL_DIR/scripts/google-drive.py folders create "Project Documents"
 
 # Upload files to the folder
-python $SKILL_DIR/scripts/google-drive.py files upload ./doc1.pdf --parent FOLDER_ID
-python $SKILL_DIR/scripts/google-drive.py files upload ./doc2.pdf --parent FOLDER_ID
+$SKILL_DIR/scripts/google-drive.py files upload ./doc1.pdf --parent FOLDER_ID
+$SKILL_DIR/scripts/google-drive.py files upload ./doc2.pdf --parent FOLDER_ID
 
 # List folder contents
-python $SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID
+$SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID
 ```
 
 ## Drive Search Query Syntax
@@ -440,8 +440,8 @@ The following Google Drive API operations are **not yet implemented** in this sk
 **Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), do NOT retry the same command. Instead:
 
 1. Inform the user about the error
-2. Run `python $SKILL_DIR/scripts/google-drive.py auth status` to check the current token state
-3. Suggest the user run `python $SKILL_DIR/scripts/google-drive.py auth reset` followed by `python $SKILL_DIR/scripts/google-drive.py check` to re-authenticate
+2. Run `$SKILL_DIR/scripts/google-drive.py auth status` to check the current token state
+3. Suggest the user run `$SKILL_DIR/scripts/google-drive.py auth reset` followed by `$SKILL_DIR/scripts/google-drive.py check` to re-authenticate
 4. The `auth reset` and `check` commands require user interaction (browser-based OAuth consent) and cannot be completed autonomously
 
 **Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
@@ -454,15 +454,15 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ### Check command fails
 
-Run `python $SKILL_DIR/scripts/google-drive.py check` to diagnose issues. It will provide specific error messages and setup instructions.
+Run `$SKILL_DIR/scripts/google-drive.py check` to diagnose issues. It will provide specific error messages and setup instructions.
 
 ### Authentication failed
 
 1. Verify your OAuth client ID and client secret are correct in `~/.config/agent-skills/google-drive.yaml`
 2. Token expired or corrupted — reset and re-authenticate:
    ```bash
-   python $SKILL_DIR/scripts/google-drive.py auth reset
-   python $SKILL_DIR/scripts/google-drive.py check
+   $SKILL_DIR/scripts/google-drive.py auth reset
+   $SKILL_DIR/scripts/google-drive.py check
    ```
 
 ### Permission denied
@@ -470,8 +470,8 @@ Run `python $SKILL_DIR/scripts/google-drive.py check` to diagnose issues. It wil
 Your OAuth token may not have the necessary scopes. Reset your token and re-authenticate:
 
 ```bash
-python $SKILL_DIR/scripts/google-drive.py auth reset
-python $SKILL_DIR/scripts/google-drive.py check
+$SKILL_DIR/scripts/google-drive.py auth reset
+$SKILL_DIR/scripts/google-drive.py check
 ```
 
 ### Cannot download Google Docs
