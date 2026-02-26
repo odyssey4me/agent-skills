@@ -4,18 +4,22 @@ Refer to [AGENTS.md](./AGENTS.md) for skill usage instructions.
 
 Refer to [CONTRIBUTING.md](./CONTRIBUTING.md) for development guidelines.
 
-## Pre-commit Hooks
+## Before Committing
 
-When committing changes to skill SKILL.md files, pre-commit hooks enforce two
-generated-file checks that may cause the first commit attempt to fail:
+Pre-commit hooks are a failsafe, not a first pass. Always run checks before
+committing to avoid wasting tokens on hook failures and re-commits.
 
-1. **skills.json registry** — Run `python scripts/generate_registry.py` to
-   regenerate, then stage `skills.json`.
-2. **tile.json sync** — The `tessl-sync` hook auto-updates `tile.json` files
-   in each skill directory. Stage any modified `tile.json` files.
+Delegate pre-commit checks to a **haiku** subagent (via the Task tool with
+`model: "haiku"`) to minimise token cost. The subagent should:
 
-After regenerating and staging these files, re-run the commit. Both checks
-must pass alongside `ruff`, `validate_skill`, and `tessl skill lint`.
+1. Run `ruff check --fix . && ruff format .`
+2. Run `python scripts/validate_skill.py skills/*` (if any skill was modified)
+3. Run `tessl skill lint skills/*/tile.json` (if any skill was modified)
+4. Fix any issues found and report back.
+
+After the subagent completes, stage everything and commit. The `tessl-sync`
+hook will auto-update `tile.json` files — if it modifies any, stage them and
+re-commit.
 
 ## TODO.md
 

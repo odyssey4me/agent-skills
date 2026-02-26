@@ -37,14 +37,6 @@ repos:
         args: [skills/*]
         stages: [pre-commit]
 
-      - id: check-registry
-        name: check skills registry is up to date
-        entry: python scripts/generate_registry.py --check
-        language: system
-        pass_filenames: false
-        stages: [pre-commit]
-        always_run: true
-
       - id: tessl-lint
         name: tessl skill lint
         entry: bash -c 'status=0; for t in skills/*/tile.json; do tessl skill lint "$t" || status=1; done; exit $status'
@@ -78,14 +70,6 @@ repos:
         language: system
         pass_filenames: false
         args: [skills/*]
-        stages: [pre-push]
-        always_run: true
-
-      - id: check-registry-prepush
-        name: check skills registry is up to date (pre-push)
-        entry: python scripts/generate_registry.py --check
-        language: system
-        pass_filenames: false
         stages: [pre-push]
         always_run: true
 

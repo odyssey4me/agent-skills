@@ -70,17 +70,6 @@ per-skill items.
   - Current custom script works well - no urgent need to migrate
   - See: https://developer.atlassian.com/cloud/acli/guides/introduction/
 
-## Remove skills.json Registry
-
-- [ ] **Remove `skills.json` and `generate_registry.py`** — The registry
-  duplicates SKILL.md frontmatter and is not consumed by any external tool
-  (`npx add-skill` reads SKILL.md directly via `gray-matter`). Replace the
-  CI drift-detection check with `tessl skill lint` or
-  `python scripts/validate_skill.py` which already validate frontmatter
-  against the source of truth. Remove `skills.json`,
-  `scripts/generate_registry.py`, `tests/test_generate_registry.py`, and
-  the pre-commit hook that runs `generate_registry.py --check`.
-
 ## Collaboration Surfacing
 
 Add collaboration surfacing features to github, gitlab, and gerrit skills,
