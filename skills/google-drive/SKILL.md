@@ -43,8 +43,8 @@ If anything is missing, the check command will provide setup instructions.
 
 Google Drive uses OAuth 2.0 for authentication. For complete setup instructions, see:
 
-1. [GCP Project Setup Guide](../../docs/gcp-project-setup.md) - Create project, enable Drive API
-2. [Google OAuth Setup Guide](../../docs/google-oauth-setup.md) - Configure credentials
+1. [GCP Project Setup Guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/gcp-project-setup.md) - Create project, enable Drive API
+2. [Google OAuth Setup Guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md) - Configure credentials
 
 ### Quick Start
 

@@ -43,8 +43,8 @@ If anything is missing, the check command will provide setup instructions.
 
 Google Sheets uses OAuth 2.0 for authentication. For complete setup instructions, see:
 
-1. [GCP Project Setup Guide](../../docs/gcp-project-setup.md) - Create project, enable Sheets API
-2. [Google OAuth Setup Guide](../../docs/google-oauth-setup.md) - Configure credentials
+1. [GCP Project Setup Guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/gcp-project-setup.md) - Create project, enable Sheets API
+2. [Google OAuth Setup Guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md) - Configure credentials
 
 ### Quick Start
 
@@ -507,13 +507,13 @@ Ensure your GCP project has:
 3. OAuth consent screen configured
 4. Your email added as a test user (if app is in testing mode)
 
-See [docs/gcp-project-setup.md](../../docs/gcp-project-setup.md) for detailed instructions.
+See [docs/gcp-project-setup.md](https://github.com/odyssey4me/agent-skills/blob/main/docs/gcp-project-setup.md) for detailed instructions.
 
 ## Related Skills
 
-- [Google Drive](../google-drive/SKILL.md) - File management (Drive manages file metadata, Sheets manages content)
-- [Google Docs](../google-docs/SKILL.md) - Document creation and editing
-- [Google Slides](../google-slides/SKILL.md) - Presentation management
+- [Google Drive](https://github.com/odyssey4me/agent-skills/blob/main/skills/google-drive/SKILL.md) - File management (Drive manages file metadata, Sheets manages content)
+- [Google Docs](https://github.com/odyssey4me/agent-skills/blob/main/skills/google-docs/SKILL.md) - Document creation and editing
+- [Google Slides](https://github.com/odyssey4me/agent-skills/blob/main/skills/google-slides/SKILL.md) - Presentation management
 
 ## API Reference
 
