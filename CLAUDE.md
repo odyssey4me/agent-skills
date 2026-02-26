@@ -12,10 +12,8 @@ committing to avoid wasting tokens on hook failures and re-commits.
 Delegate pre-commit checks to a **haiku** subagent (via the Task tool with
 `model: "haiku"`) to minimise token cost. The subagent should:
 
-1. Run `ruff check --fix . && ruff format .`
-2. Run `python scripts/validate_skill.py skills/*` (if any skill was modified)
-3. Run `tessl skill lint skills/*/tile.json` (if any skill was modified)
-4. Fix any issues found and report back.
+1. Run `scripts/pre_commit_checks.sh` (or `--skills` if only skills changed).
+2. Fix any issues found and report back.
 
 After the subagent completes, stage everything and commit. The `tessl-sync`
 hook will auto-update `tile.json` files — if it modifies any, stage them and
@@ -33,11 +31,12 @@ Follow [Semantic Versioning](https://semver.org/) when updating it:
 - **Major** (0.2.0 → 1.0.0): Breaking changes — removed or renamed commands,
   changed default behaviour, restructured arguments.
 
-**When to bump:** before committing changes to a skill, run
-`scripts/check_versions.sh` to see which skills have unreleased changes
-without a version bump. If the skill already has unreleased changes that
-bumped the version, an additional bump is not required — just ensure the
-existing bump level is still appropriate for the combined changes.
+**When to bump:** before committing changes to a skill, delegate a version
+check to a **haiku** subagent (via the Task tool with `model: "haiku"`). The
+subagent should run `scripts/check_versions.sh` and report which skills need
+a bump. If the skill already has unreleased changes that bumped the version,
+an additional bump is not required — just ensure the existing bump level is
+still appropriate for the combined changes.
 
 ## TODO.md
 
