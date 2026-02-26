@@ -222,23 +222,6 @@ gh issues
 gh review
 ```
 
-## Rate Limits
-
-GitHub enforces rate limits for API requests:
-- **Core API**: 5,000 requests/hour
-- **Search API**: 30 requests/minute
-
-Check current status:
-```bash
-gh api rate_limit --jq '.rate'
-```
-
-**Best practices for bulk operations:**
-- Check rate limit before starting
-- Use specific filters to reduce result sets
-- Prefer `--limit` flag to control results
-- Use exact issue/PR numbers when known
-
 ## Configuration
 
 ```bash

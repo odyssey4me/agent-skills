@@ -52,19 +52,7 @@ Google Calendar uses OAuth 2.0 for authentication. For complete setup instructio
 
 2. Run `$SKILL_DIR/scripts/google-calendar.py check` to trigger OAuth flow and verify setup.
 
-### OAuth Scopes
-
-The skill requests granular scopes for different operations:
-
-| Scope | Permission | Used For |
-|-------|-----------|----------|
-| `calendar.readonly` | Read calendars and events | list, get events |
-| `calendar.events` | Create/edit/delete events | create, update, delete |
-
-### Scope Errors
-
-If you encounter "insufficient scope" errors, see the
-[OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
+On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Commands
 
@@ -417,22 +405,6 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ## Troubleshooting
 
-### Check command fails
-
-Run `$SKILL_DIR/scripts/google-calendar.py check` to diagnose issues. It will provide specific error messages and setup instructions.
-
-### Authentication or permission errors
-
-See the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting)
-for resolving token, scope, and permission issues.
-
-### Import errors
-
-Ensure dependencies are installed:
-```bash
-pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
-```
-
 ### Event not found
 
 Verify the event ID and calendar ID are correct. Event IDs are unique per calendar.
@@ -440,26 +412,3 @@ Verify the event ID and calendar ID are correct. Event IDs are unique per calend
 ### Timezone issues
 
 Always use RFC3339 format with explicit timezone offsets, or UTC (Z suffix). For all-day events, use YYYY-MM-DD format and optionally specify `--timezone`.
-
-### Rate limiting
-
-Google Calendar API has quota limits. If you hit rate limits, wait a few minutes before retrying. For high-volume usage, consider requesting quota increases in the Google Cloud Console.
-
-## API Scopes
-
-This skill requests the following OAuth scopes:
-
-- `https://www.googleapis.com/auth/calendar.readonly` - Read calendar events and settings
-- `https://www.googleapis.com/auth/calendar.events` - Create, update, and delete events
-
-These scopes provide full calendar management capabilities while following the principle of least privilege.
-
-## Security Notes
-
-- **OAuth tokens** are stored securely in your system keyring
-- **Client secrets** are stored in `~/.config/agent-skills/google-calendar.yaml` with file permissions 600
-- **No passwords** are stored - only OAuth tokens
-- **Tokens refresh automatically** when using the skill
-- **Browser-based consent** ensures you approve all requested permissions
-
-Always review OAuth consent screens before granting access to your Google Calendar.

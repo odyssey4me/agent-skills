@@ -108,7 +108,6 @@
         "google-auth",
         "google-auth-oauthlib",
         "google-api-python-client",
-        "requests",
         "keyring",
         "pyyaml"
       ]
@@ -130,7 +129,6 @@
         "google-auth",
         "google-auth-oauthlib",
         "google-api-python-client",
-        "requests",
         "keyring",
         "pyyaml"
       ]
@@ -151,7 +149,6 @@
         "google-auth",
         "google-auth-oauthlib",
         "google-api-python-client",
-        "requests",
         "keyring",
         "pyyaml"
       ]
@@ -173,7 +170,6 @@
         "google-auth",
         "google-auth-oauthlib",
         "google-api-python-client",
-        "requests",
         "keyring",
         "pyyaml"
       ]
@@ -195,7 +191,6 @@
         "google-auth",
         "google-auth-oauthlib",
         "google-api-python-client",
-        "requests",
         "keyring",
         "pyyaml"
       ]
@@ -216,7 +211,6 @@
         "google-auth",
         "google-auth-oauthlib",
         "google-api-python-client",
-        "requests",
         "keyring",
         "pyyaml"
       ]

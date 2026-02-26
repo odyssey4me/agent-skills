@@ -8,13 +8,6 @@ Recommendations from `tessl skill review` to improve skill quality scores.
 Common issues flagged across multiple skills are grouped first, followed by
 per-skill items.
 
-### Common: Content Conciseness
-
-Repeated across most skills — condense or deduplicate these patterns:
-
-- [ ] **Remove OAuth/rate-limit explanations** — Claude understands these
-  concepts. Keep to a single line or remove entirely.
-
 ### Per-Skill Content Improvements
 
 **code-review** (content: 85%, overall: 59%)
@@ -26,8 +19,6 @@ Repeated across most skills — condense or deduplicate these patterns:
 **github** (content: 73%, overall: 70%)
 - [ ] Add validation/verification steps to workflows (e.g., verify PR created
   after creation commands)
-- [ ] Remove or condense rate limits section
-
 **gitlab** (content: 73%, overall: 65%)
 - [ ] Add validation checkpoints to workflow examples
 - [ ] Remove the Summary section which repeats Quick Start content
@@ -43,7 +34,6 @@ Repeated across most skills — condense or deduplicate these patterns:
 **google-drive** (content: 77%, overall: 81%)
 - [ ] Move MIME types table, unsupported operations table, and API scopes to
   a reference file (SKILL.md is 511 lines, over the 500-line recommendation)
-- [ ] Remove duplicate OAuth scopes information
 
 **google-slides** (content: 73%, overall: 75%)
 - [ ] SKILL.md is 612 lines — move content to reference files to get under 500
@@ -53,10 +43,8 @@ Repeated across most skills — condense or deduplicate these patterns:
 - [ ] Consolidate troubleshooting — several items repeat the same solution
 
 **jira** (content: 65%, overall: 75%)
-- [ ] Move JQL Reference table, Rate Limits section, and extensive examples
-  to separate reference files (SKILL.md is 504 lines)
+- [ ] Move JQL Reference table and extensive examples to separate reference files
 - [ ] Add validation steps to multi-step workflows
-- [ ] Trim Rate Limits section significantly
 
 ## Google Drive Enhancements
 

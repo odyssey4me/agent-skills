@@ -52,20 +52,7 @@ Google Slides uses OAuth 2.0 for authentication. For complete setup instructions
 
 2. Run `$SKILL_DIR/scripts/google-slides.py check` to trigger OAuth flow and verify setup.
 
-### OAuth Scopes
-
-The skill requests granular scopes for different operations:
-
-| Scope | Permission | Used For |
-|-------|-----------|----------|
-| `presentations.readonly` | Read presentations | Reading presentation metadata and content |
-| `presentations` | Full access | Creating and modifying presentations |
-| `drive.readonly` | Read Drive files | Exporting presentations as PDF |
-
-### Scope Errors
-
-If you encounter "insufficient scope" errors, see the
-[OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
+On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Commands
 
@@ -521,11 +508,6 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ## Troubleshooting
 
-### Authentication or permission errors
-
-See the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting)
-for resolving token, scope, and permission issues.
-
 ### Cannot find presentation
 
 Make sure you're using the correct presentation ID from the URL:
@@ -559,23 +541,6 @@ Remember:
 - Elements outside slide boundaries won't be visible
 - Use `--x`, `--y`, `--width`, `--height` to position elements
 
-### Dependencies not found
-
-Install required dependencies:
-
-```bash
-pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
-```
-
-### OAuth flow fails
-
-Ensure your GCP project has:
-1. Google Slides API enabled (`slides.googleapis.com`)
-2. OAuth 2.0 credentials created
-3. OAuth consent screen configured
-4. Your email added as a test user (if app is in testing mode)
-
-See [docs/gcp-project-setup.md](https://github.com/odyssey4me/agent-skills/blob/main/docs/gcp-project-setup.md) for detailed instructions.
 
 ## API Reference
 

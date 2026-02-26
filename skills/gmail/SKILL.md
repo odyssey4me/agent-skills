@@ -52,21 +52,7 @@ Gmail uses OAuth 2.0 for authentication. For complete setup instructions, see:
 
 2. Run `$SKILL_DIR/scripts/gmail.py check` to trigger OAuth flow and verify setup.
 
-### OAuth Scopes
-
-The skill requests granular scopes for different operations:
-
-| Scope | Permission | Used For |
-|-------|-----------|----------|
-| `gmail.readonly` | Read messages, labels, settings | Listing and reading messages |
-| `gmail.send` | Send emails | Sending messages and drafts |
-| `gmail.modify` | Modify labels and metadata | Managing labels on messages |
-| `gmail.labels` | Manage labels | Creating and listing labels |
-
-### Scope Errors
-
-If you encounter "insufficient scope" errors, see the
-[OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
+On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Commands
 
@@ -375,34 +361,3 @@ For the complete reference, see [gmail-queries.md](references/gmail-queries.md).
 
 This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
-## Troubleshooting
-
-### Check command fails
-
-Run `$SKILL_DIR/scripts/gmail.py check` to diagnose issues. It will provide specific error messages and setup instructions.
-
-### Authentication or permission errors
-
-See the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting)
-for resolving token, scope, and permission issues.
-
-### Import errors
-
-Ensure dependencies are installed:
-```bash
-pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
-```
-
-### Rate limiting
-
-Gmail API has quota limits. If you hit rate limits, wait a few minutes before retrying. For high-volume usage, consider requesting quota increases in the Google Cloud Console.
-
-## Security Notes
-
-- **OAuth tokens** are stored securely in your system keyring
-- **Client secrets** are stored in `~/.config/agent-skills/gmail.yaml` with file permissions 600
-- **No passwords** are stored - only OAuth tokens
-- **Tokens refresh automatically** when using the skill
-- **Browser-based consent** ensures you approve all requested permissions
-
-Always review OAuth consent screens before granting access to your Gmail account.

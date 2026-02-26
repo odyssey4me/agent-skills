@@ -52,20 +52,7 @@ Google Drive uses OAuth 2.0 for authentication. For complete setup instructions,
 
 2. Run `$SKILL_DIR/scripts/google-drive.py check` to trigger OAuth flow and verify setup.
 
-### OAuth Scopes
-
-The skill requests granular scopes for different operations:
-
-| Scope | Permission | Used For |
-|-------|-----------|----------|
-| `drive.readonly` | Read files and metadata | list, search, download |
-| `drive` | Full read/write access to all files | upload, create folders, share, move |
-| `drive.metadata.readonly` | View file metadata only | get file info |
-
-### Scope Errors
-
-If you encounter "insufficient scope" errors, see the
-[OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
+On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Commands
 
@@ -440,46 +427,7 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ## Troubleshooting
 
-### Check command fails
-
-Run `$SKILL_DIR/scripts/google-drive.py check` to diagnose issues. It will provide specific error messages and setup instructions.
-
-### Authentication or permission errors
-
-See the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting)
-for resolving token, scope, and permission issues.
-
 ### Cannot download Google Docs
 
 Google Docs, Sheets, and Slides are not binary files - they cannot be downloaded directly. Use the Google Drive web interface to export them to a downloadable format (PDF, DOCX, etc.).
 
-### Import errors
-
-Ensure dependencies are installed:
-```bash
-pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
-```
-
-### Rate limiting
-
-Drive API has quota limits. If you hit rate limits, wait a few minutes before retrying. For high-volume usage, consider requesting quota increases in the Google Cloud Console.
-
-## API Scopes
-
-This skill requests the following OAuth scopes:
-
-- `https://www.googleapis.com/auth/drive.readonly` - Read files and metadata
-- `https://www.googleapis.com/auth/drive` - Full read/write access to all files
-- `https://www.googleapis.com/auth/drive.metadata.readonly` - View file metadata only
-
-These scopes provide full file management capabilities across all Drive files.
-
-## Security Notes
-
-- **OAuth tokens** are stored securely in your system keyring
-- **Client secrets** are stored in `~/.config/agent-skills/google-drive.yaml` with file permissions 600
-- **No passwords** are stored - only OAuth tokens
-- **Tokens refresh automatically** when using the skill
-- **Browser-based consent** ensures you approve all requested permissions
-
-Always review OAuth consent screens before granting access to your Google Drive.

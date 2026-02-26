@@ -52,20 +52,7 @@ Google Docs uses OAuth 2.0 for authentication. For complete setup instructions, 
 
 2. Run `$SKILL_DIR/scripts/google-docs.py check` to trigger OAuth flow and verify setup.
 
-### OAuth Scopes
-
-The skill requests granular scopes for different operations:
-
-| Scope | Permission | Used For |
-|-------|-----------|----------|
-| `documents.readonly` | Read documents | Reading document content and metadata |
-| `documents` | Full access | Creating and modifying documents |
-| `drive.readonly` | Read Drive files | Exporting documents as markdown or PDF |
-
-### Scope Errors
-
-If you encounter "insufficient scope" errors, see the
-[OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
+On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Commands
 
@@ -425,11 +412,6 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ## Troubleshooting
 
-### Authentication or permission errors
-
-See the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting)
-for resolving token, scope, and permission issues.
-
 ### Cannot find document
 
 Make sure you're using the correct document ID from the URL:
@@ -443,23 +425,6 @@ Use `documents get` to see the document structure and valid index ranges. Rememb
 - Index 1 is at the start of document body
 - The last index is the document length
 
-### Dependencies not found
-
-Install required dependencies:
-
-```bash
-pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
-```
-
-### OAuth flow fails
-
-Ensure your GCP project has:
-1. Google Docs API enabled (`docs.googleapis.com`)
-2. OAuth 2.0 credentials created
-3. OAuth consent screen configured
-4. Your email added as a test user (if app is in testing mode)
-
-See [docs/gcp-project-setup.md](https://github.com/odyssey4me/agent-skills/blob/main/docs/gcp-project-setup.md) for detailed instructions.
 
 ## API Reference
 
