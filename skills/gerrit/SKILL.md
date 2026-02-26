@@ -172,11 +172,15 @@ git commit -m "Add new feature"
 
 # Submit for review
 git review -t feature-topic
+# Verify submission
+$SKILL_DIR/scripts/gerrit.py changes list  # confirm change appears
 
 # Address review comments
 # ... make changes ...
 git commit --amend
 git review
+# Verify new patchset uploaded
+$SKILL_DIR/scripts/gerrit.py changes view <change-number>
 ```
 
 ### Reviewing Others' Changes
@@ -184,6 +188,8 @@ git review
 ```bash
 # Download change for review
 git review -d 12345
+# Verify download
+$SKILL_DIR/scripts/gerrit.py changes view 12345
 
 # Test the change
 # ... run tests, verify code ...
@@ -198,6 +204,8 @@ git branch -D review/user/topic
 ```bash
 # Submit with topic
 git review -t authentication-refactor
+# Verify submission
+$SKILL_DIR/scripts/gerrit.py changes list
 
 # All related changes will be grouped under this topic
 git commit -m "Part 2: Update tests"
@@ -224,16 +232,3 @@ See [troubleshooting.md](references/troubleshooting.md) for common issues and fi
 - **git-review Repository**: <https://opendev.org/opendev/git-review>
 - **Gerrit Documentation**: <https://gerrit-review.googlesource.com/Documentation/>
 - **Gerrit SSH Commands**: <https://gerrit-review.googlesource.com/Documentation/cmd-index.html>
-
-## Summary
-
-The Gerrit skill uses `git-review` with a Python wrapper for markdown-formatted query output on read/view operations.
-
-**Quick start:**
-1. Install: `pip install git-review`
-2. Setup: `git review -s` (in repository)
-3. Verify: `$SKILL_DIR/scripts/gerrit.py check`
-4. Read: `$SKILL_DIR/scripts/gerrit.py changes list`
-5. Write: `git review`, `git review -d 12345`, etc. (use `git-review` directly)
-
-For detailed command reference, use `git review --help` or visit <https://docs.opendev.org/opendev/git-review/latest/>.
