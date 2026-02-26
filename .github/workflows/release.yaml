@@ -29,12 +29,11 @@ jobs:
             tar czf "../dist/${skill_name}-${version}.tar.gz" "$skill"
           done
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload assets to release
         if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: dist/*.tar.gz
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" dist/*.tar.gz --clobber
 
   publish-tiles:
     runs-on: ubuntu-latest

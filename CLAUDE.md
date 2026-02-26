@@ -44,6 +44,39 @@ to the parent agent — **never write output to files**. Specifically:
 3. Report any skills where the bump level looks wrong (e.g. a new command was
    added but only a patch bump was applied).
 
+## Releasing
+
+Follow these steps to cut a release. Delegate the version check to a
+single **haiku** subagent that performs **all** steps and reports back.
+
+### 1. Validate versions
+
+Delegate to a **haiku** subagent (via the Task tool with `model: "haiku"`).
+The subagent should — in a single invocation:
+
+1. Run `scripts/check_versions.sh` and report which skills need a bump.
+2. For skills that already have a bump, validate the bump level by reviewing
+   `git diff <tag> -- skills/<name>/` and confirming patch/minor/major is
+   appropriate for the changes.
+3. Report any skills where the bump level looks wrong.
+
+Fix any issues before proceeding.
+
+### 2. Push, tag, and create the release
+
+1. Push all commits to `origin/main`.
+2. Tag with the next semver version: use **minor** if any skill has a minor
+   bump, **patch** if all bumps are patch-only.
+3. Create the GitHub release **before** pushing the tag, using
+   `gh release create <tag>` with a hand-written summary including:
+   - Grouped changes (features, infrastructure, refactoring, fixes).
+   - A skill versions table showing each changed skill's old → new version.
+4. Push the tag: `git push origin <tag>`.
+
+The release workflow will automatically package skill tarballs and upload
+them as assets to the existing release, then publish tiles to the Tessl
+Registry.
+
 ## TODO.md
 
 When completing items from TODO.md, **remove** the finished entries entirely
