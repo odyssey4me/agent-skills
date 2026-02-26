@@ -1557,9 +1557,11 @@ class TestMetadataDiscovery:
 class TestComments:
     """Tests for comment retrieval and formatting."""
 
+    @patch("skills.jira.scripts.jira.api_path")
     @patch("skills.jira.scripts.jira.get")
-    def test_get_comments(self, mock_get):
+    def test_get_comments(self, mock_get, mock_api_path):
         """Test fetching comments from an issue."""
+        mock_api_path.return_value = "/rest/api/2/issue/DEMO-123/comment"
         mock_get.return_value = {
             "comments": [
                 {"id": "1", "body": "Hello", "author": {"displayName": "Jane"}},
@@ -1573,9 +1575,11 @@ class TestComments:
         assert result[0]["body"] == "Hello"
         mock_get.assert_called_once()
 
+    @patch("skills.jira.scripts.jira.api_path")
     @patch("skills.jira.scripts.jira.get")
-    def test_get_comments_empty(self, mock_get):
+    def test_get_comments_empty(self, mock_get, mock_api_path):
         """Test fetching comments when there are none."""
+        mock_api_path.return_value = "/rest/api/2/issue/DEMO-123/comment"
         mock_get.return_value = {"comments": []}
 
         result = get_comments("DEMO-123")
