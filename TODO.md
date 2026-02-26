@@ -8,35 +8,6 @@ Recommendations from `tessl skill review` to improve skill quality scores.
 Common issues flagged across multiple skills are grouped first, followed by
 per-skill items.
 
-### Common: Description Improvements
-
-Most skills score low on trigger term coverage. Add natural language
-variations users might say to each skill's description.
-
-- [x] **code-review** (33% → 100%) — Added `Use when...` clause with trigger
-  terms: pull request, merge request, review my code, check this PR, patchset,
-  code review feedback
-- [x] **github** (67% → 100%) — Added action verbs and trigger terms: PR,
-  repo, actions, merge
-- [x] **gitlab** (57% → 100%) — Added action verbs and trigger terms: MR,
-  CI/CD, merge request, code review
-- [x] **gerrit** (75% → 100%) — Added amend, rebase, patchset, change
-  request, CR
-- [x] **google-docs** (75% → 100%) — Added insert tables, heading styles,
-  gdoc, Google document
-- [x] **google-slides** (77% → 100%) — Added slides, slideshow, deck,
-  Google presentation
-- [x] **gmail** (85% → 100%) — Added compose, reply, forward, attachments,
-  mail
-- [x] **google-calendar** (85% → 100%) — Added meeting, appointment,
-  schedule a call, book time, gcal
-- [x] **google-drive** (85% → 100%) — Added gdrive, cloud storage, share a
-  file, Drive folder
-- [x] **google-sheets** (85% → 100%) — Added gsheets, Google spreadsheet,
-  pivot tables, charts
-- [x] **jira** (85% → 100%) — Added tickets, sprints, backlog, Atlassian,
-  bug tracking
-
 ### Common: Content Conciseness
 
 Repeated across most skills — condense or deduplicate these patterns:

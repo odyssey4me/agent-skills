@@ -17,6 +17,12 @@ generated-file checks that may cause the first commit attempt to fail:
 After regenerating and staging these files, re-run the commit. Both checks
 must pass alongside `ruff`, `validate_skill`, and `tessl skill lint`.
 
+## TODO.md
+
+When completing items from TODO.md, **remove** the finished entries entirely
+rather than marking them `[x]`. If an entire section becomes empty, remove the
+section heading too. Only pending work belongs in TODO.md.
+
 ## Skill Invocation
 
 Use `/jira` to invoke the Jira skill, or describe what you want naturally:
