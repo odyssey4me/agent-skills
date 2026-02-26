@@ -66,6 +66,30 @@ jobs:
       - name: Check skills registry is up to date
         run: python scripts/generate_registry.py --check
 
+  lint-tiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install tessl CLI
+        run: curl -fsSL https://get.tessl.io | sh
+
+      - name: Lint all skill tiles
+        run: |
+          status=0
+          for tile in skills/*/tile.json; do
+            echo "=== Linting $tile ==="
+            tessl skill lint "$tile" || status=1
+          done
+          exit $status
+
+      - name: Check tile.json files are up to date
+        run: |
+          for d in skills/*/; do
+            [ -f "$d/tile.json" ] && tessl skill import "$d" --workspace odyssey4me --public --force 2>/dev/null
+          done
+          git diff --exit-code skills/*/tile.json
+
   test-skills:
     runs-on: ubuntu-latest
     steps:

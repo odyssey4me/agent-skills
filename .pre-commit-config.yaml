@@ -45,6 +45,22 @@ repos:
         stages: [pre-commit]
         always_run: true
 
+      - id: tessl-lint
+        name: tessl skill lint
+        entry: bash -c 'status=0; for t in skills/*/tile.json; do tessl skill lint "$t" || status=1; done; exit $status'
+        language: system
+        files: ^skills/
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: tessl-sync
+        name: check tile.json files are up to date
+        entry: bash -c 'for d in skills/*/; do [ -f "$d/tile.json" ] && tessl skill import "$d" --workspace odyssey4me --public --force 2>/dev/null; done; git diff --exit-code skills/*/tile.json'
+        language: system
+        files: ^skills/
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: diff-cover
         name: coverage for changed lines
         entry: bash -c 'pytest tests/ -q --cov=skills --cov=scripts --cov-report=xml:coverage.xml && diff-cover coverage.xml --compare-branch=HEAD --fail-under=80'
@@ -68,6 +84,22 @@ repos:
       - id: check-registry-prepush
         name: check skills registry is up to date (pre-push)
         entry: python scripts/generate_registry.py --check
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        always_run: true
+
+      - id: tessl-lint-prepush
+        name: tessl skill lint (pre-push)
+        entry: bash -c 'status=0; for t in skills/*/tile.json; do tessl skill lint "$t" || status=1; done; exit $status'
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        always_run: true
+
+      - id: tessl-sync-prepush
+        name: check tile.json files are up to date (pre-push)
+        entry: bash -c 'for d in skills/*/; do [ -f "$d/tile.json" ] && tessl skill import "$d" --workspace odyssey4me --public --force 2>/dev/null; done; git diff --exit-code skills/*/tile.json'
         language: system
         pass_filenames: false
         stages: [pre-push]

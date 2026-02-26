@@ -65,7 +65,7 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 | [Google Slides](skills/google-slides/SKILL.md) | Presentation creation, slides, shapes, images, layouts |
 | [Jira](skills/jira/SKILL.md) | Issue tracking, search, create/update, transitions |
 
-Browse install counts and popularity on [skills.sh](https://skills.sh/odyssey4me/agent-skills). See [TODO.md](TODO.md) for planned skills.
+Browse install counts and popularity on [skills.sh](https://skills.sh/odyssey4me/agent-skills). Skills are also available on the [Tessl Registry](https://tessl.io/registry/odyssey4me). See [TODO.md](TODO.md) for planned skills.
 
 **Installation**: Use `npx add-skill odyssey4me/agent-skills` to install all skills, or see individual SKILL.md files for details. Manual downloads available from [Releases](https://github.com/odyssey4me/agent-skills/releases).
 
