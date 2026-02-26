@@ -22,6 +22,23 @@ extract_version() {
   sed -n 's/^  version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$1" | head -1
 }
 
+# Determine semver bump level between two versions (major.minor.patch)
+bump_level() {
+  local old="$1" new="$2"
+  local old_major old_minor new_major new_minor
+  old_major="${old%%.*}"; old="${old#*.}"
+  old_minor="${old%%.*}"
+  new_major="${new%%.*}"; new="${new#*.}"
+  new_minor="${new%%.*}"
+  if [ "$new_major" -gt "$old_major" ] 2>/dev/null; then
+    echo "major"
+  elif [ "$new_minor" -gt "$old_minor" ] 2>/dev/null; then
+    echo "minor"
+  else
+    echo "patch"
+  fi
+}
+
 needs_bump=0
 
 printf "%-22s %-10s %-10s %s\n" "SKILL" "RELEASED" "CURRENT" "STATUS"
@@ -42,7 +59,8 @@ for skill in skills/*/; do
     status="NEEDS BUMP (${changed_files} files changed)"
     needs_bump=1
   else
-    status="bumped (${released} -> ${current})"
+    level=$(bump_level "$released" "$current")
+    status="bumped ${level} (${released} -> ${current})"
   fi
 
   printf "%-22s %-10s %-10s %s\n" "$skill_name" "${released:-N/A}" "$current" "$status"

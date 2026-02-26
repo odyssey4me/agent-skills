@@ -33,10 +33,15 @@ Follow [Semantic Versioning](https://semver.org/) when updating it:
 
 **When to bump:** before committing changes to a skill, delegate a version
 check to a **haiku** subagent (via the Task tool with `model: "haiku"`). The
-subagent should run `scripts/check_versions.sh` and report which skills need
-a bump. If the skill already has unreleased changes that bumped the version,
-an additional bump is not required — just ensure the existing bump level is
-still appropriate for the combined changes.
+subagent should:
+
+1. Run `scripts/check_versions.sh` and report which skills need a bump.
+2. For skills that already have a bump, **validate the bump level** is
+   appropriate for the combined changes since the release tag. Review the
+   diff (`git diff <tag> -- skills/<name>/`) and confirm the level matches:
+   patch for doc/bug fixes, minor for new features, major for breaking changes.
+3. Report any skills where the bump level looks wrong (e.g. a new command was
+   added but only a patch bump was applied).
 
 ## TODO.md
 
