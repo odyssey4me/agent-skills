@@ -1,0 +1,27 @@
+{
+  "context": "Evaluates correct usage of the agent-skills Jira skill's config command to display active configuration settings. The solution must invoke cmd_config or the equivalent CLI config show subcommand and correctly present all stored values including connection details and project-specific defaults.",
+  "type": "weighted_checklist",
+  "capability_tested": "Jira Configuration Defaults",
+  "checklist": [
+    {
+      "name": "Config command invoked",
+      "description": "The solution invokes the Jira skill's config show functionality, either by calling cmd_config directly or by running jira.py with the 'config show' subcommand arguments",
+      "max_score": 30
+    },
+    {
+      "name": "Connection details displayed",
+      "description": "The output includes the Jira base URL (from JiraDefaults or get_credentials) and the authenticated user email address",
+      "max_score": 25
+    },
+    {
+      "name": "Default scope shown",
+      "description": "When a default JQL scope is present in the configuration (via get_jira_defaults), it is printed in the configuration output",
+      "max_score": 20
+    },
+    {
+      "name": "Project defaults displayed",
+      "description": "When project-specific defaults exist (via get_project_defaults), each project key and its associated default issue type and priority are shown",
+      "max_score": 25
+    }
+  ]
+}

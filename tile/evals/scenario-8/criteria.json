@@ -1,0 +1,27 @@
+{
+  "context": "Evaluates correct usage of the agent-skills Confluence skill to create a new page from Markdown content. The solution must call create_page with a properly converted body and handle both parent page placement and format conversion for the target deployment type.",
+  "type": "weighted_checklist",
+  "capability_tested": "Confluence Page Creation with Markdown",
+  "checklist": [
+    {
+      "name": "create_page called",
+      "description": "The solution calls create_page with the space key, title, and body arguments, or invokes confluence.py 'page create' with the equivalent flags",
+      "max_score": 30
+    },
+    {
+      "name": "Markdown converted to Atlassian format",
+      "description": "The Markdown body is converted to ADF using markdown_to_adf for Cloud deployments, or to XHTML storage format using markdown_to_storage for DataCenter/Server, before being passed to create_page",
+      "max_score": 30
+    },
+    {
+      "name": "Page URL or ID returned",
+      "description": "After creation, the solution extracts and outputs the new page's URL or numeric ID from the API response",
+      "max_score": 20
+    },
+    {
+      "name": "Parent page supported",
+      "description": "When a parent page identifier is provided, it is passed as the parent_id argument to create_page, establishing the correct hierarchy in the Confluence space",
+      "max_score": 20
+    }
+  ]
+}

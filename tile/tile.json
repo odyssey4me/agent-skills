@@ -1,0 +1,8 @@
+{
+  "name": "odyssey4me/agent-skills",
+  "version": "0.2.0",
+  "docs": "docs/index.md",
+  "describes": "pkg:pypi/agent-skills@0.2.0",
+  "summary": "Portable self-contained Python skills for AI coding assistants providing Jira and Confluence integrations via CLI scripts.",
+  "private": true
+}

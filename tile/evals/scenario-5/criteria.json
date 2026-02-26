@@ -1,0 +1,27 @@
+{
+  "context": "Evaluates correct usage of the agent-skills Jira skill to list and execute workflow transitions on an issue. The solution must call get_transitions and do_transition (or equivalent CLI transitions subcommands) and correctly handle both listing and execution flows.",
+  "type": "weighted_checklist",
+  "capability_tested": "Workflow Transition Execution",
+  "checklist": [
+    {
+      "name": "get_transitions called",
+      "description": "The solution calls get_transitions with the issue key, or invokes jira.py 'transitions list <key>', and displays the list of available transition names",
+      "max_score": 30
+    },
+    {
+      "name": "do_transition called",
+      "description": "The solution calls do_transition with the issue key and transition name, or invokes jira.py 'transitions do <key> <name>', to execute the transition",
+      "max_score": 35
+    },
+    {
+      "name": "Status updated confirmed",
+      "description": "After executing the transition, the solution verifies or reports the new status, for example by retrieving the issue with get_issue and comparing the updated status field",
+      "max_score": 20
+    },
+    {
+      "name": "Invalid transition error",
+      "description": "When the requested transition name does not appear in the list from get_transitions, an error message is shown that includes the valid transition names",
+      "max_score": 15
+    }
+  ]
+}
