@@ -2,6 +2,115 @@
 
 This document tracks planned features for the agent-skills repository. Only pending work belongs here — remove items as they are delivered.
 
+## Tessl Review Recommendations
+
+Recommendations from `tessl skill review` to improve skill quality scores.
+Common issues flagged across multiple skills are grouped first, followed by
+per-skill items.
+
+### Common: Validation Warnings
+
+All skills receive two warnings that should be investigated:
+
+- [ ] **metadata field** — `metadata` should map string keys to string values.
+  Tags arrays in metadata (`tags: [...]`) may be the cause. Check whether
+  converting to comma-separated strings resolves the warning.
+- [ ] **allowed-tools field** — `allowed-tools` contains unusual tool name(s).
+  Investigate what tessl considers "usual" and adjust the format if needed.
+
+### Common: Description Improvements
+
+Most skills score low on trigger term coverage. Add natural language
+variations users might say to each skill's description.
+
+- [ ] **code-review** (33%) — Add `Use when...` clause; include terms like
+  'pull request', 'merge request', 'review my code', 'check this PR'
+- [ ] **github** (67%) — Use specific action verbs instead of nouns; add
+  trigger terms 'PR', 'repo', 'actions', 'merge'
+- [ ] **gitlab** (57%) — Use specific action verbs; add 'MR', 'CI/CD',
+  'merge request', 'code review'
+- [ ] **gerrit** (75%) — Add actions like 'amend commits', 'rebase changes';
+  add terms 'patchset', 'change request', 'CR'
+- [ ] **google-docs** (75%) — Add specific actions like 'insert tables',
+  'apply heading styles'; add 'gdoc', 'Google document'
+- [ ] **google-slides** (77%) — Add trigger terms 'slides', 'slideshow',
+  'deck', 'Google presentation'
+- [ ] **gmail** (85%) — Add 'compose', 'reply', 'forward', 'attachments',
+  'mail'
+- [ ] **google-calendar** (85%) — Add 'meeting', 'appointment', 'schedule a
+  call', 'book time', 'gcal'
+- [ ] **google-drive** (85%) — Add 'gdrive', 'cloud storage', 'share a file',
+  'Drive folder'
+- [ ] **google-sheets** (85%) — Add 'gsheets', 'Google spreadsheet', 'pivot
+  tables', 'charts'
+- [ ] **jira** (85%) — Add 'tickets', 'sprints', 'backlog', 'Atlassian',
+  'bug tracking'
+
+### Common: Content Conciseness
+
+Repeated across most skills — condense or deduplicate these patterns:
+
+- [ ] **Consolidate auth reset instructions** — Several Google skills and
+  Jira repeat the same auth reset steps in multiple sections. Reference a
+  single troubleshooting section instead.
+- [ ] **Trim installation/prerequisites** — Claude knows how to install pip
+  packages and CLI tools. Reduce multi-platform installation instructions to
+  a single link or one-liner.
+- [ ] **Remove OAuth/rate-limit explanations** — Claude understands these
+  concepts. Keep to a single line or remove entirely.
+
+### Per-Skill Content Improvements
+
+**code-review** (content: 85%, overall: 59%)
+- [ ] Consolidate platform detection logic — explained in both Workflow and
+  Commands sections
+- [ ] Trim Repository Context section — YAML example is helpful but
+  surrounding explanation is verbose
+
+**github** (content: 73%, overall: 70%)
+- [ ] Add validation/verification steps to workflows (e.g., verify PR created
+  after creation commands)
+- [ ] Remove or condense rate limits section
+
+**gitlab** (content: 73%, overall: 65%)
+- [ ] Add validation checkpoints to workflow examples
+- [ ] Remove the Summary section which repeats Quick Start content
+
+**gerrit** (content: 77%, overall: 76%)
+- [ ] Move Troubleshooting section to `references/troubleshooting.md`
+- [ ] Move Advanced Usage (SSH Commands, JSON Output) to a reference file
+
+**gmail** (content: 85%, overall: 85%)
+- [ ] Remove duplicate API Scopes section (already in Authentication section)
+
+**google-calendar** (content: 77%, overall: 81%)
+- [ ] Move detailed command reference to a separate reference file to reduce
+  SKILL.md length (491 lines)
+
+**google-docs** (content: 85%, overall: 80%)
+- [ ] Consolidate authentication troubleshooting into a single section
+
+**google-drive** (content: 77%, overall: 81%)
+- [ ] Move MIME types table, unsupported operations table, and API scopes to
+  a reference file (SKILL.md is 511 lines, over the 500-line recommendation)
+- [ ] Remove duplicate OAuth scopes information
+
+**google-sheets** (content: 85%, overall: 85%)
+- [ ] Consolidate repeated troubleshooting advice across sections
+
+**google-slides** (content: 73%, overall: 75%)
+- [ ] SKILL.md is 612 lines — move content to reference files to get under 500
+- [ ] Add validation steps in multi-step workflow examples
+- [ ] Remove explanatory text Claude already knows (e.g., 'Slide IDs are
+  object IDs, not indices')
+- [ ] Consolidate troubleshooting — several items repeat the same solution
+
+**jira** (content: 65%, overall: 75%)
+- [ ] Move JQL Reference table, Rate Limits section, and extensive examples
+  to separate reference files (SKILL.md is 504 lines)
+- [ ] Add validation steps to multi-step workflows
+- [ ] Trim Rate Limits section significantly
+
 ## Google Drive Enhancements
 
 - [ ] **google-drive** - Add missing Drive API operations
