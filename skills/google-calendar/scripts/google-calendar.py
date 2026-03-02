@@ -482,8 +482,16 @@ def list_events(
         if query:
             params["q"] = query
 
-        result = service.events().list(**params).execute()
-        events = result.get("items", [])
+        events: list[dict[str, Any]] = []
+        page_token = None
+        while True:
+            if page_token:
+                params["pageToken"] = page_token
+            result = service.events().list(**params).execute()
+            events.extend(result.get("items", []))
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
         return events
     except HttpError as e:
         handle_api_error(e)

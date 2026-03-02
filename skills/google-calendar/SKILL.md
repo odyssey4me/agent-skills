@@ -3,7 +3,7 @@ name: google-calendar
 description: Create, update, and organize Google Calendar events and schedules. Check availability, book time, and manage calendars. Use when asked to schedule a meeting, set up an appointment, book a call, check gcal, or manage calendar events.
 metadata:
   author: odyssey4me
-  version: "0.2.0"
+  version: "0.3.0"
   category: google-workspace
   tags: "events, scheduling, availability"
   complexity: standard
@@ -111,6 +111,10 @@ $SKILL_DIR/scripts/google-calendar.py events list \
   --time-min "2026-01-24T00:00:00Z" \
   --time-max "2026-01-31T23:59:59Z"
 ```
+
+## Agent Guidance — Pagination
+
+Event listing automatically paginates through all results. When a time range is specified, all matching events are returned regardless of count — results are never silently truncated.
 
 ## Agent Guidance — Declined Events
 
