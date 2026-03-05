@@ -678,6 +678,74 @@ def modify_message_labels(
 # ============================================================================
 
 
+def _decode_body_data(data: str) -> str:
+    """Decode base64url-encoded body data from Gmail API.
+
+    Args:
+        data: Base64url-encoded string.
+
+    Returns:
+        Decoded UTF-8 string.
+    """
+    return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
+
+
+def _extract_body_from_parts(parts: list[dict[str, Any]], mime_type: str = "text/plain") -> str:
+    """Recursively extract body text from multipart message parts.
+
+    Args:
+        parts: List of message part dictionaries.
+        mime_type: Preferred MIME type to extract.
+
+    Returns:
+        Decoded body text, or empty string if not found.
+    """
+    for part in parts:
+        if part.get("mimeType") == mime_type:
+            data = part.get("body", {}).get("data", "")
+            if data:
+                return _decode_body_data(data)
+        # Recurse into nested parts (e.g., multipart/alternative inside multipart/mixed)
+        nested = part.get("parts")
+        if nested:
+            result = _extract_body_from_parts(nested, mime_type)
+            if result:
+                return result
+    return ""
+
+
+def extract_message_body(message: dict[str, Any]) -> str:
+    """Extract the body text from a Gmail message.
+
+    Handles both simple and multipart messages. Prefers text/plain,
+    falls back to text/html.
+
+    Args:
+        message: Message dictionary from Gmail API (full format).
+
+    Returns:
+        Decoded body text, or empty string if no body found.
+    """
+    payload = message.get("payload", {})
+
+    # Simple message: body data directly on payload
+    body_data = payload.get("body", {}).get("data", "")
+    if body_data:
+        return _decode_body_data(body_data)
+
+    # Multipart message: search parts for text/plain, then text/html
+    parts = payload.get("parts", [])
+    if parts:
+        body = _extract_body_from_parts(parts, "text/plain")
+        if body:
+            return body
+        body = _extract_body_from_parts(parts, "text/html")
+        if body:
+            return body
+
+    return ""
+
+
 def format_message_summary(message: dict[str, Any]) -> str:
     """Format a message for display.
 
@@ -929,8 +997,20 @@ def cmd_messages_get(args):
 
     if args.json:
         print(json.dumps(message, indent=2))
+    elif args.format == "raw":
+        # Raw format: decode the full RFC 2822 message
+        raw_data = message.get("raw", "")
+        if raw_data:
+            print(_decode_body_data(raw_data))
+        else:
+            print("(No raw data available)")
     else:
         print(format_message_summary(message))
+        # Show body for full format
+        if args.format == "full":
+            body = extract_message_body(message)
+            if body:
+                print(f"\n---\n\n{body}")
 
     return 0
 

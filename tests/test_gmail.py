@@ -11,6 +11,8 @@ import pytest
 from skills.gmail.scripts.gmail import (
     AuthenticationError,
     GmailAPIError,
+    _decode_body_data,
+    _extract_body_from_parts,
     build_gmail_service,
     build_parser,
     check_gmail_connectivity,
@@ -29,6 +31,7 @@ from skills.gmail.scripts.gmail import (
     create_draft,
     create_label,
     delete_credential,
+    extract_message_body,
     format_label,
     format_message_summary,
     get_credential,
@@ -641,6 +644,137 @@ class TestFormatting:
         assert "user" in formatted
 
 
+class TestBodyExtraction:
+    """Tests for message body extraction functions."""
+
+    def test_decode_body_data(self):
+        """Test decoding base64url-encoded body data."""
+        import base64
+
+        original = "Hello, world!"
+        encoded = base64.urlsafe_b64encode(original.encode()).decode()
+        assert _decode_body_data(encoded) == original
+
+    def test_decode_body_data_unicode(self):
+        """Test decoding body data with unicode characters."""
+        import base64
+
+        original = "Héllo wörld — test"
+        encoded = base64.urlsafe_b64encode(original.encode()).decode()
+        assert _decode_body_data(encoded) == original
+
+    def test_extract_body_simple_message(self):
+        """Test extracting body from a simple (non-multipart) message."""
+        import base64
+
+        body_text = "This is the message body."
+        encoded = base64.urlsafe_b64encode(body_text.encode()).decode()
+        message = {
+            "payload": {
+                "mimeType": "text/plain",
+                "body": {"data": encoded},
+            }
+        }
+        assert extract_message_body(message) == body_text
+
+    def test_extract_body_multipart_plain(self):
+        """Test extracting text/plain body from multipart message."""
+        import base64
+
+        plain_text = "Plain text body"
+        html_text = "<p>HTML body</p>"
+        plain_encoded = base64.urlsafe_b64encode(plain_text.encode()).decode()
+        html_encoded = base64.urlsafe_b64encode(html_text.encode()).decode()
+        message = {
+            "payload": {
+                "mimeType": "multipart/alternative",
+                "body": {"size": 0},
+                "parts": [
+                    {
+                        "mimeType": "text/plain",
+                        "body": {"data": plain_encoded},
+                    },
+                    {
+                        "mimeType": "text/html",
+                        "body": {"data": html_encoded},
+                    },
+                ],
+            }
+        }
+        assert extract_message_body(message) == plain_text
+
+    def test_extract_body_multipart_html_fallback(self):
+        """Test falling back to text/html when text/plain is absent."""
+        import base64
+
+        html_text = "<p>HTML only</p>"
+        html_encoded = base64.urlsafe_b64encode(html_text.encode()).decode()
+        message = {
+            "payload": {
+                "mimeType": "multipart/alternative",
+                "body": {"size": 0},
+                "parts": [
+                    {
+                        "mimeType": "text/html",
+                        "body": {"data": html_encoded},
+                    },
+                ],
+            }
+        }
+        assert extract_message_body(message) == html_text
+
+    def test_extract_body_nested_multipart(self):
+        """Test extracting body from nested multipart structure."""
+        import base64
+
+        body_text = "Nested plain text"
+        encoded = base64.urlsafe_b64encode(body_text.encode()).decode()
+        message = {
+            "payload": {
+                "mimeType": "multipart/mixed",
+                "body": {"size": 0},
+                "parts": [
+                    {
+                        "mimeType": "multipart/alternative",
+                        "body": {"size": 0},
+                        "parts": [
+                            {
+                                "mimeType": "text/plain",
+                                "body": {"data": encoded},
+                            },
+                        ],
+                    },
+                    {
+                        "mimeType": "application/pdf",
+                        "body": {"size": 12345, "attachmentId": "att1"},
+                    },
+                ],
+            }
+        }
+        assert extract_message_body(message) == body_text
+
+    def test_extract_body_empty_message(self):
+        """Test extracting body from message with no body data."""
+        message = {
+            "payload": {
+                "mimeType": "text/plain",
+                "body": {"size": 0},
+            }
+        }
+        assert extract_message_body(message) == ""
+
+    def test_extract_body_no_payload(self):
+        """Test extracting body from message with no payload."""
+        assert extract_message_body({}) == ""
+
+    def test_extract_body_from_parts_no_match(self):
+        """Test _extract_body_from_parts with no matching MIME type."""
+        parts = [
+            {"mimeType": "application/pdf", "body": {"size": 100}},
+        ]
+        assert _extract_body_from_parts(parts, "text/plain") == ""
+
+
 # ============================================================================
 # HEALTH CHECK TESTS
 # ============================================================================
@@ -968,11 +1102,19 @@ class TestMoreCLICommands:
     @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("skills.gmail.scripts.gmail.get_message")
     @patch("builtins.print")
-    def test_cmd_messages_get_text(self, _mock_print, mock_get_message, _mock_build_service):
-        """Test messages get command with text output."""
+    def test_cmd_messages_get_text(self, mock_print, mock_get_message, _mock_build_service):
+        """Test messages get command with text output includes body."""
+        import base64
+
+        body_text = "Full message body content"
+        encoded = base64.urlsafe_b64encode(body_text.encode()).decode()
         mock_get_message.return_value = {
             "id": "msg123",
-            "payload": {"headers": [{"name": "Subject", "value": "Test"}]},
+            "payload": {
+                "headers": [{"name": "Subject", "value": "Test"}],
+                "mimeType": "text/plain",
+                "body": {"data": encoded},
+            },
             "snippet": "test",
         }
 
@@ -984,6 +1126,73 @@ class TestMoreCLICommands:
         exit_code = cmd_messages_get(args)
 
         assert exit_code == 0
+        # Verify body was printed (second print call contains the body)
+        print_calls = [str(call) for call in mock_print.call_args_list]
+        body_printed = any(body_text in call for call in print_calls)
+        assert body_printed, f"Body not found in print calls: {print_calls}"
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.get_message")
+    @patch("builtins.print")
+    def test_cmd_messages_get_raw(self, mock_print, mock_get_message, _mock_build_service):
+        """Test messages get command with raw format."""
+        import base64
+
+        raw_content = "From: sender@example.com\r\nSubject: Test\r\n\r\nRaw body"
+        encoded = base64.urlsafe_b64encode(raw_content.encode()).decode()
+        mock_get_message.return_value = {
+            "id": "msg123",
+            "raw": encoded,
+        }
+
+        args = Mock()
+        args.message_id = "msg123"
+        args.format = "raw"
+        args.json = False
+
+        exit_code = cmd_messages_get(args)
+
+        assert exit_code == 0
+        mock_print.assert_called_once_with(raw_content)
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.get_message")
+    @patch("builtins.print")
+    def test_cmd_messages_get_raw_no_data(self, mock_print, mock_get_message, _mock_build_service):
+        """Test messages get command with raw format but no raw data."""
+        mock_get_message.return_value = {"id": "msg123"}
+
+        args = Mock()
+        args.message_id = "msg123"
+        args.format = "raw"
+        args.json = False
+
+        exit_code = cmd_messages_get(args)
+
+        assert exit_code == 0
+        mock_print.assert_called_once_with("(No raw data available)")
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.get_message")
+    @patch("builtins.print")
+    def test_cmd_messages_get_metadata(self, mock_print, mock_get_message, _mock_build_service):
+        """Test messages get command with metadata format shows summary only."""
+        mock_get_message.return_value = {
+            "id": "msg123",
+            "payload": {"headers": [{"name": "Subject", "value": "Test"}]},
+            "snippet": "test",
+        }
+
+        args = Mock()
+        args.message_id = "msg123"
+        args.format = "metadata"
+        args.json = False
+
+        exit_code = cmd_messages_get(args)
+
+        assert exit_code == 0
+        # Should only call print once (summary only, no body for metadata format)
+        assert mock_print.call_count == 1
 
     @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("skills.gmail.scripts.gmail.create_draft")
