@@ -3,7 +3,7 @@ name: google-sheets
 description: Read, write, and format Google Sheets spreadsheets. Manage cell values, ranges, formulas, pivot tables, and charts. Use when asked to update a gsheet, edit a Google spreadsheet, add formulas, or work with spreadsheet data.
 metadata:
   author: odyssey4me
-  version: "0.1.1"
+  version: "0.1.2"
   category: google-workspace
   tags: "spreadsheets, data, formulas"
   complexity: standard

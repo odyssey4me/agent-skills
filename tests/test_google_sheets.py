@@ -426,14 +426,16 @@ class TestOutputFormatting:
         result = format_values_output([])
         assert "(No data)" in result
 
-    def test_format_values_output_truncation(self):
-        """Test formatting with long cell values."""
+    def test_format_values_output_no_truncation(self):
+        """Test formatting preserves full cell values."""
         values = [["A" * 50, "B" * 50]]
 
         result = format_values_output(values)
 
-        # Should truncate long values
-        assert "..." in result
+        # Should preserve full cell content without truncation
+        assert "A" * 50 in result
+        assert "B" * 50 in result
+        assert "..." not in result
 
 
 # ============================================================================

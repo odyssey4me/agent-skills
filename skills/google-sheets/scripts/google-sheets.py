@@ -673,7 +673,7 @@ def format_values_output(values: list[list[Any]]) -> str:
         for row in values:
             if col_idx < len(row):
                 max_width = max(max_width, len(str(row[col_idx])))
-        col_widths.append(min(max_width, 30))  # Cap at 30 chars
+        col_widths.append(max_width)
 
     # Format rows
     lines = []
@@ -681,8 +681,6 @@ def format_values_output(values: list[list[Any]]) -> str:
         formatted_cells = []
         for col_idx, cell in enumerate(row):
             cell_str = str(cell) if cell else ""
-            if len(cell_str) > 30:
-                cell_str = cell_str[:27] + "..."
             formatted_cells.append(cell_str.ljust(col_widths[col_idx]))
         lines.append(" | ".join(formatted_cells))
 
