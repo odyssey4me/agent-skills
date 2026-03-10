@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.3.0"
+  version: "0.3.1"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -114,6 +114,8 @@ $SKILL_DIR/scripts/jira.py config show --project DEMO
 ```
 
 ## Commands
+
+See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ### check
 

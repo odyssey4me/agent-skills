@@ -3,7 +3,7 @@ name: gmail
 description: Send, search, and organize Gmail messages, drafts, and labels. Use when asked to compose an email, reply to mail, forward a message, search inbox, manage attachments, or organize Gmail.
 metadata:
   author: odyssey4me
-  version: "0.1.2"
+  version: "0.1.3"
   category: communication
   tags: "email, drafts, labels"
   complexity: standard
@@ -55,6 +55,8 @@ Gmail uses OAuth 2.0 for authentication. For complete setup instructions, see:
 On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Commands
+
+See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ### check
 

@@ -3,7 +3,7 @@ name: google-drive
 description: Upload, download, search, and share files on Google Drive. Create folders and manage permissions. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, or organize Google Drive files.
 metadata:
   author: odyssey4me
-  version: "0.1.1"
+  version: "0.1.2"
   category: google-workspace
   tags: "files, folders, sharing"
   complexity: standard
@@ -55,6 +55,8 @@ Google Drive uses OAuth 2.0 for authentication. For complete setup instructions,
 On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Script Usage
+
+See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ```bash
 # Setup and auth

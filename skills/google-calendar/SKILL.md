@@ -3,7 +3,7 @@ name: google-calendar
 description: Create, update, and organize Google Calendar events and schedules. Check availability, book time, and manage calendars. Use when asked to schedule a meeting, set up an appointment, book a call, check gcal, or manage calendar events.
 metadata:
   author: odyssey4me
-  version: "0.3.0"
+  version: "0.3.1"
   category: google-workspace
   tags: "events, scheduling, availability"
   complexity: standard
@@ -55,6 +55,8 @@ Google Calendar uses OAuth 2.0 for authentication. For complete setup instructio
 On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Script Usage
+
+See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ```bash
 # Setup and auth

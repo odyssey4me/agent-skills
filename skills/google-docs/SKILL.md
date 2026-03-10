@@ -3,7 +3,7 @@ name: google-docs
 description: Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.
 metadata:
   author: odyssey4me
-  version: "0.2.0"
+  version: "0.2.1"
   category: google-workspace
   tags: "documents, editing"
   complexity: standard
@@ -55,6 +55,8 @@ Google Docs uses OAuth 2.0 for authentication. For complete setup instructions, 
 On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Commands
+
+See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ### check
 

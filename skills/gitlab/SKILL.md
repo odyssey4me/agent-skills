@@ -3,7 +3,7 @@ name: gitlab
 description: Create and manage GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when asked to open an MR, review a merge request, check CI/CD pipelines, list issues, or manage code review on GitLab.
 metadata:
   author: odyssey4me
-  version: "0.2.0"
+  version: "0.2.1"
   category: code-hosting
   tags: "issues, merge-requests, pipelines"
   complexity: lightweight
@@ -34,7 +34,7 @@ See [GitLab CLI Authentication](https://docs.gitlab.com/cli/#authentication) for
 
 ## Script Usage
 
-The wrapper script (`scripts/gitlab.py`) formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `glab` directly for action commands (create, merge, close, comment).
+The wrapper script (`scripts/gitlab.py`) formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `glab` directly for action commands (create, merge, close, comment). See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ```bash
 # Check glab CLI is installed and authenticated

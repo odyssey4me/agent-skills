@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "0.2.1"
+  version: "0.2.2"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -103,6 +103,8 @@ $SKILL_DIR/scripts/confluence.py config show --space DEMO
 ```
 
 ## Commands
+
+See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ### check
 

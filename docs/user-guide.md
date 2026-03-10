@@ -220,6 +220,21 @@ Add these guidelines to your project's `AGENTS.md` (or equivalent agent instruct
 
 4. **Describe what, not how** — tell agents what information to gather, not which commands to run. The skills evolve independently; hardcoding their implementation details creates coupling that breaks when skills change.
 
+### Permission Control
+
+Each skill includes a `references/permissions.md` file that classifies its
+commands as `read` or `write`. Agents should load this reference when invoking
+a skill and use it to decide whether a command can run freely (`read`) or
+needs user confirmation (`write`). This keeps permission logic agent-agnostic
+— any agent can read the table and map it to its own permission system.
+
+The permission reference can also be used to pre-configure agent permissions
+so that read-only commands auto-execute without prompting. For example, an
+agent orchestrator can parse each skill's `permissions.md`, collect all `read`
+commands, and add them to its allow-list upfront — giving the agent
+frictionless access to queries and lookups while still gating write operations
+behind user confirmation.
+
 ### Skill-Specific Commands
 
 You can also invoke skills directly with specific commands. See individual skill documentation:

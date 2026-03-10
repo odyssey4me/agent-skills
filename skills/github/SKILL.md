@@ -3,7 +3,7 @@ name: github
 description: Create and manage GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when asked to open a PR, merge a pull request, check repo actions, list issues, create a branch, or manage GitHub projects.
 metadata:
   author: odyssey4me
-  version: "0.2.0"
+  version: "0.2.1"
   category: code-hosting
   tags: "issues, pull-requests, workflows"
   complexity: lightweight
@@ -33,7 +33,7 @@ See [GitHub CLI Authentication](https://cli.github.com/manual/gh_auth_login) for
 
 ## Script Usage
 
-The wrapper script (`scripts/github.py`) formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `gh` directly for action commands (create, merge, close, comment).
+The wrapper script (`scripts/github.py`) formats output as markdown. Use it for read/view operations to get agent-consumable output. Use `gh` directly for action commands (create, merge, close, comment). See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ```bash
 # Check gh CLI is installed and authenticated

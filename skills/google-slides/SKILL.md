@@ -3,7 +3,7 @@ name: google-slides
 description: Create and edit Google Slides presentations. Add or delete slides, insert text, shapes, and images. Use when asked to build a deck, create a slideshow, update a Google presentation, or edit slides.
 metadata:
   author: odyssey4me
-  version: "0.1.2"
+  version: "0.1.3"
   category: google-workspace
   tags: "presentations, slides"
   complexity: standard
@@ -55,6 +55,8 @@ Google Slides uses OAuth 2.0 for authentication. For complete setup instructions
 On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Script Usage
+
+See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ```bash
 # Setup and auth

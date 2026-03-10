@@ -3,7 +3,7 @@ name: gerrit
 description: Submit, amend, and review Gerrit changes using git-review CLI. Use when asked to submit a patchset, download a change, rebase a change request, check CR status, or manage code reviews in Gerrit.
 metadata:
   author: odyssey4me
-  version: "0.2.1"
+  version: "0.2.2"
   category: code-hosting
   tags: "code-review, patches"
   complexity: lightweight
@@ -64,7 +64,7 @@ See [Installation Guide](https://docs.opendev.org/opendev/git-review/latest/inst
 
 ## Script Usage
 
-The wrapper script (`scripts/gerrit.py`) uses Gerrit SSH query commands and formats output as markdown. Connection details are read from `.gitreview` or provided via `--host`/`--port`/`--username` flags.
+The wrapper script (`scripts/gerrit.py`) uses Gerrit SSH query commands and formats output as markdown. Connection details are read from `.gitreview` or provided via `--host`/`--port`/`--username` flags. See [permissions.md](references/permissions.md) for read/write classification of each command.
 
 ```bash
 # Check Gerrit SSH access
