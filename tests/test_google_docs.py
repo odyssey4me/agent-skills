@@ -44,8 +44,14 @@ cmd_content_insert = google_docs.cmd_content_insert
 cmd_content_insert_after_anchor = google_docs.cmd_content_insert_after_anchor
 cmd_documents_create = google_docs.cmd_documents_create
 cmd_documents_get = google_docs.cmd_documents_get
+cmd_documents_import = google_docs.cmd_documents_import
 cmd_documents_read = google_docs.cmd_documents_read
 cmd_formatting_apply = google_docs.cmd_formatting_apply
+convert_markdown_to_html = google_docs.convert_markdown_to_html
+extract_title_from_markdown = google_docs.extract_title_from_markdown
+import_markdown_as_doc = google_docs.import_markdown_as_doc
+update_doc_from_html = google_docs.update_doc_from_html
+DRIVE_SCOPES_FILE = google_docs.DRIVE_SCOPES_FILE
 create_document = google_docs.create_document
 delete_content = google_docs.delete_content
 delete_credential = google_docs.delete_credential
@@ -1670,4 +1676,208 @@ class TestArgumentParserInsertAfterAnchor:
                 "--json",
             ]
         )
+        assert args.json is True
+
+
+# ============================================================================
+# MARKDOWN IMPORT TESTS
+# ============================================================================
+
+
+class TestExtractTitleFromMarkdown:
+    """Tests for extract_title_from_markdown."""
+
+    def test_extracts_h1(self):
+        assert extract_title_from_markdown("# My Title\n\nBody") == "My Title"
+
+    def test_extracts_first_h1(self):
+        assert extract_title_from_markdown("# First\n# Second") == "First"
+
+    def test_ignores_h2(self):
+        assert extract_title_from_markdown("## Not H1\nBody") is None
+
+    def test_returns_none_for_no_heading(self):
+        assert extract_title_from_markdown("Just text") is None
+
+
+class TestConvertMarkdownToHtml:
+    """Tests for convert_markdown_to_html."""
+
+    def test_converts_heading(self):
+        result = convert_markdown_to_html("# Hello")
+        assert "<h1>" in result
+
+    def test_converts_bold(self):
+        result = convert_markdown_to_html("**bold**")
+        assert "<strong>" in result
+
+    def test_converts_table(self):
+        md = "| A | B |\n|---|---|\n| 1 | 2 |"
+        result = convert_markdown_to_html(md)
+        assert "<table>" in result
+
+
+class TestImportMarkdownAsDoc:
+    """Tests for import_markdown_as_doc."""
+
+    def test_creates_doc_with_html(self):
+        mock_service = Mock()
+        mock_service.files().create().execute.return_value = {
+            "id": "doc123",
+            "name": "Test",
+            "mimeType": "application/vnd.google-apps.document",
+            "webViewLink": "https://docs.google.com/document/d/doc123/edit",
+        }
+
+        result = import_markdown_as_doc(mock_service, "<h1>Test</h1>", "Test")
+
+        assert result["id"] == "doc123"
+        call_kwargs = mock_service.files().create.call_args[1]
+        assert call_kwargs["body"]["mimeType"] == "application/vnd.google-apps.document"
+        assert call_kwargs["body"]["name"] == "Test"
+
+    def test_creates_doc_in_folder(self):
+        mock_service = Mock()
+        mock_service.files().create().execute.return_value = {"id": "doc123"}
+
+        import_markdown_as_doc(mock_service, "<h1>Test</h1>", "Test", folder_id="folder1")
+
+        call_kwargs = mock_service.files().create.call_args[1]
+        assert call_kwargs["body"]["parents"] == ["folder1"]
+
+
+class TestUpdateDocFromHtml:
+    """Tests for update_doc_from_html."""
+
+    def test_updates_existing_doc(self):
+        mock_service = Mock()
+        mock_service.files().update().execute.return_value = {
+            "id": "doc123",
+            "name": "Updated",
+        }
+
+        result = update_doc_from_html(mock_service, "doc123", "<h1>Updated</h1>")
+
+        assert result["id"] == "doc123"
+        call_kwargs = mock_service.files().update.call_args[1]
+        assert call_kwargs["fileId"] == "doc123"
+
+
+class TestCmdDocumentsImport:
+    """Tests for cmd_documents_import command handler."""
+
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_import_new_doc(self, mock_import, _mock_build_service, tmp_path, capsys):
+        mock_import.return_value = {
+            "id": "doc123",
+            "name": "Test Doc",
+            "webViewLink": "https://docs.google.com/document/d/doc123/edit",
+        }
+
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Test Doc\n\nSome content")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            json=False,
+        )
+        result = cmd_documents_import(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "imported from markdown successfully" in captured.out
+        assert "doc123" in captured.out
+
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.update_doc_from_html")
+    def test_import_update_existing(self, mock_update, _mock_build_service, tmp_path, capsys):
+        mock_update.return_value = {
+            "id": "existing123",
+            "name": "Updated",
+            "webViewLink": "https://docs.google.com/document/d/existing123/edit",
+        }
+
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Updated\n\nNew content")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id="existing123",
+            folder_id=None,
+            json=False,
+        )
+        result = cmd_documents_import(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "updated from markdown successfully" in captured.out
+
+    def test_import_file_not_found(self, capsys):
+        args = Mock(
+            file_path="/nonexistent/file.md",
+            title=None,
+            document_id=None,
+            folder_id=None,
+            json=False,
+        )
+        result = cmd_documents_import(args)
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "File not found" in captured.err
+
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_import_title_fallback_to_filename(self, mock_import, _mock_build, tmp_path):
+        mock_import.return_value = {"id": "doc1", "name": "notes", "webViewLink": "url"}
+
+        md_file = tmp_path / "notes.md"
+        md_file.write_text("No heading here, just text.")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            json=False,
+        )
+        cmd_documents_import(args)
+
+        call_args = mock_import.call_args
+        assert call_args[0][2] == "notes"  # title arg
+
+
+class TestArgumentParserImport:
+    """Tests for documents import argument parser."""
+
+    def test_parser_accepts_import(self):
+        parser = build_parser()
+        args = parser.parse_args(["documents", "import", "/tmp/test.md"])
+        assert args.documents_command == "import"
+        assert args.file_path == "/tmp/test.md"
+
+    def test_parser_import_with_options(self):
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "documents",
+                "import",
+                "/tmp/test.md",
+                "--title",
+                "My Doc",
+                "--document-id",
+                "doc123",
+                "--folder-id",
+                "folder1",
+                "--json",
+            ]
+        )
+        assert args.title == "My Doc"
+        assert args.document_id == "doc123"
+        assert args.folder_id == "folder1"
         assert args.json is True

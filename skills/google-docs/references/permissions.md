@@ -16,6 +16,7 @@ enforce appropriate permission controls.
 | auth reset | write | Clear stored OAuth token |
 | documents get | read | Get document metadata |
 | documents read | read | Read document content |
+| documents import | write | Import a markdown file as a Google Doc |
 | documents create | write | Create a new document |
 | content append | write | Append content to a document |
 | content insert | write | Insert content at a position |

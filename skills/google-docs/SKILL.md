@@ -3,7 +3,7 @@ name: google-docs
 description: Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.
 metadata:
   author: odyssey4me
-  version: "0.2.1"
+  version: "0.3.0"
   category: google-workspace
   tags: "documents, editing"
   complexity: standard
@@ -17,7 +17,7 @@ Interact with Google Docs for document creation, editing, and content management
 
 ## Installation
 
-**Dependencies**: `pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml`
+**Dependencies**: `pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml markdown`
 
 ## Setup Verification
 
@@ -28,7 +28,7 @@ $SKILL_DIR/scripts/google-docs.py check
 ```
 
 This will check:
-- Python dependencies (google-auth, google-auth-oauthlib, google-api-python-client, keyring, pyyaml)
+- Python dependencies (google-auth, google-auth-oauthlib, google-api-python-client, keyring, pyyaml, markdown)
 - Authentication configuration
 - Connectivity to Google Docs API
 
@@ -188,6 +188,37 @@ $SKILL_DIR/scripts/google-docs.py documents read 1abc...xyz --format pdf --outpu
 ```
 
 **Note:** Markdown and PDF export use Google's native Drive API export. Markdown preserves tables, headings, formatting, and structure with high fidelity. Both require the `drive.readonly` scope.
+
+### documents import
+
+Import a local markdown file as a natively formatted Google Doc. Uses Drive API HTML-to-Docs conversion for full markdown fidelity including tables, code blocks, headings, bold, italic, links, and lists.
+
+```bash
+$SKILL_DIR/scripts/google-docs.py documents import FILE_PATH [--title TITLE] [--document-id DOC_ID] [--folder-id ID]
+```
+
+**Arguments:**
+- `file_path` - Local path to a markdown file
+
+**Options:**
+- `--title` - Document title (default: first H1 heading, or filename)
+- `--document-id` - Existing document ID to update (replaces content)
+- `--folder-id` - Parent folder ID for new documents
+- `--json` - Output as JSON
+
+**Examples:**
+```bash
+# Import a markdown file as a new Google Doc
+$SKILL_DIR/scripts/google-docs.py documents import ./report.md --title "Monthly Report"
+
+# Import using the first H1 heading as the title
+$SKILL_DIR/scripts/google-docs.py documents import ./notes.md
+
+# Update an existing document with new markdown content
+$SKILL_DIR/scripts/google-docs.py documents import ./updated.md --document-id 1abc...xyz
+```
+
+**Note:** Requires the `markdown` Python library (`pip install --user markdown`) and the `drive.file` scope.
 
 ### content append
 

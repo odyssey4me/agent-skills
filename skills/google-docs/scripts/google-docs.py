@@ -44,6 +44,7 @@ except ImportError:
 try:
     from googleapiclient.discovery import build
     from googleapiclient.errors import HttpError
+    from googleapiclient.http import MediaInMemoryUpload
 
     GOOGLE_API_CLIENT_AVAILABLE = True
 except ImportError:
@@ -63,6 +64,13 @@ try:
 except ImportError:
     YAML_AVAILABLE = False
 
+try:
+    import markdown as md_lib
+
+    MARKDOWN_LIB_AVAILABLE = True
+except ImportError:
+    MARKDOWN_LIB_AVAILABLE = False
+
 
 # ============================================================================
 # CONSTANTS
@@ -77,6 +85,9 @@ DOCS_SCOPES = ["https://www.googleapis.com/auth/documents"]
 
 # Drive API scope needed for markdown export
 DRIVE_SCOPES_READONLY = ["https://www.googleapis.com/auth/drive.readonly"]
+
+# Drive API scope needed for creating/updating files
+DRIVE_SCOPES_FILE = ["https://www.googleapis.com/auth/drive.file"]
 
 # Minimal read-only scope (default)
 DOCS_SCOPES_DEFAULT = DOCS_SCOPES_READONLY
@@ -1430,6 +1441,152 @@ def cmd_formatting_apply(args):
 
 
 # ============================================================================
+# MARKDOWN IMPORT
+# ============================================================================
+
+
+def extract_title_from_markdown(md_content: str) -> str | None:
+    """Extract the first H1 heading from markdown content.
+
+    Args:
+        md_content: Markdown text.
+
+    Returns:
+        The heading text, or None if no H1 found.
+    """
+    import re
+
+    match = re.search(r"^#\s+(.+)$", md_content, re.MULTILINE)
+    return match.group(1).strip() if match else None
+
+
+def convert_markdown_to_html(md_content: str) -> str:
+    """Convert markdown content to HTML using the markdown library.
+
+    Args:
+        md_content: Markdown text.
+
+    Returns:
+        HTML string.
+    """
+    return md_lib.markdown(md_content, extensions=["tables", "fenced_code"])
+
+
+def import_markdown_as_doc(
+    drive_service, html_content: str, title: str, folder_id: str | None = None
+) -> dict[str, Any]:
+    """Create a new Google Doc from HTML content via Drive API conversion.
+
+    Args:
+        drive_service: Google Drive API service object.
+        html_content: HTML content to import.
+        title: Document title.
+        folder_id: Optional parent folder ID.
+
+    Returns:
+        Created file metadata dictionary.
+    """
+    file_metadata: dict[str, Any] = {
+        "name": title,
+        "mimeType": "application/vnd.google-apps.document",
+    }
+    if folder_id:
+        file_metadata["parents"] = [folder_id]
+
+    media = MediaInMemoryUpload(
+        html_content.encode("utf-8"),
+        mimetype="text/html",
+        resumable=False,
+    )
+    return (
+        drive_service.files()
+        .create(
+            body=file_metadata,
+            media_body=media,
+            fields="id, name, mimeType, webViewLink",
+        )
+        .execute()
+    )
+
+
+def update_doc_from_html(drive_service, document_id: str, html_content: str) -> dict[str, Any]:
+    """Replace the content of an existing Google Doc with HTML content.
+
+    Args:
+        drive_service: Google Drive API service object.
+        document_id: Existing document ID to update.
+        html_content: HTML content to import.
+
+    Returns:
+        Updated file metadata dictionary.
+    """
+    media = MediaInMemoryUpload(
+        html_content.encode("utf-8"),
+        mimetype="text/html",
+        resumable=False,
+    )
+    return (
+        drive_service.files()
+        .update(
+            fileId=document_id,
+            media_body=media,
+            fields="id, name, mimeType, webViewLink",
+        )
+        .execute()
+    )
+
+
+def cmd_documents_import(args):
+    """Handle 'documents import' command."""
+    if not MARKDOWN_LIB_AVAILABLE:
+        print(
+            "Error: 'markdown' library not found. Install with: pip install --user markdown",
+            file=sys.stderr,
+        )
+        return 1
+
+    file_path = Path(args.file_path)
+    if not file_path.exists():
+        print(f"Error: File not found: {file_path}", file=sys.stderr)
+        return 1
+
+    md_content = file_path.read_text(encoding="utf-8")
+
+    # Resolve title: --title flag > first H1 > filename stem
+    title = args.title
+    if not title:
+        title = extract_title_from_markdown(md_content)
+    if not title:
+        title = file_path.stem
+
+    html_content = convert_markdown_to_html(md_content)
+
+    drive_service = build_drive_service(DRIVE_SCOPES_FILE)
+
+    if args.document_id:
+        result = update_doc_from_html(drive_service, args.document_id, html_content)
+    else:
+        result = import_markdown_as_doc(
+            drive_service, html_content, title, folder_id=args.folder_id
+        )
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        doc_id = result.get("id")
+        link = result.get("webViewLink", f"https://docs.google.com/document/d/{doc_id}/edit")
+        if args.document_id:
+            print("✓ Document updated from markdown successfully")
+        else:
+            print("✓ Document imported from markdown successfully")
+        print(f"  Title: {result.get('name')}")
+        print(f"  Document ID: {doc_id}")
+        print(f"  URL: {link}")
+
+    return 0
+
+
+# ============================================================================
 # CLI ARGUMENT PARSER
 # ============================================================================
 
@@ -1483,6 +1640,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output file path (used with pdf format)",
     )
     read_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    import_parser = documents_subparsers.add_parser(
+        "import", help="Import a local markdown file as a Google Doc"
+    )
+    import_parser.add_argument("file_path", help="Local markdown file path")
+    import_parser.add_argument("--title", help="Document title (default: first H1 or filename)")
+    import_parser.add_argument(
+        "--document-id", help="Existing document ID to update (replaces content)"
+    )
+    import_parser.add_argument("--folder-id", help="Parent folder ID for new documents")
+    import_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # content commands
     content_parser = subparsers.add_parser("content", help="Content operations")
@@ -1605,6 +1773,8 @@ def main():
                 return cmd_documents_get(args)
             elif args.documents_command == "read":
                 return cmd_documents_read(args)
+            elif args.documents_command == "import":
+                return cmd_documents_import(args)
         elif args.command == "content":
             if args.content_command == "append":
                 return cmd_content_append(args)
