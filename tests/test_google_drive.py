@@ -566,6 +566,28 @@ class TestFileOperations:
         call_kwargs = mock_service.files().create.call_args[1]
         assert call_kwargs["body"]["parents"] == ["folder123"]
 
+    def test_upload_file_with_target_mime_type(self, tmp_path):
+        """Test uploading a file with target MIME type for conversion."""
+        test_file = tmp_path / "test.html"
+        test_file.write_text("<h1>Hello</h1>")
+
+        mock_service = Mock()
+        mock_service.files().create().execute.return_value = {
+            "id": "newfile123",
+            "name": "test.html",
+            "mimeType": "application/vnd.google-apps.document",
+        }
+
+        with patch.object(google_drive, "MediaFileUpload"):
+            upload_file(
+                mock_service,
+                str(test_file),
+                target_mime_type="application/vnd.google-apps.document",
+            )
+
+        call_kwargs = mock_service.files().create.call_args[1]
+        assert call_kwargs["body"]["mimeType"] == "application/vnd.google-apps.document"
+
     def test_upload_file_not_found(self):
         """Test uploading non-existent file raises error."""
         mock_service = Mock()

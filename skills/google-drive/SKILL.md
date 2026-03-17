@@ -3,7 +3,7 @@ name: google-drive
 description: Upload, download, search, and share files on Google Drive. Create folders and manage permissions. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, or organize Google Drive files.
 metadata:
   author: odyssey4me
-  version: "0.1.2"
+  version: "0.2.0"
   category: google-workspace
   tags: "files, folders, sharing"
   complexity: standard
@@ -70,7 +70,7 @@ $SKILL_DIR/scripts/google-drive.py files list [--query QUERY] [--max-results N] 
 $SKILL_DIR/scripts/google-drive.py files search [--name NAME] [--mime-type TYPE] [--folder ID]
 $SKILL_DIR/scripts/google-drive.py files get FILE_ID
 $SKILL_DIR/scripts/google-drive.py files download FILE_ID --output PATH
-$SKILL_DIR/scripts/google-drive.py files upload PATH [--parent ID] [--name NAME] [--mime-type TYPE]
+$SKILL_DIR/scripts/google-drive.py files upload PATH [--parent ID] [--name NAME] [--mime-type TYPE] [--convert-to MIME_TYPE]
 $SKILL_DIR/scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
 
 # Folders
@@ -123,6 +123,20 @@ $SKILL_DIR/scripts/google-drive.py files upload ./presentation.pdf --name "Q4 Pr
 
 # Share with a colleague
 $SKILL_DIR/scripts/google-drive.py share FILE_ID --email colleague@example.com --role writer
+```
+
+### Upload with format conversion
+
+Use `--convert-to` to convert uploaded files to native Google formats:
+
+```bash
+# Upload HTML and convert to Google Docs
+$SKILL_DIR/scripts/google-drive.py files upload ./report.html \
+  --convert-to "application/vnd.google-apps.document"
+
+# Upload CSV and convert to Google Sheets
+$SKILL_DIR/scripts/google-drive.py files upload ./data.csv \
+  --convert-to "application/vnd.google-apps.spreadsheet"
 ```
 
 ### Organize files into folders

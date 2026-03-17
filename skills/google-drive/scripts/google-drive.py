@@ -532,6 +532,7 @@ def upload_file(
     parent_folder_id: str | None = None,
     mime_type: str | None = None,
     name: str | None = None,
+    target_mime_type: str | None = None,
 ) -> dict[str, Any]:
     """Upload a file to Google Drive.
 
@@ -541,6 +542,7 @@ def upload_file(
         parent_folder_id: Parent folder ID (optional).
         mime_type: MIME type of the file (auto-detected if not provided).
         name: Name for the file in Drive (uses local filename if not provided).
+        target_mime_type: Target Google MIME type for format conversion (optional).
 
     Returns:
         Created file metadata dictionary.
@@ -559,6 +561,8 @@ def upload_file(
             mime_type = mime_type or "application/octet-stream"
 
         file_metadata: dict[str, Any] = {"name": file_name}
+        if target_mime_type:
+            file_metadata["mimeType"] = target_mime_type
         if parent_folder_id:
             file_metadata["parents"] = [parent_folder_id]
 
@@ -1130,6 +1134,7 @@ def cmd_files_upload(args):
         parent_folder_id=args.parent,
         mime_type=args.mime_type,
         name=args.name,
+        target_mime_type=args.convert_to,
     )
 
     if args.json:
@@ -1298,6 +1303,11 @@ def build_parser() -> argparse.ArgumentParser:
     upload_parser.add_argument("--parent", help="Parent folder ID")
     upload_parser.add_argument("--mime-type", help="MIME type (auto-detected if not provided)")
     upload_parser.add_argument("--name", help="Name for the file in Drive")
+    upload_parser.add_argument(
+        "--convert-to",
+        help="Target Google MIME type for format conversion "
+        "(e.g. application/vnd.google-apps.document)",
+    )
     upload_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     move_parser = files_subparsers.add_parser("move", help="Move a file to a different folder")
