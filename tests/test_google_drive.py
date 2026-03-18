@@ -62,7 +62,9 @@ search_files = google_drive.search_files
 set_credential = google_drive.set_credential
 share_file = google_drive.share_file
 move_file = google_drive.move_file
+cmd_files_delete = google_drive.cmd_files_delete
 cmd_files_move = google_drive.cmd_files_move
+delete_file = google_drive.delete_file
 upload_file = google_drive.upload_file
 
 
@@ -626,6 +628,24 @@ class TestFileOperations:
         with pytest.raises(DriveAPIError):
             move_file(mock_service, "nonexistent", "new_parent_id")
 
+    def test_delete_file(self):
+        """Test permanently deleting a file."""
+        mock_service = Mock()
+
+        delete_file(mock_service, "file123")
+
+        mock_service.files().delete.assert_called_with(fileId="file123")
+
+    def test_delete_file_not_found(self):
+        """Test deleting a file that doesn't exist."""
+        mock_service = Mock()
+        resp = Mock(status=404, reason="Not Found")
+        content = b'{"error": {"message": "File not found"}}'
+        mock_service.files().delete().execute.side_effect = HttpError(resp, content)
+
+        with pytest.raises(DriveAPIError):
+            delete_file(mock_service, "nonexistent")
+
 
 # ============================================================================
 # FOLDER OPERATIONS TESTS
@@ -1141,6 +1161,37 @@ class TestCLICommands:
         assert exit_code == 0
 
     @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "delete_file")
+    @patch("builtins.print")
+    def test_cmd_files_delete_text(self, _mock_print, mock_delete, __mock_build_service):
+        """Test files delete command with text output."""
+        args = Mock()
+        args.file_id = "file123"
+        args.json = False
+
+        exit_code = cmd_files_delete(args)
+
+        assert exit_code == 0
+        mock_delete.assert_called_once_with(__mock_build_service.return_value, file_id="file123")
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "delete_file")
+    @patch("builtins.print")
+    def test_cmd_files_delete_json(self, mock_print, _mock_delete, __mock_build_service):
+        """Test files delete command with JSON output."""
+        args = Mock()
+        args.file_id = "file123"
+        args.json = True
+
+        exit_code = cmd_files_delete(args)
+
+        assert exit_code == 0
+        output = mock_print.call_args[0][0]
+        result = json.loads(output)
+        assert result["id"] == "file123"
+        assert result["deleted"] is True
+
+    @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "create_folder")
     @patch("builtins.print")
     def test_cmd_folders_create(self, _mock_print, mock_create_folder, __mock_build_service):
@@ -1325,6 +1376,12 @@ class TestArgumentParser:
         assert args.files_command == "move"
         assert args.file_id == "file123"
         assert args.parent == "folder456"
+
+        # Test files delete
+        args = parser.parse_args(["files", "delete", "file123"])
+        assert args.command == "files"
+        assert args.files_command == "delete"
+        assert args.file_id == "file123"
 
         # Test folders create
         args = parser.parse_args(["folders", "create", "New Folder"])

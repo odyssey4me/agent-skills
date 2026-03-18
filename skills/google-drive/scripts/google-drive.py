@@ -11,6 +11,7 @@ Usage:
     python google-drive.py files download FILE_ID --output /path/to/file
     python google-drive.py files upload /path/to/file --parent FOLDER_ID
     python google-drive.py files move FILE_ID --parent FOLDER_ID
+    python google-drive.py files delete FILE_ID
     python google-drive.py folders create "New Folder" --parent FOLDER_ID
     python google-drive.py share FILE_ID --email user@example.com --role writer
     python google-drive.py permissions list FILE_ID
@@ -618,6 +619,22 @@ def move_file(service, file_id: str, new_parent_id: str) -> dict[str, Any]:
         return {}  # Unreachable
 
 
+def delete_file(service, file_id: str) -> None:
+    """Permanently delete a file from Google Drive.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID to delete.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        service.files().delete(fileId=file_id).execute()
+    except HttpError as e:
+        handle_api_error(e)
+
+
 # ============================================================================
 # FOLDER OPERATIONS
 # ============================================================================
@@ -1164,6 +1181,20 @@ def cmd_files_move(args):
     return 0
 
 
+def cmd_files_delete(args):
+    """Handle 'files delete' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
+    delete_file(service, file_id=args.file_id)
+
+    if args.json:
+        print(json.dumps({"id": args.file_id, "deleted": True}, indent=2))
+    else:
+        print("File deleted successfully")
+        print(f"  ID: {args.file_id}")
+
+    return 0
+
+
 def cmd_folders_create(args):
     """Handle 'folders create' command."""
     service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
@@ -1315,6 +1346,10 @@ def build_parser() -> argparse.ArgumentParser:
     move_parser.add_argument("--parent", required=True, help="Destination folder ID")
     move_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    delete_parser = files_subparsers.add_parser("delete", help="Permanently delete a file")
+    delete_parser.add_argument("file_id", help="File ID")
+    delete_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # folders commands
     folders_parser = subparsers.add_parser("folders", help="Folder operations")
     folders_subparsers = folders_parser.add_subparsers(dest="folders_command")
@@ -1429,6 +1464,8 @@ def main():
                 return cmd_files_upload(args)
             elif args.files_command == "move":
                 return cmd_files_move(args)
+            elif args.files_command == "delete":
+                return cmd_files_delete(args)
         elif args.command == "folders":
             if args.folders_command == "create":
                 return cmd_folders_create(args)

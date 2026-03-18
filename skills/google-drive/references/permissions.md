@@ -23,6 +23,7 @@ data without modifying remote state.
 | files download | read | Download a file |
 | files upload | write | Upload a file |
 | files move | write | Move a file |
+| files delete | write | Permanently delete a file |
 | folders list | read | List folder contents |
 | folders create | write | Create a folder |
 | permissions list | read | List file permissions |

@@ -72,6 +72,7 @@ $SKILL_DIR/scripts/google-drive.py files get FILE_ID
 $SKILL_DIR/scripts/google-drive.py files download FILE_ID --output PATH
 $SKILL_DIR/scripts/google-drive.py files upload PATH [--parent ID] [--name NAME] [--mime-type TYPE] [--convert-to MIME_TYPE]
 $SKILL_DIR/scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
+$SKILL_DIR/scripts/google-drive.py files delete FILE_ID
 
 # Folders
 $SKILL_DIR/scripts/google-drive.py folders create NAME [--parent ID]
@@ -137,6 +138,12 @@ $SKILL_DIR/scripts/google-drive.py files upload ./report.html \
 # Upload CSV and convert to Google Sheets
 $SKILL_DIR/scripts/google-drive.py files upload ./data.csv \
   --convert-to "application/vnd.google-apps.spreadsheet"
+```
+
+### Permanently delete a file
+
+```bash
+$SKILL_DIR/scripts/google-drive.py files delete FILE_ID
 ```
 
 ### Organize files into folders

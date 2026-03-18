@@ -161,6 +161,18 @@ $SKILL_DIR/scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
 - `file_id`: The file ID (required)
 - `--parent`: Destination folder ID (required)
 
+## files delete
+
+Permanently delete a file from Google Drive. This action is irreversible.
+
+```bash
+# Delete a file
+$SKILL_DIR/scripts/google-drive.py files delete FILE_ID
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+
 ## folders create
 
 Create a new folder.

@@ -24,7 +24,6 @@ The following Google Drive API operations are **not yet implemented** in this sk
 | Operation | API Method | Alternative |
 |-----------|-----------|-------------|
 | Rename files | `files.update` (name) | Use Google Drive web interface |
-| Delete files permanently | `files.delete` | Use Google Drive web interface |
 | Trash / untrash files | `files.update` (trashed) | Use Google Drive web interface |
 | Copy files | `files.copy` | Download and re-upload as a workaround |
 | Export Google Docs/Sheets/Slides | `files.export` | Use the **google-docs**, **google-sheets**, or **google-slides** skills to work with Workspace document content |
