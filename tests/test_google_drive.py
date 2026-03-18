@@ -62,9 +62,11 @@ search_files = google_drive.search_files
 set_credential = google_drive.set_credential
 share_file = google_drive.share_file
 move_file = google_drive.move_file
+cmd_files_copy = google_drive.cmd_files_copy
 cmd_files_delete = google_drive.cmd_files_delete
 cmd_files_move = google_drive.cmd_files_move
 cmd_files_rename = google_drive.cmd_files_rename
+copy_file = google_drive.copy_file
 delete_file = google_drive.delete_file
 rename_file = google_drive.rename_file
 upload_file = google_drive.upload_file
@@ -678,6 +680,57 @@ class TestFileOperations:
         with pytest.raises(DriveAPIError):
             rename_file(mock_service, "nonexistent", "New Name")
 
+    def test_copy_file(self):
+        """Test copying a file."""
+        mock_service = Mock()
+        mock_service.files().copy().execute.return_value = {
+            "id": "copy123",
+            "name": "Copy of Test.pdf",
+            "mimeType": "application/pdf",
+            "parents": ["root"],
+            "webViewLink": "https://drive.google.com/file/d/copy123",
+        }
+
+        result = copy_file(mock_service, "file123")
+
+        assert result["id"] == "copy123"
+        mock_service.files().copy.assert_called_with(
+            fileId="file123",
+            body={},
+            fields="id, name, mimeType, parents, webViewLink",
+        )
+
+    def test_copy_file_with_name_and_parent(self):
+        """Test copying a file with custom name and parent."""
+        mock_service = Mock()
+        mock_service.files().copy().execute.return_value = {
+            "id": "copy123",
+            "name": "Backup",
+            "mimeType": "application/pdf",
+            "parents": ["folder456"],
+            "webViewLink": "https://drive.google.com/file/d/copy123",
+        }
+
+        result = copy_file(mock_service, "file123", name="Backup", parent_folder_id="folder456")
+
+        assert result["id"] == "copy123"
+        assert result["name"] == "Backup"
+        mock_service.files().copy.assert_called_with(
+            fileId="file123",
+            body={"name": "Backup", "parents": ["folder456"]},
+            fields="id, name, mimeType, parents, webViewLink",
+        )
+
+    def test_copy_file_not_found(self):
+        """Test copying a file that doesn't exist."""
+        mock_service = Mock()
+        resp = Mock(status=404, reason="Not Found")
+        content = b'{"error": {"message": "File not found"}}'
+        mock_service.files().copy().execute.side_effect = HttpError(resp, content)
+
+        with pytest.raises(DriveAPIError):
+            copy_file(mock_service, "nonexistent")
+
 
 # ============================================================================
 # FOLDER OPERATIONS TESTS
@@ -1271,6 +1324,58 @@ class TestCLICommands:
         assert result["name"] == "New Name.pdf"
 
     @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "copy_file")
+    @patch("builtins.print")
+    def test_cmd_files_copy_text(self, _mock_print, mock_copy, __mock_build_service):
+        """Test files copy command with text output."""
+        mock_copy.return_value = {
+            "id": "copy123",
+            "name": "Copy of Test.pdf",
+            "webViewLink": "https://drive.google.com/file/d/copy123",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.name = None
+        args.parent = None
+        args.json = False
+
+        exit_code = cmd_files_copy(args)
+
+        assert exit_code == 0
+        mock_copy.assert_called_once_with(
+            __mock_build_service.return_value,
+            file_id="file123",
+            name=None,
+            parent_folder_id=None,
+        )
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "copy_file")
+    @patch("builtins.print")
+    def test_cmd_files_copy_json(self, mock_print, mock_copy, __mock_build_service):
+        """Test files copy command with JSON output."""
+        mock_copy.return_value = {
+            "id": "copy123",
+            "name": "Backup",
+            "webViewLink": "https://drive.google.com/file/d/copy123",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.name = "Backup"
+        args.parent = "folder456"
+        args.json = True
+
+        exit_code = cmd_files_copy(args)
+
+        assert exit_code == 0
+        output = mock_print.call_args[0][0]
+        result = json.loads(output)
+        assert result["id"] == "copy123"
+        assert result["name"] == "Backup"
+
+    @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "create_folder")
     @patch("builtins.print")
     def test_cmd_folders_create(self, _mock_print, mock_create_folder, __mock_build_service):
@@ -1468,6 +1573,16 @@ class TestArgumentParser:
         assert args.files_command == "rename"
         assert args.file_id == "file123"
         assert args.name == "New Name.pdf"
+
+        # Test files copy
+        args = parser.parse_args(
+            ["files", "copy", "file123", "--name", "Backup", "--parent", "folder456"]
+        )
+        assert args.command == "files"
+        assert args.files_command == "copy"
+        assert args.file_id == "file123"
+        assert args.name == "Backup"
+        assert args.parent == "folder456"
 
         # Test folders create
         args = parser.parse_args(["folders", "create", "New Folder"])

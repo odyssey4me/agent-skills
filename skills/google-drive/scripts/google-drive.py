@@ -13,6 +13,7 @@ Usage:
     python google-drive.py files move FILE_ID --parent FOLDER_ID
     python google-drive.py files delete FILE_ID
     python google-drive.py files rename FILE_ID --name "New Name"
+    python google-drive.py files copy FILE_ID [--name "Copy Name"] [--parent FOLDER_ID]
     python google-drive.py folders create "New Folder" --parent FOLDER_ID
     python google-drive.py share FILE_ID --email user@example.com --role writer
     python google-drive.py permissions list FILE_ID
@@ -666,6 +667,47 @@ def rename_file(service, file_id: str, new_name: str) -> dict[str, Any]:
         return {}  # Unreachable
 
 
+def copy_file(
+    service,
+    file_id: str,
+    name: str | None = None,
+    parent_folder_id: str | None = None,
+) -> dict[str, Any]:
+    """Copy a file in Google Drive.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID to copy.
+        name: Name for the copy (optional, defaults to "Copy of <original>").
+        parent_folder_id: Parent folder ID for the copy (optional).
+
+    Returns:
+        Created file metadata dictionary.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        body: dict[str, Any] = {}
+        if name:
+            body["name"] = name
+        if parent_folder_id:
+            body["parents"] = [parent_folder_id]
+        file = (
+            service.files()
+            .copy(
+                fileId=file_id,
+                body=body,
+                fields="id, name, mimeType, parents, webViewLink",
+            )
+            .execute()
+        )
+        return file
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
 # ============================================================================
 # FOLDER OPERATIONS
 # ============================================================================
@@ -1241,6 +1283,27 @@ def cmd_files_rename(args):
     return 0
 
 
+def cmd_files_copy(args):
+    """Handle 'files copy' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
+    result = copy_file(
+        service,
+        file_id=args.file_id,
+        name=args.name,
+        parent_folder_id=args.parent,
+    )
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print("File copied successfully")
+        print(f"  ID: {result.get('id')}")
+        print(f"  Name: {result.get('name')}")
+        print(f"  Link: {result.get('webViewLink')}")
+
+    return 0
+
+
 def cmd_folders_create(args):
     """Handle 'folders create' command."""
     service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
@@ -1401,6 +1464,12 @@ def build_parser() -> argparse.ArgumentParser:
     rename_parser.add_argument("--name", required=True, help="New name for the file")
     rename_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    copy_parser = files_subparsers.add_parser("copy", help="Copy a file")
+    copy_parser.add_argument("file_id", help="File ID")
+    copy_parser.add_argument("--name", help="Name for the copy")
+    copy_parser.add_argument("--parent", help="Parent folder ID for the copy")
+    copy_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # folders commands
     folders_parser = subparsers.add_parser("folders", help="Folder operations")
     folders_subparsers = folders_parser.add_subparsers(dest="folders_command")
@@ -1519,6 +1588,8 @@ def main():
                 return cmd_files_delete(args)
             elif args.files_command == "rename":
                 return cmd_files_rename(args)
+            elif args.files_command == "copy":
+                return cmd_files_copy(args)
         elif args.command == "folders":
             if args.folders_command == "create":
                 return cmd_folders_create(args)

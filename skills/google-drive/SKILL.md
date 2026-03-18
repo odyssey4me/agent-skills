@@ -74,6 +74,7 @@ $SKILL_DIR/scripts/google-drive.py files upload PATH [--parent ID] [--name NAME]
 $SKILL_DIR/scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
 $SKILL_DIR/scripts/google-drive.py files delete FILE_ID
 $SKILL_DIR/scripts/google-drive.py files rename FILE_ID --name NAME
+$SKILL_DIR/scripts/google-drive.py files copy FILE_ID [--name NAME] [--parent ID]
 
 # Folders
 $SKILL_DIR/scripts/google-drive.py folders create NAME [--parent ID]
@@ -151,6 +152,16 @@ $SKILL_DIR/scripts/google-drive.py files delete FILE_ID
 
 ```bash
 $SKILL_DIR/scripts/google-drive.py files rename FILE_ID --name "New Name"
+```
+
+### Copy a file
+
+```bash
+# Copy with default name ("Copy of <original>")
+$SKILL_DIR/scripts/google-drive.py files copy FILE_ID
+
+# Copy with custom name into a specific folder
+$SKILL_DIR/scripts/google-drive.py files copy FILE_ID --name "Backup" --parent FOLDER_ID
 ```
 
 ### Organize files into folders

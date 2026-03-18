@@ -186,6 +186,29 @@ $SKILL_DIR/scripts/google-drive.py files rename FILE_ID --name "New Name"
 - `file_id`: The file ID (required)
 - `--name`: New name for the file (required)
 
+## files copy
+
+Copy a file in Google Drive.
+
+```bash
+# Copy a file (uses default name "Copy of <original>")
+$SKILL_DIR/scripts/google-drive.py files copy FILE_ID
+
+# Copy with a custom name
+$SKILL_DIR/scripts/google-drive.py files copy FILE_ID --name "Backup Copy"
+
+# Copy into a specific folder
+$SKILL_DIR/scripts/google-drive.py files copy FILE_ID --parent FOLDER_ID
+
+# Copy with custom name into a specific folder
+$SKILL_DIR/scripts/google-drive.py files copy FILE_ID --name "Backup" --parent FOLDER_ID
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `--name`: Name for the copy (optional, defaults to "Copy of <original>")
+- `--parent`: Parent folder ID for the copy (optional)
+
 ## folders create
 
 Create a new folder.
