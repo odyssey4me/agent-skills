@@ -5,7 +5,7 @@ Portable skills for AI coding assistants providing integrations with Jira, Confl
 ## Features
 
 - **Self-Contained**: Each skill is a single Python script - no framework dependencies
-- **Multi-Agent Compatible**: Works with [multiple AI coding assistants](https://github.com/vercel-labs/add-skill#supported-agents) including [Claude Code](https://claude.com/claude-code), Cursor, Continue.dev, and more
+- **Multi-Agent Compatible**: Works with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents) including [Claude Code](https://claude.com/claude-code), Cursor, Continue.dev, and more
 - **Simple Installation**: Just Python + 3 packages (`requests`, `keyring`, `pyyaml`)
 - **Built-in Validation**: Each skill includes a `check` command for setup verification
 - **Secure Authentication**: Supports system keyring, environment variables, and config files
@@ -14,17 +14,17 @@ Portable skills for AI coding assistants providing integrations with Jira, Confl
 
 ### Installation (Recommended)
 
-Install skills using the official `add-skill` CLI:
+Install skills using the official `skills` CLI:
 
 ```bash
 # Install all skills
-npx add-skill odyssey4me/agent-skills
+npx skills add odyssey4me/agent-skills
 
 # Or install a specific skill
-npx add-skill odyssey4me/agent-skills --skill confluence
+npx skills add odyssey4me/agent-skills --skill confluence
 
 # Or install multiple specific skills
-npx add-skill odyssey4me/agent-skills --skill gmail --skill google-calendar
+npx skills add odyssey4me/agent-skills --skill gmail --skill google-calendar
 ```
 
 This automatically:
@@ -67,7 +67,7 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 
 Browse install counts and popularity on [skills.sh](https://skills.sh/odyssey4me/agent-skills). Skills are also available on the [Tessl Registry](https://tessl.io/registry/odyssey4me). See [TODO.md](TODO.md) for planned skills.
 
-**Installation**: Use `npx add-skill odyssey4me/agent-skills` to install all skills, or see individual SKILL.md files for details. Manual downloads available from [Releases](https://github.com/odyssey4me/agent-skills/releases).
+**Installation**: Use `npx skills add odyssey4me/agent-skills` to install all skills, or see individual SKILL.md files for details. Manual downloads available from [Releases](https://github.com/odyssey4me/agent-skills/releases).
 
 ## Why Skills?
 
@@ -78,11 +78,11 @@ Skills provide a simple, transparent approach to extending Claude Code:
 - **Self-Validating**: Built-in `check` command diagnoses setup issues
 - **Portable**: Follows the [Agent Skills specification](https://agentskills.io/specification) for cross-agent compatibility
 
-This repository follows the Agent Skills spec, ensuring compatibility with `npx add-skill` and other standard tooling.
+This repository follows the Agent Skills spec, ensuring compatibility with `npx skills` and other standard tooling.
 
 ## Supported AI Agents
 
-These skills work with [multiple AI coding assistants](https://github.com/vercel-labs/add-skill#supported-agents) through the [Agent Skills specification](https://agentskills.io/specification), including:
+These skills work with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents) through the [Agent Skills specification](https://agentskills.io/specification), including:
 
 - **Claude Code** - Anthropic's official CLI
 - **Cursor** - AI-first code editor
@@ -90,7 +90,7 @@ These skills work with [multiple AI coding assistants](https://github.com/vercel
 - **GitHub Copilot** - GitHub's AI pair programmer
 - **OpenCode**, **Gemini CLI**, **Command Code**, and more
 
-See the [full list of supported agents](https://github.com/vercel-labs/add-skill#supported-agents). Installation via `npx add-skill` automatically configures skills for your AI agent.
+See the [full list of supported agents](https://github.com/vercel-labs/skills#supported-agents). Installation via `npx skills add` automatically configures skills for your AI agent.
 
 ## Contributing
 
