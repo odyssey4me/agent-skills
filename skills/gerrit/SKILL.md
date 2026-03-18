@@ -3,7 +3,7 @@ name: gerrit
 description: Submit, amend, and review Gerrit changes using git-review CLI. Use when asked to submit a patchset, download a change, rebase a change request, check CR status, or manage code reviews in Gerrit.
 metadata:
   author: odyssey4me
-  version: "0.2.2"
+  version: "0.3.0"
   category: code-hosting
   tags: "code-review, patches"
   complexity: lightweight
@@ -73,6 +73,8 @@ $SKILL_DIR/scripts/gerrit.py check
 # Changes
 $SKILL_DIR/scripts/gerrit.py changes list
 $SKILL_DIR/scripts/gerrit.py changes view 12345
+$SKILL_DIR/scripts/gerrit.py changes diff 12345
+$SKILL_DIR/scripts/gerrit.py changes diff 12345 --patchset 3
 $SKILL_DIR/scripts/gerrit.py changes search "status:open project:myproject"
 
 # Projects
