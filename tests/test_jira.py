@@ -468,11 +468,35 @@ class TestApiOperations:
     """Tests for API operations."""
 
     @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_search_issues_cloud(self, mock_api_path, mock_post, mock_is_cloud, mock_scriptrunner):
+        """Test searching issues on Cloud (POST /search/jql)."""
+        mock_api_path.return_value = "rest/api/3/search/jql"
+        mock_is_cloud.return_value = True
+        mock_post.return_value = {
+            "issues": [
+                {"key": "DEMO-1", "fields": {"summary": "Test"}},
+            ]
+        }
+        mock_scriptrunner.return_value = {"available": False}
+
+        result = search_issues("project = DEMO", max_results=10)
+
+        assert len(result) == 1
+        assert result[0]["key"] == "DEMO-1"
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues(self, mock_api_path, mock_get, mock_scriptrunner):
-        """Test searching issues."""
-        mock_api_path.return_value = "rest/api/3/search"
+    def test_search_issues_datacenter(
+        self, mock_api_path, mock_get, mock_is_cloud, mock_scriptrunner
+    ):
+        """Test searching issues on Data Center (GET /search)."""
+        mock_api_path.return_value = "rest/api/2/search"
+        mock_is_cloud.return_value = False
         mock_get.return_value = {
             "issues": [
                 {"key": "DEMO-1", "fields": {"summary": "Test"}},
@@ -779,8 +803,11 @@ class TestCommandHandlers:
     @patch("skills.jira.scripts.jira.get_credentials")
     @patch("skills.jira.scripts.jira.detect_deployment_type")
     @patch("skills.jira.scripts.jira.get_api_version")
-    @patch("skills.jira.scripts.jira.get")
-    def test_cmd_check_success(self, mock_get, mock_api_version, mock_detect, mock_creds, capsys):
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.post")
+    def test_cmd_check_success(
+        self, mock_post, mock_is_cloud, mock_api_version, mock_detect, mock_creds, capsys
+    ):
         """Test check command success."""
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net",
@@ -789,6 +816,32 @@ class TestCommandHandlers:
         )
         mock_detect.return_value = "Cloud"
         mock_api_version.return_value = "3"
+        mock_is_cloud.return_value = True
+        mock_post.return_value = {"issues": []}
+
+        result = cmd_check()
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "All checks passed" in captured.out
+        assert "search/jql" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.detect_deployment_type")
+    @patch("skills.jira.scripts.jira.get_api_version")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.get")
+    def test_cmd_check_success_datacenter(
+        self, mock_get, mock_is_cloud, mock_api_version, mock_detect, mock_creds, capsys
+    ):
+        """Test check command success on Data Center (GET /search)."""
+        mock_creds.return_value = Credentials(
+            url="https://jira.example.com",
+            token="secret",
+        )
+        mock_detect.return_value = "DataCenter"
+        mock_api_version.return_value = "2"
+        mock_is_cloud.return_value = False
         mock_get.return_value = {"issues": []}
 
         result = cmd_check()
@@ -796,6 +849,7 @@ class TestCommandHandlers:
         assert result == 0
         captured = capsys.readouterr()
         assert "All checks passed" in captured.out
+        assert "rest/api/2/search" in captured.out
 
     @patch("skills.jira.scripts.jira.get_credentials")
     def test_cmd_check_no_url(self, mock_creds, capsys):
@@ -840,8 +894,11 @@ class TestCommandHandlers:
     @patch("skills.jira.scripts.jira.get_credentials")
     @patch("skills.jira.scripts.jira.detect_deployment_type")
     @patch("skills.jira.scripts.jira.get_api_version")
-    @patch("skills.jira.scripts.jira.get")
-    def test_cmd_check_api_error(self, mock_get, mock_api_version, mock_detect, mock_creds, capsys):
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.post")
+    def test_cmd_check_api_error(
+        self, mock_post, mock_is_cloud, mock_api_version, mock_detect, mock_creds, capsys
+    ):
         """Test check command with API error."""
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net",
@@ -849,7 +906,8 @@ class TestCommandHandlers:
         )
         mock_detect.return_value = "Cloud"
         mock_api_version.return_value = "3"
-        mock_get.side_effect = APIError("API call failed")
+        mock_is_cloud.return_value = True
+        mock_post.side_effect = APIError("API call failed")
 
         result = cmd_check()
 

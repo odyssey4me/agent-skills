@@ -1085,15 +1085,26 @@ def search_issues(
     if validation["warning"]:
         print(f"Warning: {validation['warning']}", file=sys.stderr)
 
-    response = get(
-        "jira",
-        api_path("search"),
-        params={
-            "jql": jql,
-            "maxResults": max_results,
-            "fields": ",".join(fields),
-        },
-    )
+    if is_cloud():
+        response = post(
+            "jira",
+            api_path("search/jql"),
+            data={
+                "jql": jql,
+                "maxResults": max_results,
+                "fields": fields,
+            },
+        )
+    else:
+        response = get(
+            "jira",
+            api_path("search"),
+            params={
+                "jql": jql,
+                "maxResults": max_results,
+                "fields": ",".join(fields),
+            },
+        )
 
     if isinstance(response, dict):
         return response.get("issues", [])
@@ -1684,11 +1695,25 @@ def cmd_check() -> int:
     print("3. Testing API access...")
     try:
         # Use a simple search with limit 1 to test API access
-        response = get(
-            "jira",
-            api_path("search"),
-            params={"jql": "order by created DESC", "maxResults": 1},
-        )
+        if is_cloud():
+            search_endpoint = api_path("search/jql")
+            response = post(
+                "jira",
+                search_endpoint,
+                data={
+                    "jql": "created >= -30d ORDER BY created DESC",
+                    "maxResults": 1,
+                    "fields": ["summary"],
+                },
+            )
+        else:
+            search_endpoint = api_path("search")
+            response = get(
+                "jira",
+                search_endpoint,
+                params={"jql": "created >= -30d ORDER BY created DESC", "maxResults": 1},
+            )
+        print(f"   Search endpoint: {search_endpoint}")
         if isinstance(response, dict) and "issues" in response:
             print("   API access: OK\n")
         else:
