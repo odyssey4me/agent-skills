@@ -18,34 +18,34 @@ Learn more: [Progressive Disclosure in the Agent Skills Spec](https://agentskill
 
 ### Multi-Agent Compatibility
 
-Agent skills work with [multiple AI coding assistants](https://github.com/vercel-labs/add-skill#supported-agents) through the [Agent Skills specification](https://agentskills.io/specification). When you install skills using `npx add-skill`, they're automatically configured for your AI agent:
+Agent skills work with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents) through the [Agent Skills specification](https://agentskills.io/specification). When you install skills using `npx skills add`, they're automatically configured for your AI agent:
 
 **Supported AI Agents:**
-- Claude Code, Cursor, Continue.dev, GitHub Copilot, OpenCode, Gemini CLI, Command Code, and [more](https://github.com/vercel-labs/add-skill#supported-agents)
+- Claude Code, Cursor, Continue.dev, GitHub Copilot, OpenCode, Gemini CLI, Command Code, and [more](https://github.com/vercel-labs/skills#supported-agents)
 
 **Agent-Specific Installation:**
 ```bash
 # Install for specific agent (optional, auto-detects by default)
-npx add-skill odyssey4me/agent-skills --skill gitlab -a cursor
+npx skills add odyssey4me/agent-skills --skill gitlab -a cursor
 
 # Install for multiple agents
-npx add-skill odyssey4me/agent-skills --skill gitlab -a claude-code -a cursor
+npx skills add odyssey4me/agent-skills --skill gitlab -a claude-code -a cursor
 ```
 
 The examples in this guide use Claude Code, but the same natural language patterns and commands work across all supported AI agents.
 
 ## Installation
 
-### Option 1: Using npx add-skill (Recommended)
+### Option 1: Using npx skills (Recommended)
 
-The fastest way to install skills is using the official `add-skill` CLI tool:
+The fastest way to install skills is using the official `skills` CLI tool:
 
 ```bash
 # Install a specific skill
-npx add-skill odyssey4me/agent-skills --skill jira
+npx skills add odyssey4me/agent-skills --skill jira
 
 # Install multiple skills
-npx add-skill odyssey4me/agent-skills --skill google-docs --skill google-sheets
+npx skills add odyssey4me/agent-skills --skill google-docs --skill google-sheets
 ```
 
 This will:
@@ -53,7 +53,7 @@ This will:
 - Install them to `~/.claude/skills/`
 - Make them available to your AI coding assistant automatically
 
-Learn more: [add-skill CLI documentation](https://github.com/vercel-labs/add-skill)
+Learn more: [skills CLI documentation](https://github.com/vercel-labs/skills)
 
 ### Option 2: Manual Installation
 
@@ -188,7 +188,7 @@ The check command will:
 
 Once installed and configured, skills are automatically available to your AI coding assistant.
 
-Skills work with [multiple AI coding assistants](https://github.com/vercel-labs/add-skill#supported-agents). The examples below use Claude Code, but the same patterns apply to other agents like Cursor, Continue.dev, and GitHub Copilot.
+Skills work with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents). The examples below use Claude Code, but the same patterns apply to other agents like Cursor, Continue.dev, and GitHub Copilot.
 
 ### Natural Language Invocation
 
@@ -393,7 +393,7 @@ Found a bug or have a feature request? [Open an issue on GitHub](https://github.
 ## References
 
 - [Agent Skills Specification](https://agentskills.io/specification) - Official standard
-- [add-skill CLI](https://github.com/vercel-labs/add-skill) - Installation tool
+- [skills CLI](https://github.com/vercel-labs/skills) - Installation tool
 - [Vercel agent-skills](https://github.com/vercel-labs/agent-skills) - Reference implementation
 - [Anthropic skills](https://github.com/anthropics/skills) - Additional examples
 
