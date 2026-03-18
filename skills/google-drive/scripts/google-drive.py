@@ -12,6 +12,7 @@ Usage:
     python google-drive.py files upload /path/to/file --parent FOLDER_ID
     python google-drive.py files move FILE_ID --parent FOLDER_ID
     python google-drive.py files delete FILE_ID
+    python google-drive.py files rename FILE_ID --name "New Name"
     python google-drive.py folders create "New Folder" --parent FOLDER_ID
     python google-drive.py share FILE_ID --email user@example.com --role writer
     python google-drive.py permissions list FILE_ID
@@ -635,6 +636,36 @@ def delete_file(service, file_id: str) -> None:
         handle_api_error(e)
 
 
+def rename_file(service, file_id: str, new_name: str) -> dict[str, Any]:
+    """Rename a file in Google Drive.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID to rename.
+        new_name: The new name for the file.
+
+    Returns:
+        Updated file metadata dictionary.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        file = (
+            service.files()
+            .update(
+                fileId=file_id,
+                body={"name": new_name},
+                fields="id, name, mimeType, webViewLink",
+            )
+            .execute()
+        )
+        return file
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
 # ============================================================================
 # FOLDER OPERATIONS
 # ============================================================================
@@ -1195,6 +1226,21 @@ def cmd_files_delete(args):
     return 0
 
 
+def cmd_files_rename(args):
+    """Handle 'files rename' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
+    result = rename_file(service, file_id=args.file_id, new_name=args.name)
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print("File renamed successfully")
+        print(f"  ID: {result.get('id')}")
+        print(f"  Name: {result.get('name')}")
+
+    return 0
+
+
 def cmd_folders_create(args):
     """Handle 'folders create' command."""
     service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
@@ -1350,6 +1396,11 @@ def build_parser() -> argparse.ArgumentParser:
     delete_parser.add_argument("file_id", help="File ID")
     delete_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    rename_parser = files_subparsers.add_parser("rename", help="Rename a file")
+    rename_parser.add_argument("file_id", help="File ID")
+    rename_parser.add_argument("--name", required=True, help="New name for the file")
+    rename_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # folders commands
     folders_parser = subparsers.add_parser("folders", help="Folder operations")
     folders_subparsers = folders_parser.add_subparsers(dest="folders_command")
@@ -1466,6 +1517,8 @@ def main():
                 return cmd_files_move(args)
             elif args.files_command == "delete":
                 return cmd_files_delete(args)
+            elif args.files_command == "rename":
+                return cmd_files_rename(args)
         elif args.command == "folders":
             if args.folders_command == "create":
                 return cmd_folders_create(args)

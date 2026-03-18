@@ -173,6 +173,19 @@ $SKILL_DIR/scripts/google-drive.py files delete FILE_ID
 **Arguments:**
 - `file_id`: The file ID (required)
 
+## files rename
+
+Rename a file in Google Drive.
+
+```bash
+# Rename a file
+$SKILL_DIR/scripts/google-drive.py files rename FILE_ID --name "New Name"
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `--name`: New name for the file (required)
+
 ## folders create
 
 Create a new folder.

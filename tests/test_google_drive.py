@@ -64,7 +64,9 @@ share_file = google_drive.share_file
 move_file = google_drive.move_file
 cmd_files_delete = google_drive.cmd_files_delete
 cmd_files_move = google_drive.cmd_files_move
+cmd_files_rename = google_drive.cmd_files_rename
 delete_file = google_drive.delete_file
+rename_file = google_drive.rename_file
 upload_file = google_drive.upload_file
 
 
@@ -646,6 +648,36 @@ class TestFileOperations:
         with pytest.raises(DriveAPIError):
             delete_file(mock_service, "nonexistent")
 
+    def test_rename_file(self):
+        """Test renaming a file."""
+        mock_service = Mock()
+        mock_service.files().update().execute.return_value = {
+            "id": "file123",
+            "name": "New Name.pdf",
+            "mimeType": "application/pdf",
+            "webViewLink": "https://drive.google.com/file/d/file123",
+        }
+
+        result = rename_file(mock_service, "file123", "New Name.pdf")
+
+        assert result["id"] == "file123"
+        assert result["name"] == "New Name.pdf"
+        mock_service.files().update.assert_called_with(
+            fileId="file123",
+            body={"name": "New Name.pdf"},
+            fields="id, name, mimeType, webViewLink",
+        )
+
+    def test_rename_file_not_found(self):
+        """Test renaming a file that doesn't exist."""
+        mock_service = Mock()
+        resp = Mock(status=404, reason="Not Found")
+        content = b'{"error": {"message": "File not found"}}'
+        mock_service.files().update().execute.side_effect = HttpError(resp, content)
+
+        with pytest.raises(DriveAPIError):
+            rename_file(mock_service, "nonexistent", "New Name")
+
 
 # ============================================================================
 # FOLDER OPERATIONS TESTS
@@ -1192,6 +1224,53 @@ class TestCLICommands:
         assert result["deleted"] is True
 
     @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "rename_file")
+    @patch("builtins.print")
+    def test_cmd_files_rename_text(self, _mock_print, mock_rename, __mock_build_service):
+        """Test files rename command with text output."""
+        mock_rename.return_value = {
+            "id": "file123",
+            "name": "New Name.pdf",
+            "mimeType": "application/pdf",
+            "webViewLink": "https://drive.google.com/file/d/file123",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.name = "New Name.pdf"
+        args.json = False
+
+        exit_code = cmd_files_rename(args)
+
+        assert exit_code == 0
+        mock_rename.assert_called_once_with(
+            __mock_build_service.return_value, file_id="file123", new_name="New Name.pdf"
+        )
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "rename_file")
+    @patch("builtins.print")
+    def test_cmd_files_rename_json(self, mock_print, mock_rename, __mock_build_service):
+        """Test files rename command with JSON output."""
+        mock_rename.return_value = {
+            "id": "file123",
+            "name": "New Name.pdf",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.name = "New Name.pdf"
+        args.json = True
+
+        exit_code = cmd_files_rename(args)
+
+        assert exit_code == 0
+        output = mock_print.call_args[0][0]
+        result = json.loads(output)
+        assert result["id"] == "file123"
+        assert result["name"] == "New Name.pdf"
+
+    @patch.object(google_drive, "build_drive_service")
     @patch.object(google_drive, "create_folder")
     @patch("builtins.print")
     def test_cmd_folders_create(self, _mock_print, mock_create_folder, __mock_build_service):
@@ -1382,6 +1461,13 @@ class TestArgumentParser:
         assert args.command == "files"
         assert args.files_command == "delete"
         assert args.file_id == "file123"
+
+        # Test files rename
+        args = parser.parse_args(["files", "rename", "file123", "--name", "New Name.pdf"])
+        assert args.command == "files"
+        assert args.files_command == "rename"
+        assert args.file_id == "file123"
+        assert args.name == "New Name.pdf"
 
         # Test folders create
         args = parser.parse_args(["folders", "create", "New Folder"])
