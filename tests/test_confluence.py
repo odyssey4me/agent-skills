@@ -803,6 +803,28 @@ class TestCommandHandlers:
         result = cmd_check()
         assert result == 1
 
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_cmd_check_url_with_wiki_suffix(self, mock_creds):
+        """Test check command rejects URL with /wiki suffix."""
+        from skills.confluence.scripts.confluence import cmd_check
+
+        mock_creds.return_value = Credentials(
+            url="https://example.atlassian.net/wiki", token="test123"
+        )
+        result = cmd_check()
+        assert result == 1
+
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_cmd_check_url_with_wiki_trailing_slash(self, mock_creds):
+        """Test check command rejects URL with /wiki/ suffix."""
+        from skills.confluence.scripts.confluence import cmd_check
+
+        mock_creds.return_value = Credentials(
+            url="https://example.atlassian.net/wiki/", token="test123"
+        )
+        result = cmd_check()
+        assert result == 1
+
     @patch("skills.confluence.scripts.confluence.search_content")
     @patch("skills.confluence.scripts.confluence.get_confluence_defaults")
     def test_cmd_search_text_output(self, mock_defaults, mock_search):

@@ -1776,6 +1776,13 @@ def cmd_check() -> int:
 
     print(f"   URL: {creds.url}")
 
+    if creds.url.rstrip("/").endswith("/wiki"):
+        base = creds.url.rstrip("/")[: -len("/wiki")]
+        print("   ERROR: URL must not include the /wiki path suffix.")
+        print("   The skill adds the correct API path automatically.")
+        print(f"   Update your configuration to use: {base}")
+        return 1
+
     if not creds.token:
         print("   ERROR: No API token configured")
         print("\n   Configure using one of these methods:")
