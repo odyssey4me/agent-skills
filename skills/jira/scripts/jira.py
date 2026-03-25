@@ -1364,6 +1364,82 @@ def extract_contributors(issue: dict[str, Any], comments: list[dict[str, Any]]) 
 
 
 # ============================================================================
+# USER RESOLUTION
+# ============================================================================
+
+
+def resolve_user(query: str) -> list[dict[str, Any]]:
+    """Search for Jira users by email, name, or username.
+
+    On Cloud, uses the user search API to find matching accounts.
+    On Data Center/Server, returns the query as-is (usernames work directly in JQL).
+
+    Args:
+        query: Email address, display name, or username to search for.
+
+    Returns:
+        List of user dictionaries with keys: accountId, emailAddress, displayName, active.
+    """
+    if is_cloud():
+        response = get("jira", api_path("user/search"), params={"query": query})
+        if isinstance(response, list):
+            return [
+                {
+                    "accountId": u.get("accountId", ""),
+                    "emailAddress": u.get("emailAddress", ""),
+                    "displayName": u.get("displayName", ""),
+                    "active": u.get("active", True),
+                }
+                for u in response
+            ]
+        return []
+    else:
+        return [{"username": query, "displayName": query}]
+
+
+def resolve_user_for_jql(user: str) -> str:
+    """Resolve a user identifier to the appropriate JQL value.
+
+    On Cloud: converts email/name to accountId (required for JQL).
+    On DC/Server: returns the input unchanged (usernames work in JQL).
+
+    Args:
+        user: Email address, display name, or username.
+
+    Returns:
+        accountId string for Cloud, or original value for DC/Server.
+
+    Raises:
+        ValueError: If the user cannot be resolved on Cloud.
+    """
+    if not is_cloud():
+        return user
+
+    # If it already looks like an accountId (hex string), use as-is
+    if len(user) >= 20 and all(c in "0123456789abcdef:" for c in user):
+        return user
+
+    users = resolve_user(user)
+    if not users:
+        raise ValueError(
+            f"Could not find Jira Cloud user matching '{user}'. "
+            "Use an accountId, email address, or display name."
+        )
+
+    # Prefer exact email match
+    for u in users:
+        if u.get("emailAddress", "").lower() == user.lower():
+            return u["accountId"]
+
+    # Fall back to first active result
+    for u in users:
+        if u.get("active", True):
+            return u["accountId"]
+
+    return users[0]["accountId"]
+
+
+# ============================================================================
 # CONTRIBUTOR SEARCH
 # ============================================================================
 
@@ -1379,8 +1455,10 @@ def search_by_contributor(
     Always searches reporter and assignee. If ScriptRunner Enhanced Search
     is available, also searches for issues commented on by the user.
 
+    On Jira Cloud, resolves email/name to accountId before searching.
+
     Args:
-        user: Username or accountId to search for.
+        user: Username, email, or accountId to search for.
         project: Optional project key to scope the search.
         max_results: Maximum number of results.
         fields: Optional list of fields to include.
@@ -1388,6 +1466,7 @@ def search_by_contributor(
     Returns:
         List of issue dictionaries.
     """
+    user = resolve_user_for_jql(user)
     clauses = [f'reporter = "{user}" OR assignee = "{user}"']
 
     scriptrunner_info = detect_scriptrunner_support()
@@ -2076,6 +2155,45 @@ def cmd_statuses(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_user(args: argparse.Namespace) -> int:
+    """Handle user command."""
+    try:
+        if args.user_command == "search":
+            users = resolve_user(args.query)
+            if args.json:
+                print(format_json(users))
+            else:
+                if not users:
+                    print("No users found")
+                else:
+                    rows = [
+                        {
+                            "accountId": u.get("accountId", u.get("username", "N/A")),
+                            "email": u.get("emailAddress", "N/A"),
+                            "name": u.get("displayName", "N/A"),
+                            "active": "Yes" if u.get("active", True) else "No",
+                        }
+                        for u in users
+                    ]
+                    print(
+                        format_table(
+                            rows,
+                            ["accountId", "email", "name", "active"],
+                            headers={
+                                "accountId": "Account ID",
+                                "email": "Email",
+                                "name": "Display Name",
+                                "active": "Active",
+                            },
+                        )
+                    )
+        return 0
+
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
 def cmd_collaboration(args: argparse.Namespace) -> int:
     """Handle collaboration command."""
     try:
@@ -2312,6 +2430,22 @@ def main() -> int:
     )
 
     # ========================================================================
+    # USER COMMAND
+    # ========================================================================
+    user_parser = subparsers.add_parser(
+        "user",
+        help="Search for Jira users",
+    )
+    user_subparsers = user_parser.add_subparsers(dest="user_command", required=True)
+
+    # Search subcommand
+    user_search_parser = user_subparsers.add_parser(
+        "search", help="Search for users by email, name, or username"
+    )
+    user_search_parser.add_argument("query", help="Email, display name, or username to search for")
+    user_search_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # ========================================================================
     # COLLABORATION COMMAND
     # ========================================================================
     collaboration_parser = subparsers.add_parser(
@@ -2358,6 +2492,8 @@ def main() -> int:
         return cmd_fields(args)
     elif args.command == "statuses":
         return cmd_statuses(args)
+    elif args.command == "user":
+        return cmd_user(args)
     elif args.command == "collaboration":
         return cmd_collaboration(args)
 

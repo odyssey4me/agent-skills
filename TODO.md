@@ -19,6 +19,9 @@ This document tracks planned features for the agent-skills repository. Only pend
 
 ## Infrastructure Improvements
 
+- [ ] Add a debug mode (`--debug` flag or `DEBUG` env var) to Python-based skills
+  - Log HTTP requests/responses, credential source, API version detection
+  - Enables troubleshooting without requiring ad-hoc Python scripts
 - [ ] Consider migrating Jira skill to use official Atlassian CLI (ACLI)
   - Official ACLI released May 2025 for Jira Cloud
   - Covers issue management, JQL search, projects, transitions

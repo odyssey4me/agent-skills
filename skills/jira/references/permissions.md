@@ -22,4 +22,5 @@ enforce appropriate permission controls.
 | config show | read | Show configuration |
 | fields | read | List available fields |
 | statuses | read | List available statuses |
+| user search | read | Search for Jira users |
 | collaboration epics | read | List collaboration epics |

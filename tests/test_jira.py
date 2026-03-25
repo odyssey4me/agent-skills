@@ -30,6 +30,7 @@ from skills.jira.scripts.jira import (
     cmd_search,
     cmd_statuses,
     cmd_transitions,
+    cmd_user,
     create_issue,
     delete_credential,
     detect_deployment_type,
@@ -57,6 +58,8 @@ from skills.jira.scripts.jira import (
     list_status_categories,
     list_statuses,
     load_config,
+    resolve_user,
+    resolve_user_for_jql,
     save_config,
     search_by_contributor,
     search_issues,
@@ -1859,13 +1862,174 @@ class TestContributors:
         assert "Alice" in call_args["_contributors"]
 
 
+class TestUserResolution:
+    """Tests for user resolution functions."""
+
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_resolve_user_cloud(self, mock_api_path, mock_get, mock_is_cloud):
+        """Test resolving user on Cloud."""
+        mock_is_cloud.return_value = True
+        mock_api_path.return_value = "rest/api/3/user/search"
+        mock_get.return_value = [
+            {
+                "accountId": "abc123",
+                "emailAddress": "jdoe@example.com",
+                "displayName": "Jane Doe",
+                "active": True,
+            }
+        ]
+
+        result = resolve_user("jdoe@example.com")
+
+        assert len(result) == 1
+        assert result[0]["accountId"] == "abc123"
+        assert result[0]["emailAddress"] == "jdoe@example.com"
+
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_resolve_user_datacenter(self, mock_is_cloud):
+        """Test resolving user on Data Center (passthrough)."""
+        mock_is_cloud.return_value = False
+
+        result = resolve_user("jsmith")
+
+        assert len(result) == 1
+        assert result[0]["username"] == "jsmith"
+
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_resolve_user_for_jql_datacenter(self, mock_is_cloud):
+        """Test JQL resolution on Data Center returns input unchanged."""
+        mock_is_cloud.return_value = False
+
+        assert resolve_user_for_jql("jsmith") == "jsmith"
+
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_resolve_user_for_jql_accountid_passthrough(self, mock_is_cloud):
+        """Test JQL resolution with an accountId passes through."""
+        mock_is_cloud.return_value = True
+
+        result = resolve_user_for_jql("5ecff4d72490cf0c09e48bd5")
+
+        assert result == "5ecff4d72490cf0c09e48bd5"
+
+    @patch("skills.jira.scripts.jira.resolve_user")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_resolve_user_for_jql_email(self, mock_is_cloud, mock_resolve):
+        """Test JQL resolution resolves email to accountId on Cloud."""
+        mock_is_cloud.return_value = True
+        mock_resolve.return_value = [
+            {
+                "accountId": "abc123",
+                "emailAddress": "jdoe@example.com",
+                "displayName": "Jane Doe",
+                "active": True,
+            }
+        ]
+
+        result = resolve_user_for_jql("jdoe@example.com")
+
+        assert result == "abc123"
+
+    @patch("skills.jira.scripts.jira.resolve_user")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_resolve_user_for_jql_not_found(self, mock_is_cloud, mock_resolve):
+        """Test JQL resolution raises ValueError when user not found."""
+        mock_is_cloud.return_value = True
+        mock_resolve.return_value = []
+
+        with pytest.raises(ValueError, match="Could not find Jira Cloud user"):
+            resolve_user_for_jql("nobody@example.com")
+
+    @patch("skills.jira.scripts.jira.resolve_user")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_resolve_user_for_jql_prefers_email_match(self, mock_is_cloud, mock_resolve):
+        """Test JQL resolution prefers exact email match."""
+        mock_is_cloud.return_value = True
+        mock_resolve.return_value = [
+            {
+                "accountId": "other",
+                "emailAddress": "jdoe2@example.com",
+                "displayName": "Jane Doe 2",
+                "active": True,
+            },
+            {
+                "accountId": "exact",
+                "emailAddress": "jdoe@example.com",
+                "displayName": "Jane Doe",
+                "active": True,
+            },
+        ]
+
+        result = resolve_user_for_jql("jdoe@example.com")
+
+        assert result == "exact"
+
+    @patch("skills.jira.scripts.jira.resolve_user")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_resolve_user_for_jql_falls_back_to_active(self, mock_is_cloud, mock_resolve):
+        """Test JQL resolution falls back to first active user when no email match."""
+        mock_is_cloud.return_value = True
+        mock_resolve.return_value = [
+            {
+                "accountId": "inactive1",
+                "emailAddress": "",
+                "displayName": "Old User",
+                "active": False,
+            },
+            {
+                "accountId": "active1",
+                "emailAddress": "",
+                "displayName": "Jane Doe",
+                "active": True,
+            },
+        ]
+
+        result = resolve_user_for_jql("Jane Doe")
+
+        assert result == "active1"
+
+    @patch("skills.jira.scripts.jira.resolve_user")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_resolve_user_for_jql_falls_back_to_first(self, mock_is_cloud, mock_resolve):
+        """Test JQL resolution falls back to first user when none active."""
+        mock_is_cloud.return_value = True
+        mock_resolve.return_value = [
+            {
+                "accountId": "only1",
+                "emailAddress": "",
+                "displayName": "Deactivated",
+                "active": False,
+            },
+        ]
+
+        result = resolve_user_for_jql("Deactivated")
+
+        assert result == "only1"
+
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_resolve_user_cloud_empty_response(self, mock_api_path, mock_get, mock_is_cloud):
+        """Test resolve_user returns empty list when API returns non-list."""
+        mock_is_cloud.return_value = True
+        mock_api_path.return_value = "rest/api/3/user/search"
+        mock_get.return_value = {}
+
+        result = resolve_user("nobody")
+
+        assert result == []
+
+
 class TestContributorSearch:
     """Tests for contributor search."""
 
+    @patch("skills.jira.scripts.jira.resolve_user_for_jql")
     @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.search_issues")
-    def test_search_by_contributor_with_scriptrunner(self, mock_search, mock_sr):
+    def test_search_by_contributor_with_scriptrunner(self, mock_search, mock_sr, mock_resolve):
         """Test contributor search with ScriptRunner available."""
+        mock_resolve.return_value = "jsmith"
         mock_sr.return_value = {"available": True, "enhanced_search": True}
         mock_search.return_value = [{"key": "DEMO-1"}]
 
@@ -1877,10 +2041,14 @@ class TestContributorSearch:
         assert 'assignee = "jsmith"' in jql
         assert 'commentedByUser("jsmith")' in jql
 
+    @patch("skills.jira.scripts.jira.resolve_user_for_jql")
     @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.search_issues")
-    def test_search_by_contributor_without_scriptrunner(self, mock_search, mock_sr, capsys):
+    def test_search_by_contributor_without_scriptrunner(
+        self, mock_search, mock_sr, mock_resolve, capsys
+    ):
         """Test contributor search without ScriptRunner."""
+        mock_resolve.return_value = "jsmith"
         mock_sr.return_value = {"available": False, "enhanced_search": False}
         mock_search.return_value = []
 
@@ -1891,10 +2059,12 @@ class TestContributorSearch:
         jql = mock_search.call_args[0][0]
         assert "commentedByUser" not in jql
 
+    @patch("skills.jira.scripts.jira.resolve_user_for_jql")
     @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.search_issues")
-    def test_search_by_contributor_with_project(self, mock_search, mock_sr):
+    def test_search_by_contributor_with_project(self, mock_search, mock_sr, mock_resolve):
         """Test contributor search scoped to a project."""
+        mock_resolve.return_value = "jsmith"
         mock_sr.return_value = {"available": False, "enhanced_search": False}
         mock_search.return_value = []
 
@@ -1902,6 +2072,22 @@ class TestContributorSearch:
 
         jql = mock_search.call_args[0][0]
         assert "project = DEMO" in jql
+
+    @patch("skills.jira.scripts.jira.resolve_user_for_jql")
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_search_by_contributor_resolves_email(self, mock_search, mock_sr, mock_resolve):
+        """Test contributor search resolves email to accountId on Cloud."""
+        mock_resolve.return_value = "abc123"
+        mock_sr.return_value = {"available": False, "enhanced_search": False}
+        mock_search.return_value = []
+
+        search_by_contributor("jdoe@example.com")
+
+        mock_resolve.assert_called_once_with("jdoe@example.com")
+        jql = mock_search.call_args[0][0]
+        assert 'reporter = "abc123"' in jql
+        assert 'assignee = "abc123"' in jql
 
     @patch("skills.jira.scripts.jira.search_by_contributor")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
@@ -2177,3 +2363,85 @@ class TestCmdIssueComments:
         assert result == 0
         captured = capsys.readouterr()
         assert '[{"id": "1"}]' in captured.out
+
+
+class TestCmdUser:
+    """Tests for cmd_user handler."""
+
+    @patch("skills.jira.scripts.jira.resolve_user")
+    def test_cmd_user_search(self, mock_resolve, capsys):
+        """Test user search command."""
+        mock_resolve.return_value = [
+            {
+                "accountId": "abc123",
+                "emailAddress": "jdoe@example.com",
+                "displayName": "Jane Doe",
+                "active": True,
+            }
+        ]
+
+        args = argparse.Namespace(
+            user_command="search",
+            query="jdoe@example.com",
+            json=False,
+        )
+
+        result = cmd_user(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "abc123" in captured.out
+        assert "Jane Doe" in captured.out
+
+    @patch("skills.jira.scripts.jira.resolve_user")
+    def test_cmd_user_search_empty(self, mock_resolve, capsys):
+        """Test user search with no results."""
+        mock_resolve.return_value = []
+
+        args = argparse.Namespace(
+            user_command="search",
+            query="nobody",
+            json=False,
+        )
+
+        result = cmd_user(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "No users found" in captured.out
+
+    @patch("skills.jira.scripts.jira.resolve_user")
+    @patch("skills.jira.scripts.jira.format_json")
+    def test_cmd_user_search_json(self, mock_format_json, mock_resolve, capsys):
+        """Test user search with JSON output."""
+        mock_resolve.return_value = [{"accountId": "abc123"}]
+        mock_format_json.return_value = '[{"accountId": "abc123"}]'
+
+        args = argparse.Namespace(
+            user_command="search",
+            query="jdoe",
+            json=True,
+        )
+
+        result = cmd_user(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "abc123" in captured.out
+
+    @patch("skills.jira.scripts.jira.resolve_user")
+    def test_cmd_user_search_error(self, mock_resolve, capsys):
+        """Test user search with error."""
+        mock_resolve.side_effect = Exception("API error")
+
+        args = argparse.Namespace(
+            user_command="search",
+            query="jdoe",
+            json=False,
+        )
+
+        result = cmd_user(args)
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "API error" in captured.err

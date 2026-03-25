@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.3.2"
+  version: "0.4.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -161,7 +161,7 @@ $SKILL_DIR/scripts/jira.py search 'issue in hasLinkType("Dependency")'
 
 **Arguments:**
 - `jql`: JQL query string (required unless `--contributor` is used) - supports ScriptRunner functions if installed
-- `--contributor`: Search for issues where this user is a contributor (reporter, assignee, or commenter). Requires ScriptRunner for comment-based matching.
+- `--contributor`: Search for issues where this user is a contributor (reporter, assignee, or commenter). On Jira Cloud, automatically resolves email/name to accountId. Requires ScriptRunner for comment-based matching.
 - `--project`: Project key to scope a `--contributor` search
 - `--max-results`: Maximum number of results (default: 50)
 - `--fields`: Comma-separated list of fields to include
@@ -292,6 +292,22 @@ $SKILL_DIR/scripts/jira.py statuses --categories
 - `statusCategory = Done` - matches all completed statuses
 
 This is more reliable than using specific status names, which vary between projects.
+
+### user
+
+Search for Jira users by email, name, or username. On Jira Cloud, returns
+accountId values needed for JQL queries.
+
+```bash
+# Search by email
+$SKILL_DIR/scripts/jira.py user search "jdoe@example.com"
+
+# Search by display name
+$SKILL_DIR/scripts/jira.py user search "Jane Doe"
+```
+
+**Arguments for `user search`:**
+- `query`: Email, display name, or username to search for
 
 ### collaboration
 
