@@ -592,16 +592,16 @@ Use `dev-link.sh` to redirect Claude Code's skill symlinks to your local checkou
 
 See [CONTRIBUTING.md - Local Skill Testing](../CONTRIBUTING.md#local-skill-testing) for more details.
 
-### Testing with npx add-skill
+### Testing with npx skills
 
 Verify compatibility with the installation tool:
 
 ```bash
 # List skills (should show your skill)
-npx add-skill odyssey4me/agent-skills --list
+npx skills add odyssey4me/agent-skills --list
 
 # Install skill
-npx add-skill odyssey4me/agent-skills --skill myskill
+npx skills add odyssey4me/agent-skills --skill myskill
 
 # Verify installation
 ls ~/.claude/skills/myskill
@@ -628,7 +628,7 @@ ls ~/.claude/skills/myskill
 
 ### Tools
 
-- **[add-skill CLI](https://github.com/vercel-labs/add-skill)** - Installation tool
+- **[skills CLI](https://github.com/vercel-labs/skills)** - Installation tool
   - How skill discovery works
   - Installation process
   - Symlink mode
@@ -652,7 +652,7 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for:
 - Read the [Agent Skills specification](https://agentskills.io/specification)
 - Review existing skills ([Jira](../skills/jira/SKILL.md), [Confluence](../skills/confluence/SKILL.md), [Gmail](../skills/gmail/SKILL.md))
 - Copy the template and start building
-- Test with `npx add-skill` for compatibility
+- Test with `npx skills` for compatibility
 - Submit a pull request
 
 For questions, [open an issue on GitHub](https://github.com/odyssey4me/agent-skills/issues).
