@@ -31,3 +31,4 @@ data without modifying remote state.
 | permissions list | read | List file permissions |
 | share | write | Share a file with users |
 | permissions delete | write | Remove sharing permissions |
+| comments list | read | List comments on a file |

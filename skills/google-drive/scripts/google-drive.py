@@ -17,6 +17,7 @@ Usage:
     python google-drive.py folders create "New Folder" --parent FOLDER_ID
     python google-drive.py share FILE_ID --email user@example.com --role writer
     python google-drive.py permissions list FILE_ID
+    python google-drive.py comments list FILE_ID
 
 Requirements:
     pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
@@ -870,6 +871,57 @@ def delete_permission(service, file_id: str, permission_id: str) -> None:
         handle_api_error(e)
 
 
+def list_comments(
+    service,
+    file_id: str,
+    include_deleted: bool = False,
+    max_results: int = 100,
+) -> list[dict[str, Any]]:
+    """List comments on a file.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        include_deleted: Whether to include deleted comments.
+        max_results: Maximum number of comments to return.
+
+    Returns:
+        List of comment dictionaries.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    comments_fields = (
+        "comments(id,content,author(displayName,emailAddress),"
+        "resolved,quotedFileContent(value),"
+        "createdTime,modifiedTime,"
+        "replies(id,content,author(displayName,emailAddress),"
+        "action,createdTime)),nextPageToken"
+    )
+    try:
+        comments: list[dict[str, Any]] = []
+        page_token = None
+        while len(comments) < max_results:
+            page_size = min(100, max_results - len(comments))
+            kwargs: dict[str, Any] = {
+                "fileId": file_id,
+                "fields": comments_fields,
+                "pageSize": page_size,
+                "includeDeleted": include_deleted,
+            }
+            if page_token:
+                kwargs["pageToken"] = page_token
+            result = service.comments().list(**kwargs).execute()
+            comments.extend(result.get("comments", []))
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
+        return comments[:max_results]
+    except HttpError as e:
+        handle_api_error(e)
+        return []  # Unreachable
+
+
 # ============================================================================
 # OUTPUT FORMATTING
 # ============================================================================
@@ -939,6 +991,47 @@ def format_permission(permission: dict[str, Any]) -> str:
 
     user_info = display_name or email or perm_type
     return f"- **{user_info}** ({role}, ID: {perm_id})"
+
+
+def format_comment(comment: dict[str, Any]) -> str:
+    """Format a comment for display.
+
+    Args:
+        comment: Comment dictionary from Drive API.
+
+    Returns:
+        Formatted string.
+    """
+    author = comment.get("author", {})
+    author_name = author.get("displayName") or author.get("emailAddress", "Unknown")
+    resolved = comment.get("resolved", False)
+    status = "resolved" if resolved else "open"
+    created = comment.get("createdTime", "Unknown")
+    content = comment.get("content", "")
+    comment_id = comment.get("id", "")
+
+    lines = [
+        f"### Comment by {author_name} ({status})",
+        f"- **ID:** {comment_id}",
+        f"- **Created:** {created}",
+    ]
+
+    quoted = comment.get("quotedFileContent", {})
+    if quoted and quoted.get("value"):
+        lines.append(f"- **Quoted text:** {quoted['value']}")
+
+    lines.append(f"- **Content:** {content}")
+
+    replies = comment.get("replies", [])
+    for reply in replies:
+        reply_author = reply.get("author", {})
+        reply_name = reply_author.get("displayName") or reply_author.get("emailAddress", "Unknown")
+        reply_content = reply.get("content", "")
+        action = reply.get("action", "")
+        action_str = f" [{action}]" if action else ""
+        lines.append(f"  - **Reply by {reply_name}**{action_str}: {reply_content}")
+
+    return "\n".join(lines)
 
 
 # ============================================================================
@@ -1386,6 +1479,30 @@ def cmd_permissions_delete(args):
     return 0
 
 
+def cmd_comments_list(args):
+    """Handle 'comments list' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY)
+    comments = list_comments(
+        service,
+        args.file_id,
+        include_deleted=args.include_deleted,
+        max_results=args.max_results,
+    )
+
+    if args.json:
+        print(json.dumps(comments, indent=2))
+    else:
+        if not comments:
+            print("No comments found")
+        else:
+            print(f"Found {len(comments)} comment(s):\n")
+            for comment in comments:
+                print(format_comment(comment))
+                print("-" * 80)
+
+    return 0
+
+
 # ============================================================================
 # CLI ARGUMENT PARSER
 # ============================================================================
@@ -1511,6 +1628,20 @@ def build_parser() -> argparse.ArgumentParser:
     perm_delete_parser.add_argument("file_id", help="File ID")
     perm_delete_parser.add_argument("permission_id", help="Permission ID to delete")
 
+    # comments commands
+    comments_parser = subparsers.add_parser("comments", help="Comment operations")
+    comments_subparsers = comments_parser.add_subparsers(dest="comments_command")
+
+    comments_list_parser = comments_subparsers.add_parser("list", help="List comments")
+    comments_list_parser.add_argument("file_id", help="File ID")
+    comments_list_parser.add_argument(
+        "--max-results", type=int, default=100, help="Maximum number of comments"
+    )
+    comments_list_parser.add_argument(
+        "--include-deleted", action="store_true", help="Include deleted comments"
+    )
+    comments_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     return parser
 
 
@@ -1602,6 +1733,8 @@ def main():
                 return cmd_permissions_list(args)
             elif args.permissions_command == "delete":
                 return cmd_permissions_delete(args)
+        elif args.command == "comments" and args.comments_command == "list":
+            return cmd_comments_list(args)
 
         parser.print_help()
         return 1

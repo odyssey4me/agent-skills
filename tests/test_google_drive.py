@@ -67,7 +67,10 @@ cmd_files_delete = google_drive.cmd_files_delete
 cmd_files_move = google_drive.cmd_files_move
 cmd_files_rename = google_drive.cmd_files_rename
 copy_file = google_drive.copy_file
+cmd_comments_list = google_drive.cmd_comments_list
 delete_file = google_drive.delete_file
+format_comment = google_drive.format_comment
+list_comments = google_drive.list_comments
 rename_file = google_drive.rename_file
 upload_file = google_drive.upload_file
 
@@ -858,6 +861,76 @@ class TestSharingOperations:
             fileId="file123", permissionId="perm123"
         )
 
+    def test_list_comments(self):
+        """Test listing comments on a file."""
+        mock_service = Mock()
+        mock_service.comments().list().execute.return_value = {
+            "comments": [
+                {
+                    "id": "comment1",
+                    "content": "Looks good",
+                    "author": {"displayName": "Alice"},
+                    "resolved": False,
+                },
+                {
+                    "id": "comment2",
+                    "content": "Please fix typo",
+                    "author": {"displayName": "Bob"},
+                    "resolved": True,
+                    "replies": [
+                        {
+                            "id": "reply1",
+                            "content": "Fixed",
+                            "author": {"displayName": "Alice"},
+                            "action": "resolve",
+                        }
+                    ],
+                },
+            ]
+        }
+
+        comments = list_comments(mock_service, "file123")
+
+        assert len(comments) == 2
+        assert comments[0]["content"] == "Looks good"
+        assert comments[1]["resolved"] is True
+
+    def test_list_comments_pagination(self):
+        """Test listing comments with pagination."""
+        mock_service = Mock()
+        mock_service.comments().list().execute.side_effect = [
+            {
+                "comments": [{"id": "c1", "content": "First"}],
+                "nextPageToken": "token2",
+            },
+            {
+                "comments": [{"id": "c2", "content": "Second"}],
+            },
+        ]
+
+        comments = list_comments(mock_service, "file123")
+
+        assert len(comments) == 2
+
+    def test_list_comments_empty(self):
+        """Test listing comments when there are none."""
+        mock_service = Mock()
+        mock_service.comments().list().execute.return_value = {"comments": []}
+
+        comments = list_comments(mock_service, "file123")
+
+        assert comments == []
+
+    def test_list_comments_api_error(self):
+        """Test listing comments with API error."""
+        mock_service = Mock()
+        mock_service.comments().list().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+
+        with pytest.raises(DriveAPIError):
+            list_comments(mock_service, "file123")
+
 
 # ============================================================================
 # FORMATTING TESTS
@@ -929,6 +1002,63 @@ class TestFormatting:
         assert "- **John Doe**" in formatted
         assert "reader" in formatted
         assert "perm123" in formatted
+
+    def test_format_comment(self):
+        """Test formatting comment as markdown."""
+        comment = {
+            "id": "comment123",
+            "content": "This needs review",
+            "author": {"displayName": "Alice", "emailAddress": "alice@example.com"},
+            "resolved": False,
+            "createdTime": "2024-01-15T10:00:00Z",
+            "quotedFileContent": {"value": "some highlighted text"},
+        }
+
+        formatted = format_comment(comment)
+
+        assert formatted.startswith("### Comment by Alice (open)\n")
+        assert "- **ID:** comment123" in formatted
+        assert "- **Created:** 2024-01-15T10:00:00Z" in formatted
+        assert "- **Quoted text:** some highlighted text" in formatted
+        assert "- **Content:** This needs review" in formatted
+
+    def test_format_comment_resolved_with_replies(self):
+        """Test formatting resolved comment with replies."""
+        comment = {
+            "id": "comment456",
+            "content": "Fix this typo",
+            "author": {"displayName": "Bob"},
+            "resolved": True,
+            "createdTime": "2024-01-15T10:00:00Z",
+            "replies": [
+                {
+                    "id": "reply1",
+                    "content": "Done",
+                    "author": {"displayName": "Alice"},
+                    "action": "resolve",
+                    "createdTime": "2024-01-15T11:00:00Z",
+                }
+            ],
+        }
+
+        formatted = format_comment(comment)
+
+        assert "### Comment by Bob (resolved)" in formatted
+        assert "**Reply by Alice** [resolve]: Done" in formatted
+
+    def test_format_comment_email_fallback(self):
+        """Test formatting comment with email instead of display name."""
+        comment = {
+            "id": "c1",
+            "content": "Hello",
+            "author": {"emailAddress": "user@example.com"},
+            "resolved": False,
+            "createdTime": "2024-01-15T10:00:00Z",
+        }
+
+        formatted = format_comment(comment)
+
+        assert "### Comment by user@example.com (open)" in formatted
 
 
 # ============================================================================
@@ -1880,6 +2010,65 @@ class TestAdditionalCLICommands:
         args.json = False
 
         exit_code = cmd_permissions_list(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "list_comments")
+    @patch("builtins.print")
+    def test_cmd_comments_list(self, _mock_print, mock_list_comments, __mock_build_service):
+        """Test comments list command."""
+        mock_list_comments.return_value = [
+            {
+                "id": "c1",
+                "content": "Nice work",
+                "author": {"displayName": "Alice"},
+                "resolved": False,
+                "createdTime": "2024-01-15T10:00:00Z",
+            }
+        ]
+
+        args = Mock()
+        args.file_id = "file123"
+        args.json = False
+        args.include_deleted = False
+        args.max_results = 100
+
+        exit_code = cmd_comments_list(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "list_comments")
+    @patch("builtins.print")
+    def test_cmd_comments_list_json(self, _mock_print, mock_list_comments, __mock_build_service):
+        """Test comments list command with JSON output."""
+        mock_list_comments.return_value = []
+
+        args = Mock()
+        args.file_id = "file123"
+        args.json = True
+        args.include_deleted = False
+        args.max_results = 100
+
+        exit_code = cmd_comments_list(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "list_comments")
+    @patch("builtins.print")
+    def test_cmd_comments_list_empty(self, _mock_print, mock_list_comments, __mock_build_service):
+        """Test comments list command with no comments."""
+        mock_list_comments.return_value = []
+
+        args = Mock()
+        args.file_id = "file123"
+        args.json = False
+        args.include_deleted = False
+        args.max_results = 100
+
+        exit_code = cmd_comments_list(args)
 
         assert exit_code == 0
 

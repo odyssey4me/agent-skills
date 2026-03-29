@@ -3,7 +3,7 @@ name: google-drive
 description: Upload, download, search, and share files on Google Drive. Create folders and manage permissions. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, or organize Google Drive files.
 metadata:
   author: odyssey4me
-  version: "0.2.0"
+  version: "0.3.0"
   category: google-workspace
   tags: "files, folders, sharing"
   complexity: standard
@@ -84,6 +84,9 @@ $SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID [--max-results N]
 $SKILL_DIR/scripts/google-drive.py share FILE_ID --email EMAIL [--role ROLE] [--no-notify]
 $SKILL_DIR/scripts/google-drive.py permissions list FILE_ID
 $SKILL_DIR/scripts/google-drive.py permissions delete FILE_ID PERMISSION_ID
+
+# Comments
+$SKILL_DIR/scripts/google-drive.py comments list FILE_ID [--max-results N] [--include-deleted]
 ```
 
 See [command-reference.md](references/command-reference.md) for full argument details and examples.
@@ -176,6 +179,12 @@ $SKILL_DIR/scripts/google-drive.py files upload ./doc2.pdf --parent FOLDER_ID
 
 # List folder contents
 $SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID
+```
+
+### List comments on a file
+
+```bash
+$SKILL_DIR/scripts/google-drive.py comments list FILE_ID
 ```
 
 ## Drive Search Query Syntax

@@ -289,3 +289,23 @@ $SKILL_DIR/scripts/google-drive.py permissions delete FILE_ID PERMISSION_ID
 **Arguments:**
 - `file_id`: The file ID (required)
 - `permission_id`: The permission ID to delete (required)
+
+## comments list
+
+List comments on a file, including replies.
+
+```bash
+# List all comments
+$SKILL_DIR/scripts/google-drive.py comments list FILE_ID
+
+# Include deleted comments
+$SKILL_DIR/scripts/google-drive.py comments list FILE_ID --include-deleted
+
+# Limit results
+$SKILL_DIR/scripts/google-drive.py comments list FILE_ID --max-results 10
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `--max-results`: Maximum number of comments (default: 100)
+- `--include-deleted`: Include deleted comments (they will lack content)

@@ -28,6 +28,7 @@ The following Google Drive API operations are **not yet implemented** in this sk
 | Update existing permissions (change role) | `permissions.update` | Delete and re-create the permission with the new role |
 | Empty trash | `files.emptyTrash` | Use Google Drive web interface |
 | File version history | `revisions.*` | Use Google Drive web interface |
-| Comments and replies | `comments.*`, `replies.*` | Use Google Drive web interface |
+| Create/update/delete comments | `comments.create`, `comments.update`, `comments.delete` | Use Google Drive web interface |
+| Comment replies management | `replies.create`, `replies.update`, `replies.delete` | Use Google Drive web interface |
 | Watch for file changes | `files.watch`, `changes.*` | Not available via any skill |
 | Shared drive management | `drives.*` | Not available via any skill |
