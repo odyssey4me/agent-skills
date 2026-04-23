@@ -69,6 +69,13 @@ token: your-token
 - **Email**: Your Atlassian account email
 - **API Token**: Create at https://id.atlassian.com/manage-profile/security/api-tokens
 
+### Optional: authsome-managed credentials
+
+If you use [authsome](https://github.com/manojbajaj95/authsome), you can use it as a local
+credential manager and inject/export the same credentials this skill expects. Authsome must be
+configured to store your Jira credentials first, and this skill's required fields/variable names
+do not change.
+
 ## Configuration Defaults
 
 Optionally configure defaults in `~/.config/agent-skills/jira.yaml` to reduce repetitive typing:

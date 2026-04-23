@@ -85,6 +85,17 @@ For contributors or developers who want to modify skills, see the [Contributing 
 
 After installation, configure authentication for each skill you want to use.
 
+### Optional authsome Layer
+
+If you prefer to manage credentials through a local auth helper, you can use [authsome](https://github.com/manojbajaj95/authsome) as an
+optional layer on top of the repository's existing auth setup. The current skill instructions
+remain the source of truth for each service, and authsome can be introduced where it fits your
+workflow.
+
+In practice, this gives you a local place to manage credentials while still following the
+skill-specific setup guidance in this repository. If you later add more authsome-backed
+integrations, this section can serve as the shared entry point.
+
 ### Jira Authentication
 
 Jira requires:

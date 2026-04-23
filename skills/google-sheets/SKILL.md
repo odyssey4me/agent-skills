@@ -52,6 +52,13 @@ Google Sheets uses OAuth 2.0 for authentication. For complete setup instructions
 
 2. Run `$SKILL_DIR/scripts/google-sheets.py check` to trigger OAuth flow and verify setup.
 
+### Optional: authsome-backed credentials
+
+If you use [authsome](https://github.com/manojbajaj95/authsome), you can use it instead of
+`~/.config/agent-skills/google.yaml` for Google credentials. Authsome must be configured to
+store your Google credentials first (for example, via authsome login/setup flows), then this
+skill can use those credentials.
+
 On scope or authentication errors, see the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
 ## Commands

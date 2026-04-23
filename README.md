@@ -9,6 +9,7 @@ Portable skills for AI coding assistants providing integrations with Jira, Confl
 - **Simple Installation**: Just Python + 3 packages (`requests`, `keyring`, `pyyaml`)
 - **Built-in Validation**: Each skill includes a `check` command for setup verification
 - **Secure Authentication**: Supports system keyring, environment variables, and config files
+- **Optional Local Auth Layer**: Can be paired with [authsome](https://github.com/manojbajaj95/authsome) for local credential management when desired
 
 ## Quick Start
 
@@ -104,6 +105,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this pr
 
 ### For Developers
 - **[Developer Guide](docs/developer-guide.md)** - Architecture, creating skills, testing, and contributing
+- **[User Guide](docs/user-guide.md#optional-authsome-layer)** - Includes an optional authsome-based setup path
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and code standards
 - [AGENTS.md](AGENTS.md) - Instructions for AI coding assistants working with this repo
 

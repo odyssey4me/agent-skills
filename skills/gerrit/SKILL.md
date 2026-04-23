@@ -40,6 +40,12 @@ Gerrit supports multiple authentication methods:
 - **SSH** (recommended): Used by git-review for all operations
 - **HTTP/HTTPS**: For web UI and REST API access (set password in Settings > HTTP Password)
 
+### Optional: authsome-managed credentials
+
+If you use [authsome](https://github.com/manojbajaj95/authsome), you can use it as a local
+credential manager for Gerrit-related secrets in shell workflows. Gerrit SSH/key setup remains
+required for this skill's `git-review`-based operations.
+
 See [Gerrit Authentication](https://gerrit-review.googlesource.com/Documentation/user-upload.html#ssh) for details.
 
 ## Initial Setup

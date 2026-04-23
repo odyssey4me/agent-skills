@@ -29,6 +29,12 @@ glab auth login
 glab auth status
 ```
 
+### Optional: authsome-managed credentials
+
+If you use [authsome](https://github.com/manojbajaj95/authsome), you can use it as a local
+credential manager for GitLab tokens and inject/export credentials into your shell workflows.
+GitLab CLI authentication requirements remain the same for this skill.
+
 Supports GitLab.com, GitLab Dedicated, and GitLab Self-Managed instances.
 See [GitLab CLI Authentication](https://docs.gitlab.com/cli/#authentication) for details.
 

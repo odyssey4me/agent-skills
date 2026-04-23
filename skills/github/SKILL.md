@@ -29,6 +29,12 @@ gh auth login
 gh auth status
 ```
 
+### Optional: authsome-managed credentials
+
+If you use [authsome](https://github.com/manojbajaj95/authsome), you can use it as a local
+credential manager for GitHub tokens and inject/export credentials into your shell workflows.
+GitHub CLI authentication requirements remain the same for this skill.
+
 See [GitHub CLI Authentication](https://cli.github.com/manual/gh_auth_login) for details.
 
 ## Script Usage

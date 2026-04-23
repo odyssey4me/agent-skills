@@ -26,6 +26,12 @@ This skill delegates authentication to the underlying platform skill:
 - **GitLab**: Requires `glab auth login` (see the gitlab skill)
 - **Gerrit**: Requires `git-review` configuration (see the gerrit skill)
 
+### Optional: authsome-managed credentials
+
+If you use [authsome](https://github.com/manojbajaj95/authsome), you can use it as a local
+credential manager in your shell workflows. Underlying platform authentication requirements
+(`gh`, `glab`, and `git-review`) still apply.
+
 Ensure the relevant platform skill is authenticated before using code-review.
 
 ## Commands
