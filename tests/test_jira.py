@@ -31,6 +31,7 @@ from skills.jira.scripts.jira import (
     cmd_statuses,
     cmd_transitions,
     cmd_user,
+    coerce_field_value,
     create_issue,
     delete_credential,
     detect_deployment_type,
@@ -637,11 +638,16 @@ class TestCustomFieldResolution:
     def test_discover_custom_field_single_match(self, mock_list_fields):
         """Test discovering a field with exactly one match."""
         mock_list_fields.return_value = [
-            {"id": "customfield_10028", "name": "Story Points", "custom": True},
+            {
+                "id": "customfield_10028",
+                "name": "Story Points",
+                "custom": True,
+                "schema": {"type": "number"},
+            },
             {"id": "summary", "name": "Summary", "custom": False},
         ]
         result = discover_custom_field("story_points")
-        assert result == "customfield_10028"
+        assert result == ("customfield_10028", "number")
 
     @patch("skills.jira.scripts.jira.list_fields")
     def test_discover_custom_field_no_match(self, mock_list_fields):
@@ -668,9 +674,14 @@ class TestCustomFieldResolution:
     def test_resolve_or_discover_saves_to_config(
         self, mock_list_fields, mock_load_config, mock_save_config
     ):
-        """Test resolve_or_discover saves discovered mapping to config."""
+        """Test resolve_or_discover saves discovered mapping and schema to config."""
         mock_list_fields.return_value = [
-            {"id": "customfield_10028", "name": "Story Points", "custom": True},
+            {
+                "id": "customfield_10028",
+                "name": "Story Points",
+                "custom": True,
+                "schema": {"type": "number"},
+            },
         ]
         mock_load_config.return_value = {"defaults": {}}
 
@@ -680,6 +691,7 @@ class TestCustomFieldResolution:
         mock_save_config.assert_called_once()
         saved_config = mock_save_config.call_args[0][1]
         assert saved_config["defaults"]["custom_fields"]["story_points"] == "customfield_10028"
+        assert saved_config["defaults"]["custom_field_schemas"]["story_points"] == "number"
 
     @patch("skills.jira.scripts.jira.save_config")
     @patch("skills.jira.scripts.jira.load_config")
@@ -689,7 +701,12 @@ class TestCustomFieldResolution:
     ):
         """Test resolve_or_discover normalizes display name to snake_case key."""
         mock_list_fields.return_value = [
-            {"id": "customfield_10028", "name": "Story Points", "custom": True},
+            {
+                "id": "customfield_10028",
+                "name": "Story Points",
+                "custom": True,
+                "schema": {"type": "number"},
+            },
         ]
         mock_load_config.return_value = {"defaults": {}}
 
@@ -698,6 +715,7 @@ class TestCustomFieldResolution:
         assert result == "customfield_10028"
         saved_config = mock_save_config.call_args[0][1]
         assert "story_points" in saved_config["defaults"]["custom_fields"]
+        assert saved_config["defaults"]["custom_field_schemas"]["story_points"] == "number"
 
     @patch("skills.jira.scripts.jira.list_fields")
     def test_validate_custom_fields_all_valid(self, mock_list_fields):
@@ -728,6 +746,90 @@ class TestCustomFieldResolution:
         )
         assert len(errors) == 1
         assert "assigned_team" in errors[0]
+
+
+class TestCoerceFieldValue:
+    """Tests for coerce_field_value schema-aware value wrapping."""
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_option_field(self, mock_list_fields):
+        """Test option field wraps value in dict."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_12345", "schema": {"type": "option"}},
+        ]
+        result = coerce_field_value("customfield_12345", "Platform Team")
+        assert result == {"value": "Platform Team"}
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_security_level_field(self, mock_list_fields):
+        """Test security level field wraps value with name key."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_10030", "schema": {"type": "securitylevel"}},
+        ]
+        result = coerce_field_value("customfield_10030", "Red Hat Internal")
+        assert result == {"name": "Red Hat Internal"}
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_number_field(self, mock_list_fields):
+        """Test number field converts to float."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_10028", "schema": {"type": "number"}},
+        ]
+        result = coerce_field_value("customfield_10028", "5")
+        assert result == 5.0
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_string_field(self, mock_list_fields):
+        """Test string field returns raw value."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_99999", "schema": {"type": "string"}},
+        ]
+        result = coerce_field_value("customfield_99999", "hello")
+        assert result == "hello"
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_array_of_options(self, mock_list_fields):
+        """Test array of options splits and wraps each value."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_11111", "schema": {"type": "array", "items": "option"}},
+        ]
+        result = coerce_field_value("customfield_11111", "foo, bar")
+        assert result == [{"value": "foo"}, {"value": "bar"}]
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_unknown_field_returns_raw(self, mock_list_fields):
+        """Test unknown field ID returns raw value."""
+        mock_list_fields.return_value = []
+        result = coerce_field_value("customfield_00000", "whatever")
+        assert result == "whatever"
+
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_user_field_cloud(self, mock_list_fields, mock_is_cloud):
+        """Test user field wraps as accountId on Cloud."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_22222", "schema": {"type": "user"}},
+        ]
+        mock_is_cloud.return_value = True
+        result = coerce_field_value("customfield_22222", "abc123")
+        assert result == {"accountId": "abc123"}
+
+    def test_cached_schema_option(self):
+        """Test option coercion via cached schema type (no API call)."""
+        result = coerce_field_value("customfield_12345", "Platform Team", schema_type="option")
+        assert result == {"value": "Platform Team"}
+
+    def test_cached_schema_securitylevel(self):
+        """Test security level coercion via cached schema type (no API call)."""
+        result = coerce_field_value(
+            "customfield_10030", "Red Hat Internal", schema_type="securitylevel"
+        )
+        assert result == {"name": "Red Hat Internal"}
+
+    def test_cached_schema_number(self):
+        """Test number coercion via cached schema type (no API call)."""
+        result = coerce_field_value("customfield_10028", "5", schema_type="number")
+        assert result == 5.0
 
 
 class TestJiraDefaultsBackwardCompat:
@@ -1651,22 +1753,30 @@ class TestCommandHandlers:
         assert "story_points: customfield_10028" in captured.out
         assert "security_level: customfield_10030" in captured.out
 
+    @patch("skills.jira.scripts.jira.coerce_field_value")
     @patch("skills.jira.scripts.jira.load_config")
     @patch("skills.jira.scripts.jira.resolve_or_discover_field")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
     @patch("skills.jira.scripts.jira.get_project_defaults")
     @patch("skills.jira.scripts.jira.create_issue")
     def test_cmd_issue_create_with_set_field(
-        self, mock_create, mock_proj_defaults, mock_defaults, mock_resolve, mock_load
+        self, mock_create, mock_proj_defaults, mock_defaults, mock_resolve, mock_load, mock_coerce
     ):
         """Test issue create with --set-field."""
         mock_proj_defaults.return_value = ProjectDefaults()
-        mock_defaults.return_value = JiraDefaults(custom_fields={})
+        mock_defaults.return_value = JiraDefaults(
+            custom_fields={},
+            custom_field_schemas={"story_points": "number"},
+        )
         mock_resolve.return_value = "customfield_10028"
         mock_load.return_value = {
-            "defaults": {"custom_fields": {"story_points": "customfield_10028"}}
+            "defaults": {
+                "custom_fields": {"story_points": "customfield_10028"},
+                "custom_field_schemas": {"story_points": "number"},
+            }
         }
         mock_create.return_value = {"key": "DEMO-123"}
+        mock_coerce.return_value = 5.0
 
         args = argparse.Namespace(
             issue_command="create",
@@ -1685,22 +1795,31 @@ class TestCommandHandlers:
         assert result == 0
         mock_create.assert_called_once()
         call_kwargs = mock_create.call_args
-        assert call_kwargs[1]["extra_fields"] == {"customfield_10028": "5"}
+        assert call_kwargs[1]["extra_fields"] == {"customfield_10028": 5.0}
+        mock_coerce.assert_called_once_with("customfield_10028", "5", schema_type="number")
 
+    @patch("skills.jira.scripts.jira.coerce_field_value")
     @patch("skills.jira.scripts.jira.load_config")
     @patch("skills.jira.scripts.jira.resolve_or_discover_field")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
     @patch("skills.jira.scripts.jira.update_issue")
     def test_cmd_issue_update_with_set_field(
-        self, mock_update, mock_defaults, mock_resolve, mock_load
+        self, mock_update, mock_defaults, mock_resolve, mock_load, mock_coerce
     ):
         """Test issue update with --set-field."""
-        mock_defaults.return_value = JiraDefaults(custom_fields={})
+        mock_defaults.return_value = JiraDefaults(
+            custom_fields={},
+            custom_field_schemas={"assigned_team": "option"},
+        )
         mock_resolve.return_value = "customfield_12345"
         mock_load.return_value = {
-            "defaults": {"custom_fields": {"assigned_team": "customfield_12345"}}
+            "defaults": {
+                "custom_fields": {"assigned_team": "customfield_12345"},
+                "custom_field_schemas": {"assigned_team": "option"},
+            }
         }
         mock_update.return_value = {}
+        mock_coerce.return_value = {"value": "Platform Team"}
 
         args = argparse.Namespace(
             issue_command="update",
@@ -1718,7 +1837,10 @@ class TestCommandHandlers:
         assert result == 0
         mock_update.assert_called_once()
         call_kwargs = mock_update.call_args
-        assert call_kwargs[1]["extra_fields"] == {"customfield_12345": "Platform Team"}
+        assert call_kwargs[1]["extra_fields"] == {"customfield_12345": {"value": "Platform Team"}}
+        mock_coerce.assert_called_once_with(
+            "customfield_12345", "Platform Team", schema_type="option"
+        )
 
     @patch("skills.jira.scripts.jira.get_jira_defaults")
     def test_cmd_issue_create_set_field_bad_format(self, mock_defaults, capsys):
@@ -1765,7 +1887,8 @@ class TestCommandHandlers:
     ):
         """Test check command with valid custom fields."""
         mock_defaults.return_value = JiraDefaults(
-            custom_fields={"story_points": "customfield_10028"}
+            custom_fields={"story_points": "customfield_10028"},
+            custom_field_schemas={"story_points": "number"},
         )
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net", email="test@test.com", token="tok"
@@ -1781,7 +1904,7 @@ class TestCommandHandlers:
 
         assert result == 0
         captured = capsys.readouterr()
-        assert "story_points: customfield_10028 (OK)" in captured.out
+        assert "story_points: customfield_10028 (type: number, OK)" in captured.out
 
     @patch("skills.jira.scripts.jira.search_issues")
     @patch("skills.jira.scripts.jira.get_jira_defaults")

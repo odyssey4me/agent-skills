@@ -88,6 +88,9 @@ defaults:
   custom_fields:
     story_points: "customfield_10028"
     assigned_team: "customfield_12345"
+  custom_field_schemas:
+    story_points: "number"
+    assigned_team: "option"
 
 # Optional project-specific defaults
 projects:
@@ -108,9 +111,14 @@ projects:
 - **Custom fields** map friendly names to instance-specific custom field IDs.
   These fields are automatically included in API requests and displayed in
   formatted output. If a mapping is not configured, the skill auto-discovers
-  the field ID from the Jira API and saves it to the config file.
+  the field ID and schema type from the Jira API and saves both to the config.
   Use `--set-field NAME=VALUE` on `issue create` and `issue update` to set
   custom field values using the friendly name.
+- **Custom field schemas** store the Jira schema type for each custom field
+  (e.g. `number`, `option`, `securitylevel`). This lets `--set-field` wrap
+  values correctly (e.g. `{"value": "..."}` for options) without extra API
+  calls. Schemas are saved automatically during discovery. If missing, run
+  `config discover <field_name>` to populate them.
 
 ### View Configuration
 

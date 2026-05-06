@@ -133,6 +133,7 @@ class JiraDefaults:
     max_results: int | None = None
     fields: list[str] | None = None
     custom_fields: dict[str, str] | None = None
+    custom_field_schemas: dict[str, str] | None = None
 
     @staticmethod
     def from_config(config: dict[str, Any]) -> JiraDefaults:
@@ -146,6 +147,7 @@ class JiraDefaults:
         """
         defaults_dict = config.get("defaults", {})
         custom_fields = dict(defaults_dict.get("custom_fields") or {})
+        custom_field_schemas = dict(defaults_dict.get("custom_field_schemas") or {})
 
         # Backward compat: migrate story_points_field to custom_fields
         if defaults_dict.get("story_points_field") and "story_points" not in custom_fields:
@@ -157,6 +159,7 @@ class JiraDefaults:
             max_results=defaults_dict.get("max_results"),
             fields=defaults_dict.get("fields"),
             custom_fields=custom_fields or None,
+            custom_field_schemas=custom_field_schemas or None,
         )
 
 
@@ -1018,13 +1021,13 @@ def resolve_custom_field(
     return None
 
 
-def discover_custom_field(friendly_name: str) -> str | None:
+def discover_custom_field(friendly_name: str) -> tuple[str, str | None] | None:
     """Discover a custom field ID by querying the Jira fields endpoint.
 
     Searches for a field whose name matches the friendly name
     (case-insensitive, spaces/underscores interchangeable).
 
-    Returns the field ID if exactly one match is found, None otherwise.
+    Returns (field_id, schema_type) if exactly one match is found, None otherwise.
     """
     search_name = _normalize_field_name(friendly_name)
     all_fields = list_fields()
@@ -1033,8 +1036,11 @@ def discover_custom_field(friendly_name: str) -> str | None:
     if len(matches) == 1:
         field_id = matches[0].get("id", matches[0].get("fieldId"))
         field_name = matches[0].get("name")
-        print(f"Discovered field: {friendly_name} -> {field_id} ({field_name})")
-        return field_id
+        schema_type = matches[0].get("schema", {}).get("type")
+        print(
+            f"Discovered field: {friendly_name} -> {field_id} ({field_name}, type: {schema_type})"
+        )
+        return field_id, schema_type
 
     if len(matches) > 1:
         print(f"Multiple fields match '{friendly_name}':", file=sys.stderr)
@@ -1055,15 +1061,19 @@ def resolve_or_discover_field(
     if field_id:
         return field_id
 
-    field_id = discover_custom_field(friendly_name)
-    if not field_id:
+    result = discover_custom_field(friendly_name)
+    if not result:
         return None
 
+    field_id, schema_type = result
     key = _normalize_field_name(friendly_name)
     config = load_config("jira") or {}
     defaults = config.setdefault("defaults", {})
     cf = defaults.setdefault("custom_fields", {})
     cf[key] = field_id
+    if schema_type:
+        schemas = defaults.setdefault("custom_field_schemas", {})
+        schemas[key] = schema_type
     save_config("jira", config)
     print(f"Saved mapping: {key} -> {field_id} in ~/.config/agent-skills/jira.yaml")
     return field_id
@@ -1081,6 +1091,48 @@ def validate_custom_fields(custom_fields: dict[str, str]) -> list[str]:
         if field_id not in known_ids:
             errors.append(f"  {friendly_name}: {field_id} (not found in Jira)")
     return errors
+
+
+def _coerce_by_type(field_type: str, value: str, items_type: str = "") -> Any:
+    """Wrap a string value based on the Jira field schema type."""
+    if field_type == "option":
+        return {"value": value}
+    if field_type in ("securitylevel", "security-level"):
+        return {"name": value}
+    if field_type == "number":
+        try:
+            return float(value)
+        except ValueError:
+            return value
+    if field_type == "array" and items_type == "option":
+        return [{"value": v.strip()} for v in value.split(",")]
+    if field_type == "user":
+        if is_cloud():
+            return {"accountId": value}
+        return {"name": value}
+    return value
+
+
+def coerce_field_value(
+    field_id: str,
+    value: str,
+    schema_type: str | None = None,
+) -> Any:
+    """Coerce a string value to the correct type for a Jira field.
+
+    Uses the cached schema_type if available (from custom_field_schemas config).
+    Falls back to querying the fields API if no schema type is provided.
+    """
+    if schema_type:
+        return _coerce_by_type(schema_type, value)
+
+    all_fields = list_fields()
+    field_meta = next((f for f in all_fields if f.get("id", f.get("fieldId")) == field_id), None)
+    if not field_meta:
+        return value
+
+    schema = field_meta.get("schema", {})
+    return _coerce_by_type(schema.get("type", ""), value, schema.get("items", ""))
 
 
 def _format_custom_field_value(value: Any) -> str:
@@ -2046,8 +2098,13 @@ def cmd_check() -> int:
                 print(f"   {err}")
             print("   Update custom_fields in ~/.config/agent-skills/jira.yaml")
         else:
+            schemas = defaults.custom_field_schemas or {}
             for name, fid in defaults.custom_fields.items():
-                print(f"   {name}: {fid} (OK)")
+                schema = schemas.get(name)
+                if schema:
+                    print(f"   {name}: {fid} (type: {schema}, OK)")
+                else:
+                    print(f"   {name}: {fid} (type: unknown — run: config discover {name})")
             print("   Custom fields: OK")
 
     print()
@@ -2173,6 +2230,7 @@ def cmd_issue(args: argparse.Namespace) -> int:
             # Resolve --set-field values to field IDs
             extra_fields = {}
             custom_fields = defaults.custom_fields or {}
+            schemas = defaults.custom_field_schemas or {}
             for pair in getattr(args, "set_field", None) or []:
                 if "=" not in pair:
                     print(
@@ -2181,15 +2239,20 @@ def cmd_issue(args: argparse.Namespace) -> int:
                     )
                     return 1
                 name, value = pair.split("=", 1)
+                key = _normalize_field_name(name)
                 field_id = resolve_or_discover_field(name, custom_fields)
                 if not field_id:
                     print(f"Error: could not resolve field '{name}'", file=sys.stderr)
                     return 1
-                extra_fields[field_id] = value
-                # Update custom_fields in case it was just discovered
-                custom_fields = (
-                    (load_config("jira") or {}).get("defaults", {}).get("custom_fields", {})
+                extra_fields[field_id] = coerce_field_value(
+                    field_id,
+                    value,
+                    schema_type=schemas.get(key),
                 )
+                # Reload in case discovery just saved new mappings
+                reloaded = (load_config("jira") or {}).get("defaults", {})
+                custom_fields = reloaded.get("custom_fields", {})
+                schemas = reloaded.get("custom_field_schemas", {})
 
             labels = args.labels.split(",") if args.labels else None
             issue = create_issue(
@@ -2212,6 +2275,7 @@ def cmd_issue(args: argparse.Namespace) -> int:
             defaults = get_jira_defaults()
             extra_fields = {}
             custom_fields = defaults.custom_fields or {}
+            schemas = defaults.custom_field_schemas or {}
             for pair in getattr(args, "set_field", None) or []:
                 if "=" not in pair:
                     print(
@@ -2220,14 +2284,20 @@ def cmd_issue(args: argparse.Namespace) -> int:
                     )
                     return 1
                 name, value = pair.split("=", 1)
+                key = _normalize_field_name(name)
                 field_id = resolve_or_discover_field(name, custom_fields)
                 if not field_id:
                     print(f"Error: could not resolve field '{name}'", file=sys.stderr)
                     return 1
-                extra_fields[field_id] = value
-                custom_fields = (
-                    (load_config("jira") or {}).get("defaults", {}).get("custom_fields", {})
+                extra_fields[field_id] = coerce_field_value(
+                    field_id,
+                    value,
+                    schema_type=schemas.get(key),
                 )
+                # Reload in case discovery just saved new mappings
+                reloaded = (load_config("jira") or {}).get("defaults", {})
+                custom_fields = reloaded.get("custom_fields", {})
+                schemas = reloaded.get("custom_field_schemas", {})
 
             labels = args.labels.split(",") if args.labels else None
             update_issue(
@@ -2328,9 +2398,14 @@ def cmd_config(args: argparse.Namespace) -> int:
                 f"  Fields: {', '.join(defaults.fields) if defaults.fields else 'Not configured'}"
             )
             if defaults.custom_fields:
+                schemas = defaults.custom_field_schemas or {}
                 print("  Custom Fields:")
                 for name, fid in defaults.custom_fields.items():
-                    print(f"    {name}: {fid}")
+                    schema = schemas.get(name)
+                    if schema:
+                        print(f"    {name}: {fid} (type: {schema})")
+                    else:
+                        print(f"    {name}: {fid} (type: unknown — run: config discover {name})")
             else:
                 print("  Custom Fields: Not configured")
             print()
@@ -2359,7 +2434,10 @@ def cmd_config(args: argparse.Namespace) -> int:
             custom_fields = defaults.custom_fields or {}
             field_id = resolve_or_discover_field(args.field_name, custom_fields)
             if field_id:
-                print(f"\n{args.field_name} -> {field_id}")
+                key = _normalize_field_name(args.field_name)
+                reloaded = JiraDefaults.from_config(load_config("jira") or {})
+                schema = (reloaded.custom_field_schemas or {}).get(key, "unknown")
+                print(f"\n{key} -> {field_id} (type: {schema})")
             else:
                 print(f"\nCould not resolve field '{args.field_name}'.")
                 print("Use 'fields' command to list available fields.")
@@ -2650,7 +2728,7 @@ def main() -> int:
     comment_parser.add_argument("body", help="Comment text")
     comment_parser.add_argument(
         "--security-level",
-        help="Security level for private comment (e.g., 'Red Hat Internal', 'Employees')",
+        help="Security level for private comment (e.g., 'Internal', 'Employees')",
     )
 
     # ========================================================================
@@ -2676,7 +2754,7 @@ def main() -> int:
     do_parser.add_argument("--comment", help="Comment to add with transition")
     do_parser.add_argument(
         "--security-level",
-        help="Security level for private comment (e.g., 'Red Hat Internal', 'Employees')",
+        help="Security level for private comment (e.g., 'Internal', 'Employees')",
     )
 
     # ========================================================================
