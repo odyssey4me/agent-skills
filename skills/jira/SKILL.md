@@ -82,7 +82,7 @@ token: your-token
 # Optional defaults
 defaults:
   jql_scope: "project = DEMO AND assignee = currentUser()"
-  security_level: "Red Hat Internal"
+  security_level: "Internal"
   max_results: 25
   fields: ["summary", "status", "assignee", "priority", "created"]
   custom_fields:
@@ -231,7 +231,7 @@ $SKILL_DIR/scripts/jira.py issue update DEMO-123 --set-field assigned_team="Plat
 $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
 
 # Add private comment with security level
-$SKILL_DIR/scripts/jira.py issue comment DEMO-123 "Internal note" --security-level "Red Hat Internal"
+$SKILL_DIR/scripts/jira.py issue comment DEMO-123 "Internal note" --security-level "Internal"
 ```
 
 **Arguments for `issue get`:**
@@ -256,7 +256,7 @@ $SKILL_DIR/scripts/jira.py transitions do DEMO-123 "In Progress"
 $SKILL_DIR/scripts/jira.py transitions do DEMO-123 "Done" --comment "Completed"
 
 # Transition with private comment
-$SKILL_DIR/scripts/jira.py transitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Red Hat Internal"
+$SKILL_DIR/scripts/jira.py transitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Internal"
 ```
 
 ### config

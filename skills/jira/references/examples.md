@@ -47,7 +47,7 @@ $SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status"
 # Add comment visible only to specific security level
 $SKILL_DIR/scripts/jira.py issue comment DEMO-123 \
   "This is sensitive internal information" \
-  --security-level "Red Hat Internal"
+  --security-level "Internal"
 
 # Verify comment was added
 $SKILL_DIR/scripts/jira.py issue comments DEMO-123 --max-results 1
@@ -99,7 +99,7 @@ $SKILL_DIR/scripts/jira.py issue create --project DEMO --summary "Fix login bug"
 
 # Comments use default security level
 $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "Internal note"
-# Automatically applies security_level="Red Hat Internal"
+# Automatically applies security_level="Internal"
 
 # Override defaults when needed
 $SKILL_DIR/scripts/jira.py search "status = Open" --max-results 100

@@ -1478,7 +1478,7 @@ def add_comment(issue_key: str, body: str, security_level: str | None = None) ->
     Args:
         issue_key: The issue key.
         body: Comment text.
-        security_level: Optional security level name (e.g., "Red Hat Internal", "Employees").
+        security_level: Optional security level name (e.g., "Internal", "Employees").
                        Makes the comment private and visible only to users with this security level.
 
     Returns:

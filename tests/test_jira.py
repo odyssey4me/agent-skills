@@ -233,7 +233,7 @@ class TestDefaultsManagement:
         mock_load_config.return_value = {
             "defaults": {
                 "jql_scope": "project = DEMO",
-                "security_level": "Red Hat Internal",
+                "security_level": "Internal",
                 "max_results": 100,
                 "fields": ["summary", "status"],
             }
@@ -242,7 +242,7 @@ class TestDefaultsManagement:
         defaults = get_jira_defaults()
 
         assert defaults.jql_scope == "project = DEMO"
-        assert defaults.security_level == "Red Hat Internal"
+        assert defaults.security_level == "Internal"
         assert defaults.max_results == 100
         assert defaults.fields == ["summary", "status"]
 
@@ -766,8 +766,8 @@ class TestCoerceFieldValue:
         mock_list_fields.return_value = [
             {"id": "customfield_10030", "schema": {"type": "securitylevel"}},
         ]
-        result = coerce_field_value("customfield_10030", "Red Hat Internal")
-        assert result == {"name": "Red Hat Internal"}
+        result = coerce_field_value("customfield_10030", "Internal")
+        assert result == {"name": "Internal"}
 
     @patch("skills.jira.scripts.jira.list_fields")
     def test_number_field(self, mock_list_fields):
@@ -821,10 +821,8 @@ class TestCoerceFieldValue:
 
     def test_cached_schema_securitylevel(self):
         """Test security level coercion via cached schema type (no API call)."""
-        result = coerce_field_value(
-            "customfield_10030", "Red Hat Internal", schema_type="securitylevel"
-        )
-        assert result == {"name": "Red Hat Internal"}
+        result = coerce_field_value("customfield_10030", "Internal", schema_type="securitylevel")
+        assert result == {"name": "Internal"}
 
     def test_cached_schema_number(self):
         """Test number coercion via cached schema type (no API call)."""
@@ -1552,7 +1550,7 @@ class TestCommandHandlers:
             issue_command="comment",
             issue_key="DEMO-123",
             body="Private comment",
-            security_level="Red Hat Internal",
+            security_level="Internal",
         )
 
         result = cmd_issue(args)
@@ -1560,7 +1558,7 @@ class TestCommandHandlers:
         assert result == 0
         captured = capsys.readouterr()
         assert "Added private comment to DEMO-123" in captured.out
-        assert "Red Hat Internal" in captured.out
+        assert "Internal" in captured.out
 
     @patch("skills.jira.scripts.jira.do_transition")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
@@ -2084,7 +2082,7 @@ class TestCommandHandlers:
             issue_key="DEMO-123",
             transition="Done",
             comment="Completed",
-            security_level="Red Hat Internal",
+            security_level="Internal",
         )
 
         result = cmd_transitions(args)
