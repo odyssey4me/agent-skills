@@ -21,6 +21,7 @@ data without modifying remote state.
 | files search | read | Search files |
 | files get | read | Get file metadata |
 | files download | read | Download a file |
+| files export | read | Export Google Docs/Sheets/Slides |
 | files upload | write | Upload a file |
 | files move | write | Move a file |
 | files delete | write | Permanently delete a file |

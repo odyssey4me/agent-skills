@@ -3,7 +3,7 @@ name: google-drive
 description: Upload, download, search, and share files on Google Drive. Create folders and manage permissions. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, or organize Google Drive files.
 metadata:
   author: odyssey4me
-  version: "0.3.0"
+  version: "0.4.0"
   category: google-workspace
   tags: "files, folders, sharing"
   complexity: standard
@@ -70,6 +70,7 @@ $SKILL_DIR/scripts/google-drive.py files list [--query QUERY] [--max-results N] 
 $SKILL_DIR/scripts/google-drive.py files search [--name NAME] [--mime-type TYPE] [--folder ID]
 $SKILL_DIR/scripts/google-drive.py files get FILE_ID
 $SKILL_DIR/scripts/google-drive.py files download FILE_ID --output PATH
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID [--format markdown|text|pdf] [--lines N] [--output PATH]
 $SKILL_DIR/scripts/google-drive.py files upload PATH [--parent ID] [--name NAME] [--mime-type TYPE] [--convert-to MIME_TYPE]
 $SKILL_DIR/scripts/google-drive.py files move FILE_ID --parent FOLDER_ID
 $SKILL_DIR/scripts/google-drive.py files delete FILE_ID
@@ -119,6 +120,22 @@ $SKILL_DIR/scripts/google-drive.py files search --name "report.pdf"
 
 # Then download it
 $SKILL_DIR/scripts/google-drive.py files download FILE_ID -o ./report.pdf
+```
+
+### Export a Google Doc
+
+```bash
+# Export as markdown (default)
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID
+
+# Export as plain text (useful as fallback for large docs)
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID --format text
+
+# Export first 50 lines only
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID --format text --lines 50
+
+# Export as PDF
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID --format pdf --output ./doc.pdf
 ```
 
 ### Upload and share a file
@@ -213,5 +230,5 @@ This skill makes API calls requiring structured input/output. A standard-capabil
 
 ### Cannot download Google Docs
 
-Google Docs, Sheets, and Slides are not binary files - they cannot be downloaded directly. Use the Google Drive web interface to export them to a downloadable format (PDF, DOCX, etc.).
+Google Docs, Sheets, and Slides are not binary files — they cannot be downloaded with `files download`. Use `files export` instead to export them as markdown, plain text, or PDF. Use `--lines N` to limit output for large documents.
 

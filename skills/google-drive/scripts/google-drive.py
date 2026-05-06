@@ -498,7 +498,7 @@ def get_file_metadata(service, file_id: str) -> dict[str, Any]:
             service.files()
             .get(
                 fileId=file_id,
-                fields="id, name, mimeType, modifiedTime, createdTime, size, owners, webViewLink, parents, description",
+                fields="id, name, mimeType, modifiedTime, createdTime, size, quotaBytesUsed, owners, webViewLink, parents, description",
             )
             .execute()
         )
@@ -528,6 +528,59 @@ def download_file(service, file_id: str, output_path: str) -> None:
                 _, done = downloader.next_chunk()
     except HttpError as e:
         handle_api_error(e)
+
+
+def _export_via_export_links(service, file_id: str, mime_type: str) -> bytes:
+    """Export a large file using exportLinks (no 10 MB cap).
+
+    Falls back to fetching the exportLinks URL directly with the
+    service's authorized HTTP client.
+    """
+    file = service.files().get(fileId=file_id, fields="exportLinks").execute()
+    export_links = file.get("exportLinks", {})
+    url = export_links.get(mime_type)
+    if not url:
+        available = ", ".join(export_links.keys()) if export_links else "none"
+        raise DriveAPIError(f"No exportLink for MIME type '{mime_type}'. Available: {available}")
+    resp, data = service._http.request(url)
+    if resp.status != 200:
+        raise DriveAPIError(f"Failed to download via exportLink (HTTP {resp.status})")
+    if isinstance(data, str):
+        return data.encode("utf-8")
+    return data
+
+
+def export_file(service, file_id: str, mime_type: str) -> bytes:
+    """Export a Google Workspace file (Docs, Sheets, Slides) to a given format.
+
+    Tries the standard files.export endpoint first. If the file exceeds
+    the 10 MB export limit, falls back to exportLinks which has no cap.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID to export.
+        mime_type: The MIME type to export as (e.g. text/markdown, text/plain).
+
+    Returns:
+        The exported content as bytes.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        response = service.files().export(fileId=file_id, mimeType=mime_type).execute()
+        if isinstance(response, bytes):
+            return response
+        return response.encode("utf-8")
+    except HttpError as e:
+        if e.resp.status == 403 and b"exportSizeLimitExceeded" in (e.content or b""):
+            print(
+                "Export size limit exceeded, retrying via exportLinks...",
+                file=sys.stderr,
+            )
+            return _export_via_export_links(service, file_id, mime_type)
+        handle_api_error(e)
+        return b""  # Unreachable
 
 
 def upload_file(
@@ -1297,7 +1350,7 @@ def cmd_files_download(args):
     if file.get("mimeType", "").startswith("application/vnd.google-apps"):
         print(
             f"Error: Cannot download Google {file.get('mimeType')} directly. "
-            "Use Google Drive web interface to export.",
+            "Use 'files export' to export as markdown, text, or pdf.",
             file=sys.stderr,
         )
         return 1
@@ -1305,6 +1358,77 @@ def cmd_files_download(args):
     print(f"Downloading '{file.get('name')}'...")
     download_file(service, args.file_id, args.output)
     print(f"Saved to: {args.output}")
+    return 0
+
+
+EXPORT_FORMATS = {
+    "markdown": "text/markdown",
+    "text": "text/plain",
+    "pdf": "application/pdf",
+}
+
+
+def cmd_files_export(args):
+    """Handle 'files export' command."""
+    fmt = args.format
+    mime_type = EXPORT_FORMATS[fmt]
+
+    if fmt == "pdf" and not args.output:
+        print("Error: --output is required for pdf format.", file=sys.stderr)
+        return 1
+
+    service = build_drive_service(DRIVE_SCOPES_READONLY)
+    file = get_file_metadata(service, args.file_id)
+
+    if not file.get("mimeType", "").startswith("application/vnd.google-apps"):
+        print(
+            f"Error: '{file.get('name')}' is not a Google Workspace file. "
+            "Use 'files download' instead.",
+            file=sys.stderr,
+        )
+        return 1
+
+    quota_bytes = file.get("quotaBytesUsed")
+    if quota_bytes:
+        quota_int = int(quota_bytes)
+        if quota_int > 2 * 1024 * 1024:
+            size_mb = quota_int / (1024 * 1024)
+            print(
+                f"Warning: '{file.get('name')}' is large ({size_mb:.1f} MB). "
+                "If export exceeds 10 MB, it will retry via exportLinks. "
+                "Consider using --format text with --lines to limit output.",
+                file=sys.stderr,
+            )
+
+    data = export_file(service, args.file_id, mime_type)
+
+    if not data or (fmt != "pdf" and not data.strip()):
+        print(
+            f"Error: Export of '{file.get('name')}' as {fmt} returned empty content. "
+            "Try again with --format text.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if fmt == "pdf":
+        with open(args.output, "wb") as f:
+            f.write(data)
+        print(f"Exported '{file.get('name')}' to: {args.output}")
+        return 0
+
+    content = data.decode("utf-8")
+
+    if args.lines is not None:
+        lines = content.splitlines(keepends=True)
+        content = "".join(lines[: args.lines])
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"Exported '{file.get('name')}' to: {args.output}")
+    else:
+        print(content)
+
     return 0
 
 
@@ -1555,6 +1679,23 @@ def build_parser() -> argparse.ArgumentParser:
     download_parser.add_argument("file_id", help="File ID")
     download_parser.add_argument("--output", "-o", required=True, help="Output file path")
 
+    export_parser = files_subparsers.add_parser("export", help="Export Google Docs/Sheets/Slides")
+    export_parser.add_argument("file_id", help="File ID to export")
+    export_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["markdown", "text", "pdf"],
+        default="markdown",
+        help="Export format (default: markdown)",
+    )
+    export_parser.add_argument(
+        "--lines",
+        "-n",
+        type=int,
+        help="Max lines to output (markdown/text only)",
+    )
+    export_parser.add_argument("--output", "-o", help="Output file path")
+
     upload_parser = files_subparsers.add_parser("upload", help="Upload a file")
     upload_parser.add_argument("path", help="Local file path")
     upload_parser.add_argument("--parent", help="Parent folder ID")
@@ -1711,6 +1852,8 @@ def main():
                 return cmd_files_get(args)
             elif args.files_command == "download":
                 return cmd_files_download(args)
+            elif args.files_command == "export":
+                return cmd_files_export(args)
             elif args.files_command == "upload":
                 return cmd_files_upload(args)
             elif args.files_command == "move":

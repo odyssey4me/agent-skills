@@ -68,6 +68,8 @@ cmd_files_move = google_drive.cmd_files_move
 cmd_files_rename = google_drive.cmd_files_rename
 copy_file = google_drive.copy_file
 cmd_comments_list = google_drive.cmd_comments_list
+cmd_files_export = google_drive.cmd_files_export
+export_file = google_drive.export_file
 delete_file = google_drive.delete_file
 format_comment = google_drive.format_comment
 list_comments = google_drive.list_comments
@@ -2088,3 +2090,361 @@ class TestAdditionalCLICommands:
         exit_code = cmd_files_search(args)
 
         assert exit_code == 0
+
+
+# ============================================================================
+# FILES EXPORT TESTS
+# ============================================================================
+
+
+class TestExportFile:
+    """Tests for export_file helper function."""
+
+    def test_export_file_returns_bytes(self):
+        """Test export_file returns bytes from API."""
+        mock_service = Mock()
+        mock_service.files().export().execute.return_value = b"# Heading\nContent"
+
+        result = export_file(mock_service, "doc123", "text/markdown")
+
+        assert result == b"# Heading\nContent"
+        mock_service.files().export.assert_called_with(fileId="doc123", mimeType="text/markdown")
+
+    def test_export_file_encodes_string_response(self):
+        """Test export_file encodes string responses to bytes."""
+        mock_service = Mock()
+        mock_service.files().export().execute.return_value = "plain text content"
+
+        result = export_file(mock_service, "doc123", "text/plain")
+
+        assert result == b"plain text content"
+
+    def test_export_file_api_error(self):
+        """Test export_file raises on API error."""
+        mock_service = Mock()
+        mock_service.files().export().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+
+        with pytest.raises(DriveAPIError):
+            export_file(mock_service, "doc123", "text/markdown")
+
+    def test_export_file_falls_back_to_export_links(self):
+        """Test export_file retries via exportLinks on size limit exceeded."""
+        mock_service = Mock()
+        mock_service.files().export().execute.side_effect = HttpError(
+            resp=Mock(status=403), content=b"exportSizeLimitExceeded"
+        )
+        mock_service.files().get().execute.return_value = {
+            "exportLinks": {
+                "text/markdown": "https://docs.google.com/export?id=doc123&format=md",
+            }
+        }
+        mock_service._http.request.return_value = (
+            Mock(status=200),
+            b"# Large doc content",
+        )
+
+        result = export_file(mock_service, "doc123", "text/markdown")
+
+        assert result == b"# Large doc content"
+
+    def test_export_file_export_links_missing_mime_type(self):
+        """Test export_file raises when exportLinks lacks requested MIME type."""
+        mock_service = Mock()
+        mock_service.files().export().execute.side_effect = HttpError(
+            resp=Mock(status=403), content=b"exportSizeLimitExceeded"
+        )
+        mock_service.files().get().execute.return_value = {
+            "exportLinks": {
+                "application/pdf": "https://docs.google.com/export?id=doc123&format=pdf",
+            }
+        }
+
+        with pytest.raises(DriveAPIError, match="No exportLink"):
+            export_file(mock_service, "doc123", "text/markdown")
+
+    def test_export_file_export_links_http_error(self):
+        """Test export_file raises on HTTP error from exportLinks download."""
+        mock_service = Mock()
+        mock_service.files().export().execute.side_effect = HttpError(
+            resp=Mock(status=403), content=b"exportSizeLimitExceeded"
+        )
+        mock_service.files().get().execute.return_value = {
+            "exportLinks": {
+                "text/markdown": "https://docs.google.com/export?id=doc123&format=md",
+            }
+        }
+        mock_service._http.request.return_value = (Mock(status=500), b"Server Error")
+
+        with pytest.raises(DriveAPIError, match="HTTP 500"):
+            export_file(mock_service, "doc123", "text/markdown")
+
+
+class TestFilesExport:
+    """Tests for cmd_files_export command."""
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_markdown(self, mock_print, mock_export, mock_get_file, _mock_build):
+        """Test exporting as markdown (default)."""
+        mock_get_file.return_value = {
+            "id": "doc123",
+            "name": "My Doc",
+            "mimeType": "application/vnd.google-apps.document",
+        }
+        mock_export.return_value = b"# Heading\n\nParagraph text"
+
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "markdown"
+        args.lines = None
+        args.output = None
+
+        exit_code = cmd_files_export(args)
+
+        assert exit_code == 0
+        mock_export.assert_called_once()
+        mock_print.assert_called_with("# Heading\n\nParagraph text")
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_text(self, _mock_print, mock_export, mock_get_file, _mock_build):
+        """Test exporting as plain text."""
+        mock_get_file.return_value = {
+            "id": "doc123",
+            "name": "My Doc",
+            "mimeType": "application/vnd.google-apps.document",
+        }
+        mock_export.return_value = b"Plain text content"
+
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "text"
+        args.lines = None
+        args.output = None
+
+        exit_code = cmd_files_export(args)
+
+        assert exit_code == 0
+        mock_export.assert_called_once()
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_with_lines_limit(self, mock_print, mock_export, mock_get_file, _mock_build):
+        """Test exporting with --lines truncation."""
+        mock_get_file.return_value = {
+            "id": "doc123",
+            "name": "My Doc",
+            "mimeType": "application/vnd.google-apps.document",
+        }
+        mock_export.return_value = b"line1\nline2\nline3\nline4\nline5\n"
+
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "text"
+        args.lines = 3
+        args.output = None
+
+        exit_code = cmd_files_export(args)
+
+        assert exit_code == 0
+        mock_print.assert_called_with("line1\nline2\nline3\n")
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_pdf_requires_output(
+        self, _mock_print, mock_export, _mock_get_file, _mock_build
+    ):
+        """Test PDF export fails without --output."""
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "pdf"
+        args.lines = None
+        args.output = None
+
+        exit_code = cmd_files_export(args)
+
+        assert exit_code == 1
+        mock_export.assert_not_called()
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_pdf_with_output(self, _mock_print, mock_export, mock_get_file, _mock_build):
+        """Test PDF export writes to file."""
+        mock_get_file.return_value = {
+            "id": "doc123",
+            "name": "My Doc",
+            "mimeType": "application/vnd.google-apps.document",
+        }
+        mock_export.return_value = b"%PDF-1.4 binary content"
+
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "pdf"
+        args.lines = None
+        args.output = "/tmp/test_export.pdf"
+
+        with patch("builtins.open", create=True):
+            exit_code = cmd_files_export(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch("builtins.print")
+    def test_export_non_google_file_fails(self, _mock_print, mock_get_file, _mock_build):
+        """Test export fails for non-Google Workspace files."""
+        mock_get_file.return_value = {
+            "id": "file123",
+            "name": "photo.jpg",
+            "mimeType": "image/jpeg",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.format = "markdown"
+        args.lines = None
+        args.output = None
+
+        exit_code = cmd_files_export(args)
+
+        assert exit_code == 1
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_text_to_output_file(self, _mock_print, mock_export, mock_get_file, _mock_build):
+        """Test text export writes to file when --output specified."""
+        mock_get_file.return_value = {
+            "id": "doc123",
+            "name": "My Doc",
+            "mimeType": "application/vnd.google-apps.document",
+        }
+        mock_export.return_value = b"exported content"
+
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "text"
+        args.lines = None
+        args.output = "/tmp/test_export.txt"
+
+        with patch("builtins.open", create=True):
+            exit_code = cmd_files_export(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_large_file_warning(self, mock_print, mock_export, mock_get_file, _mock_build):
+        """Test that large files produce a size warning on stderr."""
+        mock_get_file.return_value = {
+            "id": "doc123",
+            "name": "Huge Doc",
+            "mimeType": "application/vnd.google-apps.document",
+            "quotaBytesUsed": str(6 * 1024 * 1024),
+        }
+        mock_export.return_value = b"content"
+
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "markdown"
+        args.lines = None
+        args.output = None
+
+        exit_code = cmd_files_export(args)
+
+        assert exit_code == 0
+        stderr_calls = [c for c in mock_print.call_args_list if c.kwargs.get("file") is not None]
+        assert any("large" in str(c).lower() for c in stderr_calls)
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_small_file_no_warning(
+        self, mock_print, mock_export, mock_get_file, _mock_build
+    ):
+        """Test that small files do not produce a size warning."""
+        mock_get_file.return_value = {
+            "id": "doc123",
+            "name": "Small Doc",
+            "mimeType": "application/vnd.google-apps.document",
+            "quotaBytesUsed": str(100 * 1024),
+        }
+        mock_export.return_value = b"content"
+
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "markdown"
+        args.lines = None
+        args.output = None
+
+        exit_code = cmd_files_export(args)
+
+        assert exit_code == 0
+        stderr_calls = [c for c in mock_print.call_args_list if c.kwargs.get("file") is not None]
+        assert not any("large" in str(c).lower() for c in stderr_calls)
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_empty_content_fails(self, mock_print, mock_export, mock_get_file, _mock_build):
+        """Test that empty export content returns error."""
+        mock_get_file.return_value = {
+            "id": "doc123",
+            "name": "Empty Doc",
+            "mimeType": "application/vnd.google-apps.document",
+        }
+        mock_export.return_value = b""
+
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "markdown"
+        args.lines = None
+        args.output = None
+
+        exit_code = cmd_files_export(args)
+
+        assert exit_code == 1
+        stderr_calls = [c for c in mock_print.call_args_list if c.kwargs.get("file") is not None]
+        assert any("empty" in str(c).lower() for c in stderr_calls)
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_file_metadata")
+    @patch.object(google_drive, "export_file")
+    @patch("builtins.print")
+    def test_export_whitespace_only_content_fails(
+        self, _mock_print, mock_export, mock_get_file, _mock_build
+    ):
+        """Test that whitespace-only export content returns error."""
+        mock_get_file.return_value = {
+            "id": "doc123",
+            "name": "Blank Doc",
+            "mimeType": "application/vnd.google-apps.document",
+        }
+        mock_export.return_value = b"   \n\n  "
+
+        args = Mock()
+        args.file_id = "doc123"
+        args.format = "markdown"
+        args.lines = None
+        args.output = None
+
+        exit_code = cmd_files_export(args)
+
+        assert exit_code == 1

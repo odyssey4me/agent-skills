@@ -122,7 +122,34 @@ $SKILL_DIR/scripts/google-drive.py files download FILE_ID -o ./downloaded-file.p
 - `file_id`: The file ID (required)
 - `--output`, `-o`: Output file path (required)
 
-**Note:** Google Docs, Sheets, and Slides cannot be downloaded directly. Use the Google Drive web interface to export them.
+**Note:** Google Docs, Sheets, and Slides cannot be downloaded directly. Use `files export` instead.
+
+## files export
+
+Export Google Docs, Sheets, or Slides to markdown, plain text, or PDF.
+
+```bash
+# Export as markdown (default)
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID
+
+# Export as plain text
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID --format text
+
+# Export first 50 lines only
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID --format text --lines 50
+
+# Export as PDF to a file
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID --format pdf --output ./doc.pdf
+
+# Export markdown to a file
+$SKILL_DIR/scripts/google-drive.py files export FILE_ID -o ./doc.md
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `--format`, `-f`: Export format — `markdown` (default), `text`, or `pdf`
+- `--lines`, `-n`: Maximum number of lines to output (markdown/text only)
+- `--output`, `-o`: Output file path (required for pdf, optional for markdown/text)
 
 ## files upload
 
