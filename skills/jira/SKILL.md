@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.4.0"
+  version: "0.5.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -85,7 +85,9 @@ defaults:
   security_level: "Red Hat Internal"
   max_results: 25
   fields: ["summary", "status", "assignee", "priority", "created"]
-  story_points_field: "customfield_10028"  # Instance-specific field ID
+  custom_fields:
+    story_points: "customfield_10028"
+    assigned_team: "customfield_12345"
 
 # Optional project-specific defaults
 projects:
@@ -103,6 +105,12 @@ projects:
 - **JQL scope** is prepended to all searches: `(scope) AND (your_query)`
 - **Security level** applies to comments and transitions with comments
 - **Project defaults** apply when creating issues in that project
+- **Custom fields** map friendly names to instance-specific custom field IDs.
+  These fields are automatically included in API requests and displayed in
+  formatted output. If a mapping is not configured, the skill auto-discovers
+  the field ID from the Jira API and saves it to the config file.
+  Use `--set-field NAME=VALUE` on `issue create` and `issue update` to set
+  custom field values using the friendly name.
 
 ### View Configuration
 
@@ -202,8 +210,14 @@ $SKILL_DIR/scripts/jira.py issue comments DEMO-123 --max-results 10
 # Create new issue
 $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task"
 
+# Create issue with custom fields
+$SKILL_DIR/scripts/jira.py issue create --project DEMO --type Story --summary "New story" --set-field story_points=5
+
 # Update issue
 $SKILL_DIR/scripts/jira.py issue update DEMO-123 --summary "Updated summary"
+
+# Update custom fields
+$SKILL_DIR/scripts/jira.py issue update DEMO-123 --set-field assigned_team="Platform Team"
 
 # Add comment
 $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
@@ -247,12 +261,21 @@ $SKILL_DIR/scripts/jira.py config show
 
 # Show project-specific defaults
 $SKILL_DIR/scripts/jira.py config show --project DEMO
+
+# Discover and save a custom field mapping
+$SKILL_DIR/scripts/jira.py config discover story_points
+$SKILL_DIR/scripts/jira.py config discover security_level
 ```
 
 This displays:
 - Authentication settings (with masked token)
 - Default JQL scope, security level, max results, and fields
 - Project-specific defaults for issue type and priority
+
+**`config discover`** takes a snake_case friendly name, queries the Jira API
+for a matching field (underscores become spaces for matching, case-insensitive),
+and saves the mapping to `~/.config/agent-skills/jira.yaml` under
+`defaults.custom_fields`.
 
 ### fields
 

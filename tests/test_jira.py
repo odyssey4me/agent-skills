@@ -34,6 +34,7 @@ from skills.jira.scripts.jira import (
     create_issue,
     delete_credential,
     detect_deployment_type,
+    discover_custom_field,
     do_transition,
     ensure_field_included,
     extract_contributors,
@@ -59,6 +60,8 @@ from skills.jira.scripts.jira import (
     list_status_categories,
     list_statuses,
     load_config,
+    resolve_custom_field,
+    resolve_or_discover_field,
     resolve_user,
     resolve_user_for_jql,
     save_config,
@@ -66,6 +69,7 @@ from skills.jira.scripts.jira import (
     search_issues,
     set_credential,
     update_issue,
+    validate_custom_fields,
 )
 
 
@@ -462,8 +466,8 @@ class TestFormatting:
         assert "- **Assignee:** Alice" in result
         assert "- **Assignee:** Unassigned" in result
 
-    def test_format_issue_with_story_points(self):
-        """Test issue formatting includes story points when configured."""
+    def test_format_issue_with_custom_fields(self):
+        """Test issue formatting includes custom fields when configured."""
         issue = {
             "key": "DEMO-123",
             "fields": {
@@ -475,12 +479,12 @@ class TestFormatting:
             },
         }
 
-        result = format_issue(issue, story_points_field="customfield_10028")
+        result = format_issue(issue, custom_fields={"story_points": "customfield_10028"})
 
         assert "- **Story Points:** 5" in result
 
-    def test_format_issue_with_fractional_story_points(self):
-        """Test issue formatting preserves fractional story points."""
+    def test_format_issue_with_fractional_custom_field(self):
+        """Test issue formatting preserves fractional custom field values."""
         issue = {
             "key": "DEMO-123",
             "fields": {
@@ -492,12 +496,12 @@ class TestFormatting:
             },
         }
 
-        result = format_issue(issue, story_points_field="customfield_10028")
+        result = format_issue(issue, custom_fields={"story_points": "customfield_10028"})
 
         assert "- **Story Points:** 0.5" in result
 
-    def test_format_issue_without_story_points_field(self):
-        """Test story points omitted when field not configured."""
+    def test_format_issue_without_custom_fields(self):
+        """Test custom fields omitted when not configured."""
         issue = {
             "key": "DEMO-123",
             "fields": {
@@ -512,8 +516,8 @@ class TestFormatting:
 
         assert "Story Points" not in result
 
-    def test_format_issue_story_points_none(self):
-        """Test story points omitted when field value is None."""
+    def test_format_issue_custom_field_none_value(self):
+        """Test custom fields omitted when field value is None."""
         issue = {
             "key": "DEMO-123",
             "fields": {
@@ -525,12 +529,37 @@ class TestFormatting:
             },
         }
 
-        result = format_issue(issue, story_points_field="customfield_10028")
+        result = format_issue(issue, custom_fields={"story_points": "customfield_10028"})
 
         assert "Story Points" not in result
 
-    def test_format_issues_list_with_story_points(self):
-        """Test list formatting includes story points when configured."""
+    def test_format_issue_multiple_custom_fields(self):
+        """Test issue formatting with multiple custom fields."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test",
+                "status": {"name": "Open"},
+                "assignee": None,
+                "priority": None,
+                "customfield_10028": 3.0,
+                "customfield_12345": {"value": "Platform"},
+            },
+        }
+
+        result = format_issue(
+            issue,
+            custom_fields={
+                "story_points": "customfield_10028",
+                "assigned_team": "customfield_12345",
+            },
+        )
+
+        assert "- **Story Points:** 3" in result
+        assert "- **Assigned Team:** Platform" in result
+
+    def test_format_issues_list_with_custom_fields(self):
+        """Test list formatting includes custom fields when configured."""
         issues = [
             {
                 "key": "DEMO-1",
@@ -551,7 +580,7 @@ class TestFormatting:
             },
         ]
 
-        result = format_issues_list(issues, story_points_field="customfield_10028")
+        result = format_issues_list(issues, custom_fields={"story_points": "customfield_10028"})
 
         assert "- **Story Points:** 3" in result
         assert result.count("Story Points") == 1
@@ -579,6 +608,153 @@ class TestEnsureFieldIncluded:
         assert "customfield_10028" in result
         assert "summary" in result
         assert "status" in result
+
+
+class TestCustomFieldResolution:
+    """Tests for custom field resolution and discovery."""
+
+    def test_resolve_custom_field_found(self):
+        """Test resolving a configured custom field."""
+        result = resolve_custom_field("story_points", {"story_points": "customfield_10028"})
+        assert result == "customfield_10028"
+
+    def test_resolve_custom_field_display_name(self):
+        """Test resolving with display name normalizes to snake_case key."""
+        result = resolve_custom_field("Story Points", {"story_points": "customfield_10028"})
+        assert result == "customfield_10028"
+
+    def test_resolve_custom_field_not_found(self):
+        """Test resolving an unconfigured custom field."""
+        result = resolve_custom_field("unknown", {"story_points": "customfield_10028"})
+        assert result is None
+
+    def test_resolve_custom_field_none_mapping(self):
+        """Test resolving with no custom fields configured."""
+        result = resolve_custom_field("story_points", None)
+        assert result is None
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_discover_custom_field_single_match(self, mock_list_fields):
+        """Test discovering a field with exactly one match."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_10028", "name": "Story Points", "custom": True},
+            {"id": "summary", "name": "Summary", "custom": False},
+        ]
+        result = discover_custom_field("story_points")
+        assert result == "customfield_10028"
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_discover_custom_field_no_match(self, mock_list_fields):
+        """Test discovering a field with no matches."""
+        mock_list_fields.return_value = [
+            {"id": "summary", "name": "Summary", "custom": False},
+        ]
+        result = discover_custom_field("story_points")
+        assert result is None
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_discover_custom_field_multiple_matches(self, mock_list_fields):
+        """Test discovering a field with multiple matches returns None."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_10028", "name": "Story Points", "custom": True},
+            {"id": "customfield_20028", "name": "Story Points", "custom": True},
+        ]
+        result = discover_custom_field("story_points")
+        assert result is None
+
+    @patch("skills.jira.scripts.jira.save_config")
+    @patch("skills.jira.scripts.jira.load_config")
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_resolve_or_discover_saves_to_config(
+        self, mock_list_fields, mock_load_config, mock_save_config
+    ):
+        """Test resolve_or_discover saves discovered mapping to config."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_10028", "name": "Story Points", "custom": True},
+        ]
+        mock_load_config.return_value = {"defaults": {}}
+
+        result = resolve_or_discover_field("story_points", None)
+
+        assert result == "customfield_10028"
+        mock_save_config.assert_called_once()
+        saved_config = mock_save_config.call_args[0][1]
+        assert saved_config["defaults"]["custom_fields"]["story_points"] == "customfield_10028"
+
+    @patch("skills.jira.scripts.jira.save_config")
+    @patch("skills.jira.scripts.jira.load_config")
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_resolve_or_discover_normalizes_display_name(
+        self, mock_list_fields, mock_load_config, mock_save_config
+    ):
+        """Test resolve_or_discover normalizes display name to snake_case key."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_10028", "name": "Story Points", "custom": True},
+        ]
+        mock_load_config.return_value = {"defaults": {}}
+
+        result = resolve_or_discover_field("Story Points", None)
+
+        assert result == "customfield_10028"
+        saved_config = mock_save_config.call_args[0][1]
+        assert "story_points" in saved_config["defaults"]["custom_fields"]
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_validate_custom_fields_all_valid(self, mock_list_fields):
+        """Test validation passes when all fields exist."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_10028", "name": "Story Points"},
+            {"id": "customfield_12345", "name": "Assigned Team"},
+        ]
+        errors = validate_custom_fields(
+            {
+                "story_points": "customfield_10028",
+                "assigned_team": "customfield_12345",
+            }
+        )
+        assert errors == []
+
+    @patch("skills.jira.scripts.jira.list_fields")
+    def test_validate_custom_fields_invalid(self, mock_list_fields):
+        """Test validation catches missing fields."""
+        mock_list_fields.return_value = [
+            {"id": "customfield_10028", "name": "Story Points"},
+        ]
+        errors = validate_custom_fields(
+            {
+                "story_points": "customfield_10028",
+                "assigned_team": "customfield_99999",
+            }
+        )
+        assert len(errors) == 1
+        assert "assigned_team" in errors[0]
+
+
+class TestJiraDefaultsBackwardCompat:
+    """Tests for backward compatibility of story_points_field config."""
+
+    def test_story_points_field_migrated_to_custom_fields(self):
+        """Test old story_points_field config is migrated."""
+        config = {"defaults": {"story_points_field": "customfield_10028"}}
+        defaults = JiraDefaults.from_config(config)
+        assert defaults.custom_fields == {"story_points": "customfield_10028"}
+
+    def test_custom_fields_takes_precedence(self):
+        """Test custom_fields entry takes precedence over story_points_field."""
+        config = {
+            "defaults": {
+                "story_points_field": "customfield_OLD",
+                "custom_fields": {"story_points": "customfield_NEW"},
+            }
+        }
+        defaults = JiraDefaults.from_config(config)
+        assert defaults.custom_fields["story_points"] == "customfield_NEW"
+
+    def test_no_custom_fields_returns_none(self):
+        """Test no custom fields configured returns None."""
+        config = {"defaults": {"max_results": 25}}
+        defaults = JiraDefaults.from_config(config)
+        assert defaults.custom_fields is None
 
 
 class TestApiOperations:
@@ -1418,6 +1594,242 @@ class TestCommandHandlers:
         assert "Project Defaults for DEMO" in captured.out
         assert "Task" in captured.out
         assert "High" in captured.out
+
+    @patch("skills.jira.scripts.jira.resolve_or_discover_field")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_config_discover_found(self, mock_defaults, mock_resolve, capsys):
+        """Test config discover when field is found."""
+        mock_defaults.return_value = JiraDefaults(custom_fields={})
+        mock_resolve.return_value = "customfield_10028"
+
+        args = argparse.Namespace(
+            config_command="discover",
+            field_name="story_points",
+        )
+        result = cmd_config(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "story_points -> customfield_10028" in captured.out
+        mock_resolve.assert_called_once_with("story_points", {})
+
+    @patch("skills.jira.scripts.jira.resolve_or_discover_field")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_config_discover_not_found(self, mock_defaults, mock_resolve, capsys):
+        """Test config discover when field is not found."""
+        mock_defaults.return_value = JiraDefaults(custom_fields={})
+        mock_resolve.return_value = None
+
+        args = argparse.Namespace(
+            config_command="discover",
+            field_name="nonexistent_field",
+        )
+        result = cmd_config(args)
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Could not resolve field" in captured.out
+
+    @patch("skills.jira.scripts.jira.load_config")
+    def test_cmd_config_show_custom_fields(self, mock_load, capsys):
+        """Test config show displays custom fields."""
+        mock_load.return_value = {
+            "url": "https://example.atlassian.net",
+            "defaults": {
+                "custom_fields": {
+                    "story_points": "customfield_10028",
+                    "security_level": "customfield_10030",
+                }
+            },
+        }
+        args = argparse.Namespace(config_command="show", project=None)
+        result = cmd_config(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Custom Fields:" in captured.out
+        assert "story_points: customfield_10028" in captured.out
+        assert "security_level: customfield_10030" in captured.out
+
+    @patch("skills.jira.scripts.jira.load_config")
+    @patch("skills.jira.scripts.jira.resolve_or_discover_field")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.create_issue")
+    def test_cmd_issue_create_with_set_field(
+        self, mock_create, mock_proj_defaults, mock_defaults, mock_resolve, mock_load
+    ):
+        """Test issue create with --set-field."""
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_defaults.return_value = JiraDefaults(custom_fields={})
+        mock_resolve.return_value = "customfield_10028"
+        mock_load.return_value = {
+            "defaults": {"custom_fields": {"story_points": "customfield_10028"}}
+        }
+        mock_create.return_value = {"key": "DEMO-123"}
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project="DEMO",
+            issue_type="Task",
+            summary="Test",
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            set_field=["story_points=5"],
+        )
+        result = cmd_issue(args)
+
+        assert result == 0
+        mock_create.assert_called_once()
+        call_kwargs = mock_create.call_args
+        assert call_kwargs[1]["extra_fields"] == {"customfield_10028": "5"}
+
+    @patch("skills.jira.scripts.jira.load_config")
+    @patch("skills.jira.scripts.jira.resolve_or_discover_field")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.update_issue")
+    def test_cmd_issue_update_with_set_field(
+        self, mock_update, mock_defaults, mock_resolve, mock_load
+    ):
+        """Test issue update with --set-field."""
+        mock_defaults.return_value = JiraDefaults(custom_fields={})
+        mock_resolve.return_value = "customfield_12345"
+        mock_load.return_value = {
+            "defaults": {"custom_fields": {"assigned_team": "customfield_12345"}}
+        }
+        mock_update.return_value = {}
+
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            set_field=["assigned_team=Platform Team"],
+        )
+        result = cmd_issue(args)
+
+        assert result == 0
+        mock_update.assert_called_once()
+        call_kwargs = mock_update.call_args
+        assert call_kwargs[1]["extra_fields"] == {"customfield_12345": "Platform Team"}
+
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_create_set_field_bad_format(self, mock_defaults, capsys):
+        """Test issue create with badly formatted --set-field."""
+        mock_defaults.return_value = JiraDefaults(custom_fields={})
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project="DEMO",
+            issue_type="Task",
+            summary="Test",
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            set_field=["bad_format"],
+        )
+        result = cmd_issue(args)
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "NAME=VALUE" in captured.err
+
+    @patch("skills.jira.scripts.jira.validate_custom_fields")
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.get_api_version")
+    @patch("skills.jira.scripts.jira.detect_deployment_type")
+    @patch("skills.jira.scripts.jira.get_credentials")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_check_custom_fields_ok(
+        self,
+        mock_defaults,
+        mock_creds,
+        mock_detect,
+        mock_api_version,
+        mock_is_cloud,
+        mock_post,
+        mock_scriptrunner,
+        mock_validate,
+        capsys,
+    ):
+        """Test check command with valid custom fields."""
+        mock_defaults.return_value = JiraDefaults(
+            custom_fields={"story_points": "customfield_10028"}
+        )
+        mock_creds.return_value = Credentials(
+            url="https://example.atlassian.net", email="test@test.com", token="tok"
+        )
+        mock_detect.return_value = ("cloud", "3")
+        mock_api_version.return_value = "2"
+        mock_is_cloud.return_value = True
+        mock_post.return_value = {"issues": []}
+        mock_scriptrunner.return_value = {"available": False}
+        mock_validate.return_value = []
+
+        result = cmd_check()
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "story_points: customfield_10028 (OK)" in captured.out
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.format_issues_list")
+    def test_cmd_search_includes_custom_fields(self, mock_format, mock_defaults, mock_search):
+        """Test search command includes custom field IDs in requested fields."""
+        mock_defaults.return_value = JiraDefaults(
+            custom_fields={"story_points": "customfield_10028"}
+        )
+        mock_search.return_value = []
+        mock_format.return_value = ""
+
+        args = argparse.Namespace(
+            jql="project = DEMO",
+            contributor=None,
+            max_results=None,
+            fields=None,
+            json=False,
+        )
+        cmd_search(args)
+
+        call_args = mock_search.call_args
+        fields = call_args[0][2]
+        assert "customfield_10028" in fields
+
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.format_issue")
+    def test_cmd_issue_get_includes_custom_fields(self, mock_format, mock_defaults, mock_get_issue):
+        """Test issue get command includes custom field IDs in requested fields."""
+        mock_defaults.return_value = JiraDefaults(
+            custom_fields={"story_points": "customfield_10028"}
+        )
+        mock_get_issue.return_value = {"key": "DEMO-123", "fields": {}}
+        mock_format.return_value = ""
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-123",
+            fields=None,
+            json=False,
+            contributors=False,
+        )
+        cmd_issue(args)
+
+        call_args = mock_get_issue.call_args
+        fields = call_args[1]["fields"]
+        assert "customfield_10028" in fields
 
     @patch("skills.jira.scripts.jira.create_issue")
     @patch("skills.jira.scripts.jira.get_project_defaults")

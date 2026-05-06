@@ -132,7 +132,7 @@ class JiraDefaults:
     security_level: str | None = None
     max_results: int | None = None
     fields: list[str] | None = None
-    story_points_field: str | None = None
+    custom_fields: dict[str, str] | None = None
 
     @staticmethod
     def from_config(config: dict[str, Any]) -> JiraDefaults:
@@ -145,12 +145,18 @@ class JiraDefaults:
             JiraDefaults object with available values.
         """
         defaults_dict = config.get("defaults", {})
+        custom_fields = dict(defaults_dict.get("custom_fields") or {})
+
+        # Backward compat: migrate story_points_field to custom_fields
+        if defaults_dict.get("story_points_field") and "story_points" not in custom_fields:
+            custom_fields["story_points"] = defaults_dict["story_points_field"]
+
         return JiraDefaults(
             jql_scope=defaults_dict.get("jql_scope"),
             security_level=defaults_dict.get("security_level"),
             max_results=defaults_dict.get("max_results"),
             fields=defaults_dict.get("fields"),
-            story_points_field=defaults_dict.get("story_points_field"),
+            custom_fields=custom_fields or None,
         )
 
 
@@ -996,12 +1002,114 @@ def ensure_field_included(fields: list[str] | None, field: str) -> list[str]:
     return fields
 
 
-def format_issue(issue: dict[str, Any], story_points_field: str | None = None) -> str:
+def _normalize_field_name(name: str) -> str:
+    """Normalize a field name to snake_case for use as a config key."""
+    return name.strip().lower().replace(" ", "_")
+
+
+def resolve_custom_field(
+    friendly_name: str,
+    custom_fields: dict[str, str] | None,
+) -> str | None:
+    """Look up a custom field ID from the configured mapping."""
+    if custom_fields:
+        key = _normalize_field_name(friendly_name)
+        return custom_fields.get(key)
+    return None
+
+
+def discover_custom_field(friendly_name: str) -> str | None:
+    """Discover a custom field ID by querying the Jira fields endpoint.
+
+    Searches for a field whose name matches the friendly name
+    (case-insensitive, spaces/underscores interchangeable).
+
+    Returns the field ID if exactly one match is found, None otherwise.
+    """
+    search_name = _normalize_field_name(friendly_name)
+    all_fields = list_fields()
+    matches = [f for f in all_fields if _normalize_field_name(f.get("name", "")) == search_name]
+
+    if len(matches) == 1:
+        field_id = matches[0].get("id", matches[0].get("fieldId"))
+        field_name = matches[0].get("name")
+        print(f"Discovered field: {friendly_name} -> {field_id} ({field_name})")
+        return field_id
+
+    if len(matches) > 1:
+        print(f"Multiple fields match '{friendly_name}':", file=sys.stderr)
+        for m in matches:
+            print(f"  {m.get('id', m.get('fieldId'))}: {m.get('name')}", file=sys.stderr)
+        return None
+
+    print(f"No field found matching '{friendly_name}'", file=sys.stderr)
+    return None
+
+
+def resolve_or_discover_field(
+    friendly_name: str,
+    custom_fields: dict[str, str] | None,
+) -> str | None:
+    """Resolve a custom field ID, discovering and saving it if needed."""
+    field_id = resolve_custom_field(friendly_name, custom_fields)
+    if field_id:
+        return field_id
+
+    field_id = discover_custom_field(friendly_name)
+    if not field_id:
+        return None
+
+    key = _normalize_field_name(friendly_name)
+    config = load_config("jira") or {}
+    defaults = config.setdefault("defaults", {})
+    cf = defaults.setdefault("custom_fields", {})
+    cf[key] = field_id
+    save_config("jira", config)
+    print(f"Saved mapping: {key} -> {field_id} in ~/.config/agent-skills/jira.yaml")
+    return field_id
+
+
+def validate_custom_fields(custom_fields: dict[str, str]) -> list[str]:
+    """Validate that all configured custom field IDs exist in Jira.
+
+    Returns a list of error messages for fields that don't exist.
+    """
+    all_fields = list_fields()
+    known_ids = {f.get("id", f.get("fieldId")) for f in all_fields}
+    errors = []
+    for friendly_name, field_id in custom_fields.items():
+        if field_id not in known_ids:
+            errors.append(f"  {friendly_name}: {field_id} (not found in Jira)")
+    return errors
+
+
+def _format_custom_field_value(value: Any) -> str:
+    """Format a custom field value for display."""
+    if isinstance(value, float) and value == int(value):
+        return str(int(value))
+    if isinstance(value, dict):
+        return value.get("value", value.get("name", str(value)))
+    return str(value)
+
+
+def _append_custom_fields(text: str, fields: dict, custom_fields: dict[str, str] | None) -> str:
+    """Append configured custom field values to formatted output."""
+    if not custom_fields:
+        return text
+    for friendly_name, field_id in custom_fields.items():
+        value = fields.get(field_id)
+        if value is not None:
+            label = friendly_name.replace("_", " ").title()
+            text += f"\n- **{label}:** {_format_custom_field_value(value)}"
+    return text
+
+
+def format_issue(issue: dict[str, Any], custom_fields: dict[str, str] | None = None) -> str:
     """Format a Jira issue for display.
 
     Args:
         issue: Jira issue dictionary.
-        story_points_field: Custom field ID for story points (e.g. "customfield_10028").
+        custom_fields: Mapping of friendly names to custom field IDs.
 
     Returns:
         Formatted issue string.
@@ -1022,21 +1130,17 @@ def format_issue(issue: dict[str, Any], story_points_field: str | None = None) -
         f"- **Priority:** {priority_name}"
     )
 
-    if story_points_field:
-        story_points = fields.get(story_points_field)
-        if story_points is not None:
-            sp_display = int(story_points) if story_points == int(story_points) else story_points
-            result += f"\n- **Story Points:** {sp_display}"
-
-    return result
+    return _append_custom_fields(result, fields, custom_fields)
 
 
-def format_issues_list(issues: list[dict[str, Any]], story_points_field: str | None = None) -> str:
+def format_issues_list(
+    issues: list[dict[str, Any]], custom_fields: dict[str, str] | None = None
+) -> str:
     """Format a list of Jira issues for display.
 
     Args:
         issues: List of Jira issue dictionaries.
-        story_points_field: Custom field ID for story points (e.g. "customfield_10028").
+        custom_fields: Mapping of friendly names to custom field IDs.
 
     Returns:
         Formatted table string.
@@ -1053,13 +1157,7 @@ def format_issues_list(issues: list[dict[str, Any]], story_points_field: str | N
         status = fields.get("status", {}).get("name", "Unknown")
         assignee_name = assignee.get("displayName", "Unassigned") if assignee else "Unassigned"
         entry = f"### {key}: {summary}\n- **Status:** {status}\n- **Assignee:** {assignee_name}"
-        if story_points_field:
-            story_points = fields.get(story_points_field)
-            if story_points is not None:
-                sp_display = (
-                    int(story_points) if story_points == int(story_points) else story_points
-                )
-                entry += f"\n- **Story Points:** {sp_display}"
+        entry = _append_custom_fields(entry, fields, custom_fields)
         parts.append(entry)
 
     return "\n\n".join(parts)
@@ -1226,6 +1324,7 @@ def create_issue(
     priority: str | None = None,
     labels: list[str] | None = None,
     assignee: str | None = None,
+    extra_fields: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create a new issue.
 
@@ -1237,6 +1336,7 @@ def create_issue(
         priority: Priority name.
         labels: List of labels.
         assignee: Assignee account ID.
+        extra_fields: Additional fields keyed by field ID.
 
     Returns:
         Created issue dictionary.
@@ -1259,6 +1359,9 @@ def create_issue(
     if assignee:
         fields["assignee"] = {"accountId": assignee}
 
+    if extra_fields:
+        fields.update(extra_fields)
+
     response = post("jira", api_path("issue"), {"fields": fields})
     if isinstance(response, dict):
         return response
@@ -1272,6 +1375,7 @@ def update_issue(
     priority: str | None = None,
     labels: list[str] | None = None,
     assignee: str | None = None,
+    extra_fields: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Update an existing issue.
 
@@ -1282,6 +1386,7 @@ def update_issue(
         priority: New priority name.
         labels: New labels.
         assignee: New assignee account ID.
+        extra_fields: Additional fields keyed by field ID.
 
     Returns:
         Response dictionary (empty on success).
@@ -1302,6 +1407,9 @@ def update_issue(
 
     if assignee:
         fields["assignee"] = {"accountId": assignee}
+
+    if extra_fields:
+        fields.update(extra_fields)
 
     if not fields:
         return {}
@@ -1927,6 +2035,21 @@ def cmd_check() -> int:
     except Exception as e:
         print(f"   WARNING: Could not check ScriptRunner: {e}")
 
+    # 5. Validate custom field mappings
+    defaults = get_jira_defaults()
+    if defaults.custom_fields:
+        print("\n5. Validating custom field mappings...")
+        errors = validate_custom_fields(defaults.custom_fields)
+        if errors:
+            print("   WARNING: Some custom field mappings are invalid:")
+            for err in errors:
+                print(f"   {err}")
+            print("   Update custom_fields in ~/.config/agent-skills/jira.yaml")
+        else:
+            for name, fid in defaults.custom_fields.items():
+                print(f"   {name}: {fid} (OK)")
+            print("   Custom fields: OK")
+
     print()
     print("All checks passed!")
     print("\nYou can now use commands like:")
@@ -1947,7 +2070,7 @@ def cmd_search(args: argparse.Namespace) -> int:
     try:
         # Load defaults
         defaults = get_jira_defaults()
-        story_points_field = defaults.story_points_field
+        custom_fields = defaults.custom_fields or {}
 
         contributor = getattr(args, "contributor", None)
         jql = getattr(args, "jql", None)
@@ -1969,8 +2092,8 @@ def cmd_search(args: argparse.Namespace) -> int:
         else:
             fields = None
 
-        if story_points_field:
-            fields = ensure_field_included(fields, story_points_field)
+        for field_id in custom_fields.values():
+            fields = ensure_field_included(fields, field_id)
 
         if contributor:
             project = getattr(args, "project", None)
@@ -1983,7 +2106,7 @@ def cmd_search(args: argparse.Namespace) -> int:
         if args.json:
             print(format_json(issues))
         else:
-            print(format_issues_list(issues, story_points_field=story_points_field))
+            print(format_issues_list(issues, custom_fields=custom_fields))
 
         return 0
 
@@ -1998,7 +2121,7 @@ def cmd_issue(args: argparse.Namespace) -> int:
         if args.issue_command == "get":
             # Load defaults and apply fields
             defaults = get_jira_defaults()
-            story_points_field = defaults.story_points_field
+            custom_fields = defaults.custom_fields or {}
             if args.fields:
                 fields = args.fields.split(",")
             elif defaults.fields:
@@ -2006,8 +2129,8 @@ def cmd_issue(args: argparse.Namespace) -> int:
             else:
                 fields = None
 
-            if story_points_field:
-                fields = ensure_field_included(fields, story_points_field)
+            for field_id in custom_fields.values():
+                fields = ensure_field_included(fields, field_id)
 
             issue = get_issue(args.issue_key, fields=fields)
 
@@ -2018,13 +2141,13 @@ def cmd_issue(args: argparse.Namespace) -> int:
                     issue["_contributors"] = sorted(contributor_names)
                     print(format_json(issue))
                 else:
-                    output = format_issue(issue, story_points_field=story_points_field)
+                    output = format_issue(issue, custom_fields=custom_fields)
                     output += f"\n- **Contributors:** {', '.join(sorted(contributor_names))}"
                     print(output)
             elif args.json:
                 print(format_json(issue))
             else:
-                print(format_issue(issue, story_points_field=story_points_field))
+                print(format_issue(issue, custom_fields=custom_fields))
 
         elif args.issue_command == "comments":
             max_results = getattr(args, "max_results", 50) or 50
@@ -2036,6 +2159,7 @@ def cmd_issue(args: argparse.Namespace) -> int:
 
         elif args.issue_command == "create":
             # Load project-specific defaults
+            defaults = get_jira_defaults()
             project_defaults = get_project_defaults(args.project)
 
             # Apply defaults with CLI precedence
@@ -2046,6 +2170,27 @@ def cmd_issue(args: argparse.Namespace) -> int:
                 print("Error: --type is required (no project default configured)", file=sys.stderr)
                 return 1
 
+            # Resolve --set-field values to field IDs
+            extra_fields = {}
+            custom_fields = defaults.custom_fields or {}
+            for pair in getattr(args, "set_field", None) or []:
+                if "=" not in pair:
+                    print(
+                        f"Error: --set-field requires NAME=VALUE format, got: {pair}",
+                        file=sys.stderr,
+                    )
+                    return 1
+                name, value = pair.split("=", 1)
+                field_id = resolve_or_discover_field(name, custom_fields)
+                if not field_id:
+                    print(f"Error: could not resolve field '{name}'", file=sys.stderr)
+                    return 1
+                extra_fields[field_id] = value
+                # Update custom_fields in case it was just discovered
+                custom_fields = (
+                    (load_config("jira") or {}).get("defaults", {}).get("custom_fields", {})
+                )
+
             labels = args.labels.split(",") if args.labels else None
             issue = create_issue(
                 project=args.project,
@@ -2055,6 +2200,7 @@ def cmd_issue(args: argparse.Namespace) -> int:
                 priority=priority,
                 labels=labels,
                 assignee=args.assignee,
+                extra_fields=extra_fields or None,
             )
             if args.json:
                 print(format_json(issue))
@@ -2062,6 +2208,27 @@ def cmd_issue(args: argparse.Namespace) -> int:
                 print(f"Created issue: {issue.get('key', 'N/A')}")
 
         elif args.issue_command == "update":
+            # Resolve --set-field values to field IDs
+            defaults = get_jira_defaults()
+            extra_fields = {}
+            custom_fields = defaults.custom_fields or {}
+            for pair in getattr(args, "set_field", None) or []:
+                if "=" not in pair:
+                    print(
+                        f"Error: --set-field requires NAME=VALUE format, got: {pair}",
+                        file=sys.stderr,
+                    )
+                    return 1
+                name, value = pair.split("=", 1)
+                field_id = resolve_or_discover_field(name, custom_fields)
+                if not field_id:
+                    print(f"Error: could not resolve field '{name}'", file=sys.stderr)
+                    return 1
+                extra_fields[field_id] = value
+                custom_fields = (
+                    (load_config("jira") or {}).get("defaults", {}).get("custom_fields", {})
+                )
+
             labels = args.labels.split(",") if args.labels else None
             update_issue(
                 issue_key=args.issue_key,
@@ -2070,6 +2237,7 @@ def cmd_issue(args: argparse.Namespace) -> int:
                 priority=args.priority,
                 labels=labels,
                 assignee=args.assignee,
+                extra_fields=extra_fields or None,
             )
             print(f"Updated issue: {args.issue_key}")
 
@@ -2159,7 +2327,12 @@ def cmd_config(args: argparse.Namespace) -> int:
             print(
                 f"  Fields: {', '.join(defaults.fields) if defaults.fields else 'Not configured'}"
             )
-            print(f"  Story Points Field: {defaults.story_points_field or 'Not configured'}")
+            if defaults.custom_fields:
+                print("  Custom Fields:")
+                for name, fid in defaults.custom_fields.items():
+                    print(f"    {name}: {fid}")
+            else:
+                print("  Custom Fields: Not configured")
             print()
 
             # Show project defaults
@@ -2179,6 +2352,18 @@ def cmd_config(args: argparse.Namespace) -> int:
                 else:
                     print("No project-specific defaults configured")
 
+            return 0
+
+        elif args.config_command == "discover":
+            defaults = get_jira_defaults()
+            custom_fields = defaults.custom_fields or {}
+            field_id = resolve_or_discover_field(args.field_name, custom_fields)
+            if field_id:
+                print(f"\n{args.field_name} -> {field_id}")
+            else:
+                print(f"\nCould not resolve field '{args.field_name}'.")
+                print("Use 'fields' command to list available fields.")
+                return 1
             return 0
 
     except Exception as e:
@@ -2436,6 +2621,12 @@ def main() -> int:
     create_parser.add_argument("--priority", help="Priority name")
     create_parser.add_argument("--labels", help="Comma-separated labels")
     create_parser.add_argument("--assignee", help="Assignee account ID")
+    create_parser.add_argument(
+        "--set-field",
+        action="append",
+        metavar="NAME=VALUE",
+        help="Set a custom field (e.g. --set-field story_points=5)",
+    )
     create_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Update subcommand
@@ -2446,6 +2637,12 @@ def main() -> int:
     update_parser.add_argument("--priority", help="New priority")
     update_parser.add_argument("--labels", help="New labels (comma-separated)")
     update_parser.add_argument("--assignee", help="New assignee account ID")
+    update_parser.add_argument(
+        "--set-field",
+        action="append",
+        metavar="NAME=VALUE",
+        help="Set a custom field (e.g. --set-field story_points=5)",
+    )
 
     # Comment subcommand
     comment_parser = issue_subparsers.add_parser("comment", help="Add comment to issue")
@@ -2496,6 +2693,16 @@ def main() -> int:
     show_parser.add_argument(
         "--project",
         help="Show project-specific defaults for this project",
+    )
+
+    # Discover subcommand
+    discover_parser = config_subparsers.add_parser(
+        "discover",
+        help="Discover and save a custom field mapping",
+    )
+    discover_parser.add_argument(
+        "field_name",
+        help="Friendly name of the field to discover (e.g. story_points, security_level)",
     )
 
     # ========================================================================
