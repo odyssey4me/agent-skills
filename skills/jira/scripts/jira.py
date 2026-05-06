@@ -21,6 +21,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -523,14 +524,176 @@ def api_path(endpoint: str) -> str:
     return f"rest/api/{version}/{endpoint.lstrip('/')}"
 
 
+_INLINE_RE = re.compile(r"(\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\))")
+
+
+def _parse_inline(text: str) -> list[dict[str, Any]]:
+    """Parse inline markdown (bold, links) into ADF text nodes."""
+    nodes: list[dict[str, Any]] = []
+    pos = 0
+    for m in _INLINE_RE.finditer(text):
+        if m.start() > pos:
+            nodes.append({"type": "text", "text": text[pos : m.start()]})
+        if m.group(2) is not None:
+            nodes.append({"type": "text", "text": m.group(2), "marks": [{"type": "strong"}]})
+        elif m.group(3) is not None:
+            nodes.append(
+                {
+                    "type": "text",
+                    "text": m.group(3),
+                    "marks": [{"type": "link", "attrs": {"href": m.group(4)}}],
+                }
+            )
+        pos = m.end()
+    if pos < len(text):
+        nodes.append({"type": "text", "text": text[pos:]})
+    return nodes or [{"type": "text", "text": ""}]
+
+
+def _parse_markdown_to_adf(text: str) -> list[dict[str, Any]]:
+    """Parse markdown text into a list of ADF block nodes."""
+    lines = text.split("\n")
+    blocks: list[dict[str, Any]] = []
+    pending_lines: list[str] = []
+    list_items: list[dict[str, Any]] = []
+    table_rows: list[dict[str, Any]] = []
+    i = 0
+
+    def _flush_pending() -> None:
+        if pending_lines:
+            joined = " ".join(pending_lines)
+            blocks.append({"type": "paragraph", "content": _parse_inline(joined)})
+            pending_lines.clear()
+
+    def _flush_list() -> None:
+        if list_items:
+            blocks.append({"type": "bulletList", "content": list(list_items)})
+            list_items.clear()
+
+    def _flush_table() -> None:
+        if table_rows:
+            blocks.append(
+                {
+                    "type": "table",
+                    "attrs": {"isNumberColumnEnabled": False, "layout": "default"},
+                    "content": list(table_rows),
+                }
+            )
+            table_rows.clear()
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+
+        # Blank line — paragraph separator
+        if not stripped:
+            _flush_pending()
+            _flush_list()
+            _flush_table()
+            i += 1
+            continue
+
+        # Horizontal rule
+        if re.match(r"^-{3,}$", stripped):
+            _flush_pending()
+            _flush_list()
+            _flush_table()
+            blocks.append({"type": "rule"})
+            i += 1
+            continue
+
+        # Heading
+        heading_match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if heading_match:
+            _flush_pending()
+            _flush_list()
+            _flush_table()
+            level = len(heading_match.group(1))
+            blocks.append(
+                {
+                    "type": "heading",
+                    "attrs": {"level": level},
+                    "content": _parse_inline(heading_match.group(2)),
+                }
+            )
+            i += 1
+            continue
+
+        # Bullet list item
+        list_match = re.match(r"^[-*]\s+(.+)$", stripped)
+        if list_match:
+            _flush_pending()
+            _flush_table()
+            list_items.append(
+                {
+                    "type": "listItem",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": _parse_inline(list_match.group(1)),
+                        }
+                    ],
+                }
+            )
+            i += 1
+            continue
+
+        # Table header row (|| cell || cell ||)
+        if stripped.startswith("||"):
+            _flush_pending()
+            _flush_list()
+            cells = [c.strip() for c in stripped.strip("|").split("||") if c.strip()]
+            row_content = [
+                {
+                    "type": "tableHeader",
+                    "content": [{"type": "paragraph", "content": _parse_inline(c)}],
+                }
+                for c in cells
+            ]
+            table_rows.append({"type": "tableRow", "content": row_content})
+            i += 1
+            continue
+
+        # Table body row (| cell | cell |)
+        if stripped.startswith("|") and not stripped.startswith("||"):
+            _flush_pending()
+            _flush_list()
+            cells = [c.strip() for c in stripped.strip("|").split("|") if c.strip()]
+            row_content = [
+                {
+                    "type": "tableCell",
+                    "content": [{"type": "paragraph", "content": _parse_inline(c)}],
+                }
+                for c in cells
+            ]
+            table_rows.append({"type": "tableRow", "content": row_content})
+            i += 1
+            continue
+
+        # Plain text line — accumulate for paragraph
+        _flush_list()
+        _flush_table()
+        pending_lines.append(stripped)
+        i += 1
+
+    _flush_pending()
+    _flush_list()
+    _flush_table()
+
+    return blocks or [{"type": "paragraph", "content": [{"type": "text", "text": ""}]}]
+
+
 def format_rich_text(text: str) -> dict[str, Any] | str:
     """Format text for the appropriate Jira API version.
 
     Cloud API (v3) requires Atlassian Document Format (ADF).
+    Parses markdown (headings, bold, links, lists, tables, rules)
+    into proper ADF nodes.
+
     Data Center/Server API (v2) uses plain text.
 
     Args:
-        text: Plain text content.
+        text: Markdown or plain text content.
 
     Returns:
         ADF document dict for Cloud, plain string for DC/Server.
@@ -538,19 +701,12 @@ def format_rich_text(text: str) -> dict[str, Any] | str:
     version = get_api_version()
 
     if version == "3":
-        # Return Atlassian Document Format (ADF)
         return {
             "type": "doc",
             "version": 1,
-            "content": [
-                {
-                    "type": "paragraph",
-                    "content": [{"type": "text", "text": text}],
-                }
-            ],
+            "content": _parse_markdown_to_adf(text),
         }
     else:
-        # Return plain text for API v2
         return text
 
 

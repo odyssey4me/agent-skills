@@ -18,6 +18,8 @@ from skills.jira.scripts.jira import (
     _deployment_cache,
     _extract_text_from_adf,
     _make_detection_request,
+    _parse_inline,
+    _parse_markdown_to_adf,
     _truncate,
     add_comment,
     api_path,
@@ -381,6 +383,122 @@ class TestApiHelpers:
             result = format_rich_text("Hello world")
 
             assert result == "Hello world"
+
+    def test_format_rich_text_heading(self):
+        """Test heading markdown produces ADF heading node."""
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
+            mock_version.return_value = "3"
+            result = format_rich_text("## My Title")
+
+            node = result["content"][0]
+            assert node["type"] == "heading"
+            assert node["attrs"]["level"] == 2
+            assert node["content"][0]["text"] == "My Title"
+
+    def test_format_rich_text_bold(self):
+        """Test bold markdown produces text node with strong mark."""
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
+            mock_version.return_value = "3"
+            result = format_rich_text("Some **bold** text")
+
+            content = result["content"][0]["content"]
+            assert len(content) == 3
+            assert content[0] == {"type": "text", "text": "Some "}
+            assert content[1]["text"] == "bold"
+            assert content[1]["marks"] == [{"type": "strong"}]
+            assert content[2] == {"type": "text", "text": " text"}
+
+    def test_format_rich_text_link(self):
+        """Test link markdown produces text node with link mark."""
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
+            mock_version.return_value = "3"
+            result = format_rich_text("Click [here](https://example.com)")
+
+            content = result["content"][0]["content"]
+            assert len(content) == 2
+            assert content[0] == {"type": "text", "text": "Click "}
+            assert content[1]["text"] == "here"
+            assert content[1]["marks"] == [
+                {"type": "link", "attrs": {"href": "https://example.com"}}
+            ]
+
+    def test_format_rich_text_bullet_list(self):
+        """Test bullet list markdown produces ADF bulletList."""
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
+            mock_version.return_value = "3"
+            result = format_rich_text("- one\n- two\n- three")
+
+            node = result["content"][0]
+            assert node["type"] == "bulletList"
+            assert len(node["content"]) == 3
+            assert node["content"][0]["type"] == "listItem"
+            para = node["content"][0]["content"][0]
+            assert para["content"][0]["text"] == "one"
+
+    def test_format_rich_text_horizontal_rule(self):
+        """Test horizontal rule produces ADF rule node."""
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
+            mock_version.return_value = "3"
+            result = format_rich_text("above\n---\nbelow")
+
+            assert result["content"][0]["type"] == "paragraph"
+            assert result["content"][1]["type"] == "rule"
+            assert result["content"][2]["type"] == "paragraph"
+
+    def test_format_rich_text_table(self):
+        """Test Jira wiki table syntax produces ADF table."""
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
+            mock_version.return_value = "3"
+            result = format_rich_text("|| H1 || H2 ||\n| c1 | c2 |")
+
+            table = result["content"][0]
+            assert table["type"] == "table"
+            assert len(table["content"]) == 2
+            header_row = table["content"][0]
+            assert header_row["content"][0]["type"] == "tableHeader"
+            body_row = table["content"][1]
+            assert body_row["content"][0]["type"] == "tableCell"
+
+    def test_format_rich_text_paragraphs(self):
+        """Test blank lines separate paragraphs."""
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
+            mock_version.return_value = "3"
+            result = format_rich_text("para one\n\npara two")
+
+            assert len(result["content"]) == 2
+            assert result["content"][0]["type"] == "paragraph"
+            assert result["content"][0]["content"][0]["text"] == "para one"
+            assert result["content"][1]["type"] == "paragraph"
+            assert result["content"][1]["content"][0]["text"] == "para two"
+
+    def test_format_rich_text_mixed(self):
+        """Test mixed markdown produces correct sequence of ADF nodes."""
+        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
+            mock_version.return_value = "3"
+            result = format_rich_text("## Heading\n\nSome text\n\n- item one\n- item two")
+
+            assert result["content"][0]["type"] == "heading"
+            assert result["content"][1]["type"] == "paragraph"
+            assert result["content"][2]["type"] == "bulletList"
+
+    def test_parse_inline_plain(self):
+        """Test parse_inline with no formatting."""
+        nodes = _parse_inline("plain text")
+        assert nodes == [{"type": "text", "text": "plain text"}]
+
+    def test_parse_inline_multiple_marks(self):
+        """Test parse_inline with bold and link in same line."""
+        nodes = _parse_inline("**bold** and [link](http://x.com)")
+        assert len(nodes) == 3
+        assert nodes[0]["marks"] == [{"type": "strong"}]
+        assert nodes[1] == {"type": "text", "text": " and "}
+        assert nodes[2]["marks"][0]["type"] == "link"
+
+    def test_parse_markdown_to_adf_empty(self):
+        """Test empty string produces a single empty paragraph."""
+        blocks = _parse_markdown_to_adf("")
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "paragraph"
 
 
 class TestFormatting:
