@@ -132,6 +132,7 @@ class JiraDefaults:
     security_level: str | None = None
     max_results: int | None = None
     fields: list[str] | None = None
+    story_points_field: str | None = None
 
     @staticmethod
     def from_config(config: dict[str, Any]) -> JiraDefaults:
@@ -149,6 +150,7 @@ class JiraDefaults:
             security_level=defaults_dict.get("security_level"),
             max_results=defaults_dict.get("max_results"),
             fields=defaults_dict.get("fields"),
+            story_points_field=defaults_dict.get("story_points_field"),
         )
 
 
@@ -981,11 +983,25 @@ def _truncate(text: str, max_length: int) -> str:
     return text[: max_length - 3] + "..."
 
 
-def format_issue(issue: dict[str, Any]) -> str:
+def ensure_field_included(fields: list[str] | None, field: str) -> list[str]:
+    """Ensure a field is included in the fields list.
+
+    If fields is None, starts from DEFAULT_FIELDS.
+    Appends the field if not already present.
+    """
+    if fields is None:
+        fields = list(DEFAULT_FIELDS)
+    if field not in fields:
+        return [*fields, field]
+    return fields
+
+
+def format_issue(issue: dict[str, Any], story_points_field: str | None = None) -> str:
     """Format a Jira issue for display.
 
     Args:
         issue: Jira issue dictionary.
+        story_points_field: Custom field ID for story points (e.g. "customfield_10028").
 
     Returns:
         Formatted issue string.
@@ -999,19 +1015,28 @@ def format_issue(issue: dict[str, Any]) -> str:
     priority = fields.get("priority", {})
     priority_name = priority.get("name", "None") if priority else "None"
 
-    return (
+    result = (
         f"### {key}: {summary}\n"
         f"- **Status:** {status}\n"
         f"- **Assignee:** {assignee_name}\n"
         f"- **Priority:** {priority_name}"
     )
 
+    if story_points_field:
+        story_points = fields.get(story_points_field)
+        if story_points is not None:
+            sp_display = int(story_points) if story_points == int(story_points) else story_points
+            result += f"\n- **Story Points:** {sp_display}"
 
-def format_issues_list(issues: list[dict[str, Any]]) -> str:
+    return result
+
+
+def format_issues_list(issues: list[dict[str, Any]], story_points_field: str | None = None) -> str:
     """Format a list of Jira issues for display.
 
     Args:
         issues: List of Jira issue dictionaries.
+        story_points_field: Custom field ID for story points (e.g. "customfield_10028").
 
     Returns:
         Formatted table string.
@@ -1027,9 +1052,15 @@ def format_issues_list(issues: list[dict[str, Any]]) -> str:
         summary = fields.get("summary", "No summary")
         status = fields.get("status", {}).get("name", "Unknown")
         assignee_name = assignee.get("displayName", "Unassigned") if assignee else "Unassigned"
-        parts.append(
-            f"### {key}: {summary}\n- **Status:** {status}\n- **Assignee:** {assignee_name}"
-        )
+        entry = f"### {key}: {summary}\n- **Status:** {status}\n- **Assignee:** {assignee_name}"
+        if story_points_field:
+            story_points = fields.get(story_points_field)
+            if story_points is not None:
+                sp_display = (
+                    int(story_points) if story_points == int(story_points) else story_points
+                )
+                entry += f"\n- **Story Points:** {sp_display}"
+        parts.append(entry)
 
     return "\n\n".join(parts)
 
@@ -1053,12 +1084,15 @@ def search_issues(
     max_results: int = 50,
     fields: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Search for issues using JQL.
+    """Search for issues using JQL with automatic pagination.
 
     Supports standard JQL and ScriptRunner Enhanced Search functions.
     If ScriptRunner functions are detected in the query, the function
     will validate that ScriptRunner is available on the Jira instance
     and warn if it's not.
+
+    Automatically paginates through results when the server returns
+    fewer issues than the total matching the query, up to max_results.
 
     Args:
         jql: JQL query string (supports ScriptRunner functions).
@@ -1080,35 +1114,84 @@ def search_issues(
     """
     fields = fields or DEFAULT_FIELDS
 
-    # Validate JQL for ScriptRunner functions
     validation = validate_jql_for_scriptrunner(jql)
     if validation["warning"]:
         print(f"Warning: {validation['warning']}", file=sys.stderr)
 
     if is_cloud():
-        response = post(
-            "jira",
-            api_path("search/jql"),
-            data={
-                "jql": jql,
-                "maxResults": max_results,
-                "fields": fields,
-            },
-        )
-    else:
+        return _search_issues_cloud(jql, max_results, fields)
+    return _search_issues_datacenter(jql, max_results, fields)
+
+
+def _search_issues_cloud(
+    jql: str,
+    max_results: int,
+    fields: list[str],
+) -> list[dict[str, Any]]:
+    """Search with pagination for Jira Cloud (uses nextPageToken)."""
+    all_issues: list[dict[str, Any]] = []
+    next_page_token: str | None = None
+
+    while len(all_issues) < max_results:
+        page_size = min(max_results - len(all_issues), 100)
+        data: dict[str, Any] = {
+            "jql": jql,
+            "maxResults": page_size,
+            "fields": fields,
+        }
+        if next_page_token is not None:
+            data["nextPageToken"] = next_page_token
+
+        response = post("jira", api_path("search/jql"), data=data)
+
+        if not isinstance(response, dict):
+            break
+
+        issues = response.get("issues", [])
+        all_issues.extend(issues)
+
+        next_page_token = response.get("nextPageToken")
+        if not next_page_token or not issues:
+            break
+
+    return all_issues[:max_results]
+
+
+def _search_issues_datacenter(
+    jql: str,
+    max_results: int,
+    fields: list[str],
+) -> list[dict[str, Any]]:
+    """Search with pagination for Jira Data Center (uses startAt/total)."""
+    all_issues: list[dict[str, Any]] = []
+    start_at = 0
+
+    while len(all_issues) < max_results:
+        page_size = min(max_results - len(all_issues), 100)
         response = get(
             "jira",
             api_path("search"),
             params={
                 "jql": jql,
-                "maxResults": max_results,
+                "startAt": start_at,
+                "maxResults": page_size,
                 "fields": ",".join(fields),
             },
         )
 
-    if isinstance(response, dict):
-        return response.get("issues", [])
-    return []
+        if not isinstance(response, dict):
+            break
+
+        issues = response.get("issues", [])
+        all_issues.extend(issues)
+
+        total = response.get("total", 0)
+        if not issues or start_at + len(issues) >= total:
+            break
+
+        start_at += len(issues)
+
+    return all_issues[:max_results]
 
 
 # ============================================================================
@@ -1281,7 +1364,7 @@ def _extract_text_from_adf(node: Any) -> str:
 
 
 def get_comments(issue_key: str, max_results: int = 50) -> list[dict[str, Any]]:
-    """Get comments on an issue.
+    """Get comments on an issue with automatic pagination.
 
     Args:
         issue_key: The issue key (e.g., DEMO-123).
@@ -1290,14 +1373,30 @@ def get_comments(issue_key: str, max_results: int = 50) -> list[dict[str, Any]]:
     Returns:
         List of comment dictionaries.
     """
-    response = get(
-        "jira",
-        api_path(f"issue/{issue_key}/comment"),
-        params={"maxResults": max_results},
-    )
-    if isinstance(response, dict):
-        return response.get("comments", [])
-    return []
+    all_comments: list[dict[str, Any]] = []
+    start_at = 0
+
+    while len(all_comments) < max_results:
+        page_size = min(max_results - len(all_comments), 100)
+        response = get(
+            "jira",
+            api_path(f"issue/{issue_key}/comment"),
+            params={"startAt": start_at, "maxResults": page_size},
+        )
+
+        if not isinstance(response, dict):
+            break
+
+        comments = response.get("comments", [])
+        all_comments.extend(comments)
+
+        total = response.get("total", 0)
+        if not comments or start_at + len(comments) >= total:
+            break
+
+        start_at += len(comments)
+
+    return all_comments[:max_results]
 
 
 def format_comments(comments: list[dict[str, Any]], issue_key: str) -> str:
@@ -1848,6 +1947,7 @@ def cmd_search(args: argparse.Namespace) -> int:
     try:
         # Load defaults
         defaults = get_jira_defaults()
+        story_points_field = defaults.story_points_field
 
         contributor = getattr(args, "contributor", None)
         jql = getattr(args, "jql", None)
@@ -1869,6 +1969,9 @@ def cmd_search(args: argparse.Namespace) -> int:
         else:
             fields = None
 
+        if story_points_field:
+            fields = ensure_field_included(fields, story_points_field)
+
         if contributor:
             project = getattr(args, "project", None)
             issues = search_by_contributor(contributor, project, max_results, fields)
@@ -1880,7 +1983,7 @@ def cmd_search(args: argparse.Namespace) -> int:
         if args.json:
             print(format_json(issues))
         else:
-            print(format_issues_list(issues))
+            print(format_issues_list(issues, story_points_field=story_points_field))
 
         return 0
 
@@ -1895,12 +1998,17 @@ def cmd_issue(args: argparse.Namespace) -> int:
         if args.issue_command == "get":
             # Load defaults and apply fields
             defaults = get_jira_defaults()
+            story_points_field = defaults.story_points_field
             if args.fields:
                 fields = args.fields.split(",")
             elif defaults.fields:
                 fields = defaults.fields
             else:
                 fields = None
+
+            if story_points_field:
+                fields = ensure_field_included(fields, story_points_field)
+
             issue = get_issue(args.issue_key, fields=fields)
 
             if getattr(args, "contributors", False):
@@ -1910,13 +2018,13 @@ def cmd_issue(args: argparse.Namespace) -> int:
                     issue["_contributors"] = sorted(contributor_names)
                     print(format_json(issue))
                 else:
-                    output = format_issue(issue)
+                    output = format_issue(issue, story_points_field=story_points_field)
                     output += f"\n- **Contributors:** {', '.join(sorted(contributor_names))}"
                     print(output)
             elif args.json:
                 print(format_json(issue))
             else:
-                print(format_issue(issue))
+                print(format_issue(issue, story_points_field=story_points_field))
 
         elif args.issue_command == "comments":
             max_results = getattr(args, "max_results", 50) or 50
@@ -2051,6 +2159,7 @@ def cmd_config(args: argparse.Namespace) -> int:
             print(
                 f"  Fields: {', '.join(defaults.fields) if defaults.fields else 'Not configured'}"
             )
+            print(f"  Story Points Field: {defaults.story_points_field or 'Not configured'}")
             print()
 
             # Show project defaults

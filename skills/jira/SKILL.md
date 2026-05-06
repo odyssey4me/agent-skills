@@ -85,6 +85,7 @@ defaults:
   security_level: "Red Hat Internal"
   max_results: 25
   fields: ["summary", "status", "assignee", "priority", "created"]
+  story_points_field: "customfield_10028"  # Instance-specific field ID
 
 # Optional project-specific defaults
 projects:

@@ -35,6 +35,7 @@ from skills.jira.scripts.jira import (
     delete_credential,
     detect_deployment_type,
     do_transition,
+    ensure_field_included,
     extract_contributors,
     find_collaborative_epics,
     format_collaborative_epics,
@@ -461,10 +462,123 @@ class TestFormatting:
         assert "- **Assignee:** Alice" in result
         assert "- **Assignee:** Unassigned" in result
 
+    def test_format_issue_with_story_points(self):
+        """Test issue formatting includes story points when configured."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test issue",
+                "status": {"name": "Open"},
+                "assignee": {"displayName": "Alice"},
+                "priority": {"name": "High"},
+                "customfield_10028": 5.0,
+            },
+        }
+
+        result = format_issue(issue, story_points_field="customfield_10028")
+
+        assert "- **Story Points:** 5" in result
+
+    def test_format_issue_with_fractional_story_points(self):
+        """Test issue formatting preserves fractional story points."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test",
+                "status": {"name": "Open"},
+                "assignee": None,
+                "priority": None,
+                "customfield_10028": 0.5,
+            },
+        }
+
+        result = format_issue(issue, story_points_field="customfield_10028")
+
+        assert "- **Story Points:** 0.5" in result
+
+    def test_format_issue_without_story_points_field(self):
+        """Test story points omitted when field not configured."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test",
+                "status": {"name": "Open"},
+                "assignee": None,
+                "priority": None,
+            },
+        }
+
+        result = format_issue(issue)
+
+        assert "Story Points" not in result
+
+    def test_format_issue_story_points_none(self):
+        """Test story points omitted when field value is None."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test",
+                "status": {"name": "Open"},
+                "assignee": None,
+                "priority": None,
+                "customfield_10028": None,
+            },
+        }
+
+        result = format_issue(issue, story_points_field="customfield_10028")
+
+        assert "Story Points" not in result
+
+    def test_format_issues_list_with_story_points(self):
+        """Test list formatting includes story points when configured."""
+        issues = [
+            {
+                "key": "DEMO-1",
+                "fields": {
+                    "summary": "With points",
+                    "status": {"name": "Open"},
+                    "assignee": None,
+                    "customfield_10028": 3.0,
+                },
+            },
+            {
+                "key": "DEMO-2",
+                "fields": {
+                    "summary": "Without points",
+                    "status": {"name": "Open"},
+                    "assignee": None,
+                },
+            },
+        ]
+
+        result = format_issues_list(issues, story_points_field="customfield_10028")
+
+        assert "- **Story Points:** 3" in result
+        assert result.count("Story Points") == 1
+
     def test_format_issues_list_empty(self):
         """Test formatting empty issue list."""
         result = format_issues_list([])
         assert result == "No issues found"
+
+
+class TestEnsureFieldIncluded:
+    """Tests for ensure_field_included helper."""
+
+    def test_adds_field_to_existing_list(self):
+        result = ensure_field_included(["summary", "status"], "customfield_10028")
+        assert "customfield_10028" in result
+        assert "summary" in result
+
+    def test_does_not_duplicate_existing_field(self):
+        result = ensure_field_included(["summary", "customfield_10028"], "customfield_10028")
+        assert result.count("customfield_10028") == 1
+
+    def test_none_fields_uses_defaults(self):
+        result = ensure_field_included(None, "customfield_10028")
+        assert "customfield_10028" in result
+        assert "summary" in result
+        assert "status" in result
 
 
 class TestApiOperations:
@@ -511,6 +625,77 @@ class TestApiOperations:
 
         assert len(result) == 1
         assert result[0]["key"] == "DEMO-1"
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_search_issues_cloud_pagination(
+        self, mock_api_path, mock_post, mock_is_cloud, mock_scriptrunner
+    ):
+        """Test Cloud search paginates using nextPageToken."""
+        mock_api_path.return_value = "rest/api/3/search/jql"
+        mock_is_cloud.return_value = True
+        mock_scriptrunner.return_value = {"available": False}
+        mock_post.side_effect = [
+            {
+                "issues": [{"key": "DEMO-1", "fields": {"summary": "First"}}],
+                "nextPageToken": "token123",
+            },
+            {
+                "issues": [{"key": "DEMO-2", "fields": {"summary": "Second"}}],
+            },
+        ]
+
+        result = search_issues("project = DEMO", max_results=10)
+
+        assert len(result) == 2
+        assert result[0]["key"] == "DEMO-1"
+        assert result[1]["key"] == "DEMO-2"
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_search_issues_cloud_non_dict_response(
+        self, mock_api_path, mock_post, mock_is_cloud, mock_scriptrunner
+    ):
+        """Test Cloud search handles non-dict response."""
+        mock_api_path.return_value = "rest/api/3/search/jql"
+        mock_is_cloud.return_value = True
+        mock_scriptrunner.return_value = {"available": False}
+        mock_post.return_value = "unexpected"
+
+        result = search_issues("project = DEMO", max_results=10)
+
+        assert result == []
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_search_issues_datacenter_pagination(
+        self, mock_api_path, mock_get, mock_is_cloud, mock_scriptrunner
+    ):
+        """Test Data Center search paginates using startAt/total."""
+        mock_api_path.return_value = "rest/api/2/search"
+        mock_is_cloud.return_value = False
+        mock_scriptrunner.return_value = {"available": False}
+        mock_get.side_effect = [
+            {
+                "issues": [{"key": "DEMO-1", "fields": {"summary": "First"}}],
+                "total": 2,
+            },
+            {
+                "issues": [{"key": "DEMO-2", "fields": {"summary": "Second"}}],
+                "total": 2,
+            },
+        ]
+
+        result = search_issues("project = DEMO", max_results=10)
+
+        assert len(result) == 2
+        assert result[1]["key"] == "DEMO-2"
 
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.api_path")
@@ -1646,6 +1831,28 @@ class TestComments:
         result = get_comments("DEMO-123")
 
         assert result == []
+
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_comments_pagination(self, mock_get, mock_api_path):
+        """Test fetching comments paginates through results."""
+        mock_api_path.return_value = "/rest/api/2/issue/DEMO-123/comment"
+        mock_get.side_effect = [
+            {
+                "comments": [{"id": "1", "body": "First"}],
+                "total": 2,
+            },
+            {
+                "comments": [{"id": "2", "body": "Second"}],
+                "total": 2,
+            },
+        ]
+
+        result = get_comments("DEMO-123", max_results=10)
+
+        assert len(result) == 2
+        assert result[1]["body"] == "Second"
+        assert mock_get.call_count == 2
 
     def test_extract_text_from_adf_plain_string(self):
         """Test ADF extraction with a plain text string (DC format)."""
