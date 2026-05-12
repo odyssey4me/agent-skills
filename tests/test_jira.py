@@ -19,6 +19,7 @@ from skills.jira.scripts.jira import (
     _extract_text_from_adf,
     _make_detection_request,
     _parse_inline,
+    _parse_link_args,
     _parse_markdown_to_adf,
     _truncate,
     add_comment,
@@ -35,6 +36,7 @@ from skills.jira.scripts.jira import (
     cmd_user,
     coerce_field_value,
     create_issue,
+    create_link,
     delete_credential,
     detect_deployment_type,
     discover_custom_field,
@@ -56,6 +58,7 @@ from skills.jira.scripts.jira import (
     get_epic_children,
     get_issue,
     get_jira_defaults,
+    get_link_types,
     get_project_defaults,
     get_transitions,
     is_cloud,
@@ -63,6 +66,7 @@ from skills.jira.scripts.jira import (
     list_status_categories,
     list_statuses,
     load_config,
+    parse_issue_file,
     resolve_custom_field,
     resolve_or_discover_field,
     resolve_user,
@@ -73,6 +77,7 @@ from skills.jira.scripts.jira import (
     set_credential,
     update_issue,
     validate_custom_fields,
+    validate_jql_for_scriptrunner,
 )
 
 
@@ -1538,8 +1543,10 @@ class TestCommandHandlers:
 
     @patch("skills.jira.scripts.jira.create_issue")
     @patch("skills.jira.scripts.jira.get_project_defaults")
-    def test_cmd_issue_create(self, mock_defaults, mock_create):
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_create(self, mock_jira_defaults, mock_defaults, mock_create):
         """Test issue create command."""
+        mock_jira_defaults.return_value = JiraDefaults()
         mock_defaults.return_value = ProjectDefaults()
         mock_create.return_value = {"key": "DEMO-123"}
 
@@ -1553,6 +1560,8 @@ class TestCommandHandlers:
             labels=None,
             assignee=None,
             json=False,
+            from_file=None,
+            set_field=None,
         )
 
         result = cmd_issue(args)
@@ -1617,8 +1626,10 @@ class TestCommandHandlers:
         assert "test@example.com" in captured.out
 
     @patch("skills.jira.scripts.jira.update_issue")
-    def test_cmd_issue_update(self, mock_update, capsys):
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_update(self, mock_jira_defaults, mock_update, capsys):
         """Test issue update command."""
+        mock_jira_defaults.return_value = JiraDefaults()
         mock_update.return_value = {}
 
         args = argparse.Namespace(
@@ -1629,6 +1640,8 @@ class TestCommandHandlers:
             priority=None,
             labels=None,
             assignee=None,
+            from_file=None,
+            set_field=None,
         )
 
         result = cmd_issue(args)
@@ -1743,8 +1756,12 @@ class TestCommandHandlers:
 
     @patch("skills.jira.scripts.jira.create_issue")
     @patch("skills.jira.scripts.jira.get_project_defaults")
-    def test_cmd_issue_create_missing_type(self, mock_defaults, _mock_create, capsys):
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_create_missing_type(
+        self, mock_jira_defaults, mock_defaults, _mock_create, capsys
+    ):
         """Test issue create without type."""
+        mock_jira_defaults.return_value = JiraDefaults()
         mock_defaults.return_value = ProjectDefaults()
 
         args = argparse.Namespace(
@@ -1757,6 +1774,8 @@ class TestCommandHandlers:
             labels=None,
             assignee=None,
             json=False,
+            from_file=None,
+            set_field=None,
         )
 
         result = cmd_issue(args)
@@ -1905,6 +1924,7 @@ class TestCommandHandlers:
             assignee=None,
             json=False,
             set_field=["story_points=5"],
+            from_file=None,
         )
         result = cmd_issue(args)
 
@@ -1947,6 +1967,7 @@ class TestCommandHandlers:
             assignee=None,
             json=False,
             set_field=["assigned_team=Platform Team"],
+            from_file=None,
         )
         result = cmd_issue(args)
 
@@ -1958,10 +1979,12 @@ class TestCommandHandlers:
             "customfield_12345", "Platform Team", schema_type="option"
         )
 
+    @patch("skills.jira.scripts.jira.get_project_defaults")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
-    def test_cmd_issue_create_set_field_bad_format(self, mock_defaults, capsys):
+    def test_cmd_issue_create_set_field_bad_format(self, mock_defaults, mock_proj_defaults, capsys):
         """Test issue create with badly formatted --set-field."""
         mock_defaults.return_value = JiraDefaults(custom_fields={})
+        mock_proj_defaults.return_value = ProjectDefaults()
 
         args = argparse.Namespace(
             issue_command="create",
@@ -1974,6 +1997,7 @@ class TestCommandHandlers:
             assignee=None,
             json=False,
             set_field=["bad_format"],
+            from_file=None,
         )
         result = cmd_issue(args)
 
@@ -2072,11 +2096,13 @@ class TestCommandHandlers:
 
     @patch("skills.jira.scripts.jira.create_issue")
     @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
     @patch("skills.jira.scripts.jira.format_json")
     def test_cmd_issue_create_json_output(
-        self, mock_format_json, mock_defaults, mock_create, capsys
+        self, mock_format_json, mock_jira_defaults, mock_defaults, mock_create, capsys
     ):
         """Test issue create with JSON output."""
+        mock_jira_defaults.return_value = JiraDefaults()
         mock_defaults.return_value = ProjectDefaults()
         mock_create.return_value = {"key": "DEMO-123", "id": "10001"}
         mock_format_json.return_value = '{"key": "DEMO-123"}'
@@ -2091,6 +2117,8 @@ class TestCommandHandlers:
             labels="test,bug",
             assignee="123",
             json=True,
+            from_file=None,
+            set_field=None,
         )
 
         result = cmd_issue(args)
@@ -2167,8 +2195,10 @@ class TestCommandHandlers:
         assert call_args[0][2] == ["summary", "status", "assignee"]
 
     @patch("skills.jira.scripts.jira.update_issue")
-    def test_cmd_issue_update_with_labels(self, mock_update):
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_update_with_labels(self, mock_jira_defaults, mock_update):
         """Test issue update with labels."""
+        mock_jira_defaults.return_value = JiraDefaults()
         mock_update.return_value = {}
 
         args = argparse.Namespace(
@@ -2179,6 +2209,8 @@ class TestCommandHandlers:
             priority=None,
             labels="test,bug",
             assignee=None,
+            from_file=None,
+            set_field=None,
         )
 
         result = cmd_issue(args)
@@ -3303,3 +3335,1044 @@ class TestCmdUser:
         assert result == 1
         captured = capsys.readouterr()
         assert "API error" in captured.err
+
+
+class TestScriptRunnerQueryGating:
+    """Tests for ScriptRunner query rejection behavior."""
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_search_rejects_scriptrunner_on_cloud(self, mock_is_cloud, mock_scriptrunner, capsys):
+        """ScriptRunner queries on Cloud should be rejected with a clear error."""
+        mock_is_cloud.return_value = True
+        mock_scriptrunner.return_value = {
+            "available": False,
+            "enhanced_search": False,
+            "type": "cloud",
+        }
+
+        result = search_issues('issue in linkedIssuesOf("DEMO-123")', max_results=10)
+
+        assert result == []
+        captured = capsys.readouterr()
+        assert "not supported on Jira Cloud" in captured.err
+        assert "linkedIssuesOf" in captured.err
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_search_allows_scriptrunner_on_dc_with_plugin(
+        self, mock_api_path, mock_get, mock_is_cloud, mock_scriptrunner
+    ):
+        """ScriptRunner queries on DC with plugin installed should proceed."""
+        mock_is_cloud.return_value = False
+        mock_scriptrunner.return_value = {
+            "available": True,
+            "enhanced_search": True,
+            "type": "datacenter",
+        }
+        mock_api_path.return_value = "rest/api/2/search"
+        mock_get.return_value = {
+            "issues": [{"key": "DEMO-1", "fields": {"summary": "Test"}}],
+            "total": 1,
+        }
+
+        result = search_issues('issue in linkedIssuesOf("DEMO-123")', max_results=10)
+
+        assert len(result) == 1
+        assert result[0]["key"] == "DEMO-1"
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    def test_search_rejects_scriptrunner_on_dc_without_plugin(
+        self, mock_is_cloud, mock_scriptrunner, capsys
+    ):
+        """ScriptRunner queries on DC without plugin should be rejected."""
+        mock_is_cloud.return_value = False
+        mock_scriptrunner.return_value = {
+            "available": False,
+            "enhanced_search": False,
+            "type": "datacenter",
+        }
+
+        result = search_issues('issue in subtasksOf("DEMO-456")', max_results=10)
+
+        assert result == []
+        captured = capsys.readouterr()
+        assert "not available on this instance" in captured.err
+        assert "subtasksOf" in captured.err
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    def test_validate_jql_no_scriptrunner_functions(self, mock_scriptrunner):
+        """Standard JQL should not trigger ScriptRunner validation."""
+        mock_scriptrunner.return_value = {
+            "available": False,
+            "enhanced_search": False,
+            "type": "cloud",
+        }
+
+        result = validate_jql_for_scriptrunner("project = DEMO AND status = Open")
+
+        assert result["uses_scriptrunner"] is False
+        assert result["functions_detected"] == []
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    def test_validate_jql_warning_does_not_recommend_install(self, mock_scriptrunner):
+        """Warning message should not recommend installing ScriptRunner."""
+        mock_scriptrunner.return_value = {
+            "available": False,
+            "enhanced_search": False,
+            "type": "datacenter",
+        }
+
+        result = validate_jql_for_scriptrunner('issue in linkedIssuesOf("DEMO-123")')
+
+        assert result["uses_scriptrunner"] is True
+        assert not result["supported"]
+        assert "Install" not in (result["warning"] or "")
+        assert "Marketplace" not in (result["warning"] or "")
+
+
+class TestParseIssueFile:
+    """Tests for parse_issue_file()."""
+
+    def test_full_frontmatter_and_body(self, tmp_path):
+        """Test file with all frontmatter keys and a body."""
+        f = tmp_path / "issue.md"
+        f.write_text(
+            "---\n"
+            "summary: My issue\n"
+            "project: DEMO\n"
+            "type: Task\n"
+            "priority: High\n"
+            "labels:\n"
+            "  - bug\n"
+            "  - urgent\n"
+            "assignee: abc123\n"
+            "fields:\n"
+            "  story_points: 5\n"
+            "---\n"
+            "This is the description.\n"
+            "\n"
+            "It has **multiple** paragraphs.\n"
+        )
+        fields, body = parse_issue_file(str(f))
+        assert fields["summary"] == "My issue"
+        assert fields["project"] == "DEMO"
+        assert fields["type"] == "Task"
+        assert fields["priority"] == "High"
+        assert fields["labels"] == ["bug", "urgent"]
+        assert fields["assignee"] == "abc123"
+        assert fields["fields"] == {"story_points": 5}
+        assert "multiple" in body
+
+    def test_minimal_frontmatter(self, tmp_path):
+        """Test file with only summary in frontmatter."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Just a title\n---\nBody text.\n")
+        fields, body = parse_issue_file(str(f))
+        assert fields["summary"] == "Just a title"
+        assert body == "Body text."
+
+    def test_no_body(self, tmp_path):
+        """Test file with frontmatter only, no body."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: No body\n---\n")
+        fields, body = parse_issue_file(str(f))
+        assert fields["summary"] == "No body"
+        assert body is None
+
+    def test_labels_as_string(self, tmp_path):
+        """Test labels as comma-separated string are converted to list."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Test\nlabels: bug, urgent, fix\n---\n")
+        fields, _ = parse_issue_file(str(f))
+        assert fields["labels"] == ["bug", "urgent", "fix"]
+
+    def test_labels_as_list(self, tmp_path):
+        """Test labels as YAML list are preserved."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Test\nlabels:\n  - bug\n  - urgent\n---\n")
+        fields, _ = parse_issue_file(str(f))
+        assert fields["labels"] == ["bug", "urgent"]
+
+    def test_custom_fields(self, tmp_path):
+        """Test frontmatter with fields mapping."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Test\nfields:\n  story_points: 8\n---\n")
+        fields, _ = parse_issue_file(str(f))
+        assert fields["fields"] == {"story_points": 8}
+
+    def test_file_not_found(self):
+        """Test non-existent file raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError):
+            parse_issue_file("/nonexistent/path/issue.md")
+
+    def test_no_frontmatter(self, tmp_path):
+        """Test file without frontmatter delimiters raises ValueError."""
+        f = tmp_path / "issue.md"
+        f.write_text("Just plain text, no frontmatter.\n")
+        with pytest.raises(ValueError, match="must start with"):
+            parse_issue_file(str(f))
+
+    def test_invalid_yaml(self, tmp_path):
+        """Test malformed YAML in frontmatter raises ValueError."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\n: invalid: yaml: {{{\n---\n")
+        with pytest.raises(ValueError, match="invalid YAML"):
+            parse_issue_file(str(f))
+
+    def test_empty_frontmatter(self, tmp_path):
+        """Test empty frontmatter raises ValueError."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\n---\nBody text.\n")
+        with pytest.raises(ValueError, match="frontmatter is empty"):
+            parse_issue_file(str(f))
+
+    def test_missing_closing_delimiter(self, tmp_path):
+        """Test missing closing --- raises ValueError."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Test\nno closing delimiter\n")
+        with pytest.raises(ValueError, match="missing closing"):
+            parse_issue_file(str(f))
+
+    def test_unrecognized_keys_warn(self, tmp_path, capsys):
+        """Test unrecognized frontmatter keys produce a warning."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Test\nunknown_key: value\n---\n")
+        fields, _ = parse_issue_file(str(f))
+        assert fields["summary"] == "Test"
+        captured = capsys.readouterr()
+        assert "unrecognized frontmatter keys" in captured.err
+        assert "unknown_key" in captured.err
+
+    def test_numeric_summary_coerced_to_string(self, tmp_path):
+        """Test numeric values in string fields are coerced to strings."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: 12345\npriority: 1\n---\n")
+        fields, _ = parse_issue_file(str(f))
+        assert fields["summary"] == "12345"
+        assert fields["priority"] == "1"
+
+
+class TestFromFileIntegration:
+    """Tests for --from-file integration in cmd_issue()."""
+
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_create_from_file(
+        self, mock_parse, mock_jira_defaults, mock_proj_defaults, mock_create
+    ):
+        """Test issue create from file with all required fields."""
+        mock_parse.return_value = (
+            {"summary": "From file", "project": "DEMO", "type": "Story"},
+            "File description",
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_create.return_value = {"key": "DEMO-456"}
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project=None,
+            issue_type=None,
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="issue.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        mock_create.assert_called_once_with(
+            project="DEMO",
+            issue_type="Story",
+            summary="From file",
+            description="File description",
+            priority=None,
+            labels=None,
+            assignee=None,
+            extra_fields=None,
+        )
+
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_create_from_file_cli_override(
+        self, mock_parse, mock_jira_defaults, mock_proj_defaults, mock_create
+    ):
+        """Test CLI args override frontmatter values."""
+        mock_parse.return_value = (
+            {"summary": "File summary", "project": "DEMO", "type": "Story"},
+            "File desc",
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_create.return_value = {"key": "DEMO-789"}
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project=None,
+            issue_type=None,
+            summary="CLI summary",
+            description=None,
+            priority="Critical",
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="issue.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        call_kwargs = mock_create.call_args[1]
+        assert call_kwargs["summary"] == "CLI summary"
+        assert call_kwargs["priority"] == "Critical"
+
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_create_from_file_missing_project(
+        self, mock_parse, mock_jira_defaults, mock_proj_defaults, capsys
+    ):
+        """Test error when project missing from both CLI and frontmatter."""
+        mock_parse.return_value = (
+            {"summary": "No project", "type": "Task"},
+            "Body",
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project=None,
+            issue_type=None,
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="issue.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "--project is required" in captured.err
+
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_create_from_file_missing_summary(
+        self, mock_parse, mock_jira_defaults, mock_proj_defaults, capsys
+    ):
+        """Test error when summary missing from both CLI and frontmatter."""
+        mock_parse.return_value = (
+            {"project": "DEMO", "type": "Task"},
+            None,
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project=None,
+            issue_type=None,
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="issue.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "--summary is required" in captured.err
+
+    def test_create_from_file_conflict_description(self, capsys):
+        """Test error when both --from-file and --description provided."""
+        args = argparse.Namespace(
+            issue_command="create",
+            project="DEMO",
+            issue_type="Task",
+            summary="Test",
+            description="Inline desc",
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="issue.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "--from-file and --description cannot be used together" in captured.err
+
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_create_from_file_not_found(self, mock_parse, capsys):
+        """Test error when --from-file path does not exist."""
+        mock_parse.side_effect = FileNotFoundError("File not found: missing.md")
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project="DEMO",
+            issue_type="Task",
+            summary="Test",
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="missing.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "file not found" in captured.err
+
+    @patch("skills.jira.scripts.jira.update_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_update_from_file(self, mock_parse, mock_jira_defaults, mock_update, capsys):
+        """Test issue update from file."""
+        mock_parse.return_value = (
+            {"summary": "Updated title", "priority": "Low"},
+            "New description",
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_update.return_value = {}
+
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            from_file="update.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        mock_update.assert_called_once_with(
+            issue_key="DEMO-123",
+            summary="Updated title",
+            description="New description",
+            priority="Low",
+            labels=None,
+            assignee=None,
+            extra_fields=None,
+        )
+        captured = capsys.readouterr()
+        assert "Updated issue: DEMO-123" in captured.out
+
+    @patch("skills.jira.scripts.jira.update_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_update_from_file_ignores_project_type(
+        self, mock_parse, mock_jira_defaults, mock_update
+    ):
+        """Test update silently ignores project and type from frontmatter."""
+        mock_parse.return_value = (
+            {"summary": "Test", "project": "IGNORED", "type": "IGNORED"},
+            None,
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_update.return_value = {}
+
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            from_file="update.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        call_kwargs = mock_update.call_args[1]
+        assert "project" not in call_kwargs
+        assert "type" not in call_kwargs
+
+    def test_update_from_file_conflict_description(self, capsys):
+        """Test error when both --from-file and --description on update."""
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary=None,
+            description="Inline",
+            priority=None,
+            labels=None,
+            assignee=None,
+            from_file="update.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "--from-file and --description cannot be used together" in captured.err
+
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_create_from_file_with_labels(
+        self, mock_parse, mock_jira_defaults, mock_proj_defaults, mock_create
+    ):
+        """Test labels from frontmatter are passed correctly."""
+        mock_parse.return_value = (
+            {
+                "summary": "Test",
+                "project": "DEMO",
+                "type": "Task",
+                "labels": ["bug", "urgent"],
+            },
+            None,
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_create.return_value = {"key": "DEMO-100"}
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project=None,
+            issue_type=None,
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="issue.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        call_kwargs = mock_create.call_args[1]
+        assert call_kwargs["labels"] == ["bug", "urgent"]
+
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_create_no_file_no_project_errors(
+        self, mock_jira_defaults, mock_proj_defaults, _mock_create, capsys
+    ):
+        """Test that required fields are still enforced without --from-file."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project=None,
+            issue_type="Task",
+            summary="Test",
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file=None,
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "--project is required" in captured.err
+
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_create_no_file_no_summary_errors(
+        self, mock_jira_defaults, mock_proj_defaults, _mock_create, capsys
+    ):
+        """Test that summary is still required without --from-file."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project="DEMO",
+            issue_type="Task",
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file=None,
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "--summary is required" in captured.err
+
+
+class TestCreateErrorHints:
+    """Tests for helpful error messages on create failures."""
+
+    @patch("skills.jira.scripts.jira.get_project_issue_types")
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_400_shows_valid_issue_types(
+        self, mock_jira_defaults, mock_proj_defaults, mock_create, mock_types, capsys
+    ):
+        """Test that a 400 error on create shows valid issue types."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_create.side_effect = APIError(
+            "POST failed: 400 Bad Request", status_code=400, response='{"errors":{}}'
+        )
+        mock_types.return_value = ["Task", "Bug", "Epic", "Feature"]
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project="DEMO",
+            issue_type="Story",
+            summary="Test",
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file=None,
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Valid issue types for DEMO" in captured.err
+        assert "Task" in captured.err
+        assert "Feature" in captured.err
+
+    @patch("skills.jira.scripts.jira.get_project_issue_types")
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_from_file_400_shows_valid_issue_types(
+        self,
+        mock_parse,
+        mock_jira_defaults,
+        mock_proj_defaults,
+        mock_create,
+        mock_types,
+        capsys,
+    ):
+        """Test that a 400 error on create from file shows valid issue types."""
+        mock_parse.return_value = (
+            {"summary": "Test", "project": "PROJ", "type": "InvalidType"},
+            "Body",
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_create.side_effect = APIError(
+            "POST failed: 400 Bad Request", status_code=400, response='{"errors":{}}'
+        )
+        mock_types.return_value = ["Task", "Bug"]
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project=None,
+            issue_type=None,
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="issue.md",
+            set_field=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Valid issue types for PROJ" in captured.err
+
+
+class TestIssueLinking:
+    """Tests for issue link functions."""
+
+    SAMPLE_LINK_TYPES = [
+        {"name": "Blocks", "inward": "is blocked by", "outward": "blocks"},
+        {"name": "Relates", "inward": "relates to", "outward": "relates to"},
+        {"name": "Cloners", "inward": "is cloned by", "outward": "clones"},
+    ]
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_get_link_types(self, mock_api_path, mock_get):
+        """Test fetching link types."""
+        mock_api_path.return_value = "rest/api/3/issueLinkType"
+        mock_get.return_value = {
+            "issueLinkTypes": [
+                {"name": "Blocks", "inward": "is blocked by", "outward": "blocks", "id": "1"},
+            ]
+        }
+        result = get_link_types()
+        assert len(result) == 1
+        assert result[0]["name"] == "Blocks"
+        assert result[0]["outward"] == "blocks"
+        assert result[0]["inward"] == "is blocked by"
+
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_create_link_outward(self, mock_types, mock_api_path, mock_post):
+        """Test creating a link using outward name."""
+        mock_types.return_value = self.SAMPLE_LINK_TYPES
+        mock_api_path.return_value = "rest/api/3/issueLink"
+        mock_post.return_value = {}
+
+        create_link("SRC-1", "blocks", "TGT-2")
+
+        mock_post.assert_called_once()
+        payload = mock_post.call_args[0][2]
+        assert payload["type"]["name"] == "Blocks"
+        assert payload["outwardIssue"]["key"] == "SRC-1"
+        assert payload["inwardIssue"]["key"] == "TGT-2"
+
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_create_link_inward_swaps_direction(self, mock_types, mock_api_path, mock_post):
+        """Test that using inward name swaps issue direction."""
+        mock_types.return_value = self.SAMPLE_LINK_TYPES
+        mock_api_path.return_value = "rest/api/3/issueLink"
+        mock_post.return_value = {}
+
+        create_link("SRC-1", "is blocked by", "TGT-2")
+
+        payload = mock_post.call_args[0][2]
+        assert payload["type"]["name"] == "Blocks"
+        assert payload["outwardIssue"]["key"] == "TGT-2"
+        assert payload["inwardIssue"]["key"] == "SRC-1"
+
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_create_link_by_type_name(self, mock_types, mock_api_path, mock_post):
+        """Test creating a link using the type name directly."""
+        mock_types.return_value = self.SAMPLE_LINK_TYPES
+        mock_api_path.return_value = "rest/api/3/issueLink"
+        mock_post.return_value = {}
+
+        create_link("SRC-1", "Blocks", "TGT-2")
+
+        payload = mock_post.call_args[0][2]
+        assert payload["type"]["name"] == "Blocks"
+        assert payload["outwardIssue"]["key"] == "SRC-1"
+
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_create_link_invalid_type(self, mock_types):
+        """Test that unknown link type raises ValueError with valid types."""
+        mock_types.return_value = self.SAMPLE_LINK_TYPES
+
+        with pytest.raises(ValueError, match="Unknown link type 'InvalidType'") as exc_info:
+            create_link("SRC-1", "InvalidType", "TGT-2")
+        assert "Blocks" in str(exc_info.value)
+        assert "Relates" in str(exc_info.value)
+
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_create_link_case_insensitive(self, mock_types, mock_api_path, mock_post):
+        """Test that link type matching is case-insensitive."""
+        mock_types.return_value = self.SAMPLE_LINK_TYPES
+        mock_api_path.return_value = "rest/api/3/issueLink"
+        mock_post.return_value = {}
+
+        create_link("SRC-1", "BLOCKS", "TGT-2")
+
+        payload = mock_post.call_args[0][2]
+        assert payload["type"]["name"] == "Blocks"
+
+
+class TestParseLinkArgs:
+    """Tests for _parse_link_args()."""
+
+    def test_valid_links(self):
+        """Test parsing valid link args."""
+        result = _parse_link_args(["Blocks:DEMO-456", "Relates:DEMO-789"])
+        assert result == [("Blocks", "DEMO-456"), ("Relates", "DEMO-789")]
+
+    def test_none_returns_empty(self):
+        """Test None input returns empty list."""
+        assert _parse_link_args(None) == []
+
+    def test_empty_list_returns_empty(self):
+        """Test empty list returns empty list."""
+        assert _parse_link_args([]) == []
+
+    def test_missing_colon_returns_error(self):
+        """Test missing colon returns error string."""
+        result = _parse_link_args(["BadFormat"])
+        assert isinstance(result, str)
+        assert "TYPE:ISSUE" in result
+
+    def test_empty_type_returns_error(self):
+        """Test empty type part returns error."""
+        result = _parse_link_args([":DEMO-456"])
+        assert isinstance(result, str)
+
+    def test_empty_issue_returns_error(self):
+        """Test empty issue part returns error."""
+        result = _parse_link_args(["Blocks:"])
+        assert isinstance(result, str)
+
+    def test_colon_in_value_preserved(self):
+        """Test that only first colon is split on."""
+        result = _parse_link_args(["Blocks:DEMO-456:extra"])
+        assert result == [("Blocks", "DEMO-456:extra")]
+
+
+class TestParseIssueFileLinks:
+    """Tests for links in parse_issue_file() frontmatter."""
+
+    def test_links_parsed(self, tmp_path):
+        """Test links are normalized to tuples."""
+        f = tmp_path / "issue.md"
+        f.write_text(
+            "---\nsummary: Test\nlinks:\n  - blocks: DEMO-456\n  - relates to: DEMO-789\n---\n"
+        )
+        fields, _ = parse_issue_file(str(f))
+        assert fields["links"] == [("blocks", "DEMO-456"), ("relates to", "DEMO-789")]
+
+    def test_links_not_list_raises(self, tmp_path):
+        """Test non-list links value raises ValueError."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Test\nlinks: not-a-list\n---\n")
+        with pytest.raises(ValueError, match="must be a list"):
+            parse_issue_file(str(f))
+
+    def test_links_bad_entry_raises(self, tmp_path):
+        """Test link entry with multiple keys raises ValueError."""
+        f = tmp_path / "issue.md"
+        f.write_text(
+            "---\nsummary: Test\nlinks:\n  - blocks: DEMO-1\n    relates to: DEMO-2\n---\n"
+        )
+        with pytest.raises(ValueError, match="single-key mapping"):
+            parse_issue_file(str(f))
+
+    def test_links_string_entry_raises(self, tmp_path):
+        """Test link entry that is a plain string raises ValueError."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Test\nlinks:\n  - just-a-string\n---\n")
+        with pytest.raises(ValueError, match="single-key mapping"):
+            parse_issue_file(str(f))
+
+
+class TestCmdIssueLinkIntegration:
+    """Tests for --link integration in cmd_issue()."""
+
+    @patch("skills.jira.scripts.jira.create_link")
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_create_with_links(
+        self, mock_jira_defaults, mock_proj_defaults, mock_create, mock_link, capsys
+    ):
+        """Test issue create with --link args."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_create.return_value = {"key": "DEMO-100"}
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project="DEMO",
+            issue_type="Task",
+            summary="Test",
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file=None,
+            set_field=None,
+            link=["Blocks:DEMO-456", "Relates:DEMO-789"],
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        assert mock_link.call_count == 2
+        mock_link.assert_any_call("DEMO-100", "Blocks", "DEMO-456")
+        mock_link.assert_any_call("DEMO-100", "Relates", "DEMO-789")
+        captured = capsys.readouterr()
+        assert "Linked DEMO-100" in captured.out
+
+    @patch("skills.jira.scripts.jira.create_link")
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_create_from_file_with_links(
+        self, mock_parse, mock_jira_defaults, mock_proj_defaults, mock_create, mock_link
+    ):
+        """Test issue create from file with links in frontmatter."""
+        mock_parse.return_value = (
+            {
+                "summary": "Test",
+                "project": "DEMO",
+                "type": "Task",
+                "links": [("blocks", "DEMO-456")],
+            },
+            None,
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_create.return_value = {"key": "DEMO-200"}
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project=None,
+            issue_type=None,
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="issue.md",
+            set_field=None,
+            link=None,
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        mock_link.assert_called_once_with("DEMO-200", "blocks", "DEMO-456")
+
+    @patch("skills.jira.scripts.jira.create_link")
+    @patch("skills.jira.scripts.jira.update_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_update_with_links(self, mock_jira_defaults, mock_update, mock_link, capsys):
+        """Test issue update with --link args."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_update.return_value = {}
+
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary="Updated",
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            from_file=None,
+            set_field=None,
+            link=["Blocks:DEMO-456"],
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        mock_link.assert_called_once_with("DEMO-123", "Blocks", "DEMO-456")
+        captured = capsys.readouterr()
+        assert "Linked DEMO-123" in captured.out
+
+    @patch("skills.jira.scripts.jira.create_link")
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_create_link_failure_continues(
+        self, mock_jira_defaults, mock_proj_defaults, mock_create, mock_link, capsys
+    ):
+        """Test that a link failure doesn't fail the whole create."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_create.return_value = {"key": "DEMO-300"}
+        mock_link.side_effect = [None, ValueError("Unknown link type 'Bad'")]
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project="DEMO",
+            issue_type="Task",
+            summary="Test",
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file=None,
+            set_field=None,
+            link=["Blocks:DEMO-456", "Bad:DEMO-789"],
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        assert mock_link.call_count == 2
+        captured = capsys.readouterr()
+        assert "Warning: failed to link to DEMO-789" in captured.err
+
+    @patch("skills.jira.scripts.jira.create_link")
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.parse_issue_file")
+    def test_create_file_and_cli_links_additive(
+        self, mock_parse, mock_jira_defaults, mock_proj_defaults, mock_create, mock_link
+    ):
+        """Test that frontmatter and CLI links are both applied."""
+        mock_parse.return_value = (
+            {
+                "summary": "Test",
+                "project": "DEMO",
+                "type": "Task",
+                "links": [("blocks", "DEMO-1")],
+            },
+            None,
+        )
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_proj_defaults.return_value = ProjectDefaults()
+        mock_create.return_value = {"key": "DEMO-400"}
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project=None,
+            issue_type=None,
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file="issue.md",
+            set_field=None,
+            link=["Relates:DEMO-2"],
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        assert mock_link.call_count == 2
+        mock_link.assert_any_call("DEMO-400", "blocks", "DEMO-1")
+        mock_link.assert_any_call("DEMO-400", "Relates", "DEMO-2")

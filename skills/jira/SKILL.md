@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.5.0"
+  version: "0.7.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -153,49 +153,30 @@ This validates:
 Search for issues using JQL (Jira Query Language).
 
 ```bash
-# Standard JQL
 $SKILL_DIR/scripts/jira.py search "project = DEMO AND status = Open"
 $SKILL_DIR/scripts/jira.py search "assignee = currentUser() ORDER BY updated DESC" --max-results 20
-
-# ScriptRunner Enhanced Search (if available)
-# Find issues linked to a specific issue
-$SKILL_DIR/scripts/jira.py search 'issue in linkedIssuesOf("DEMO-123")'
-
-# Find parent/child relationships
-$SKILL_DIR/scripts/jira.py search 'issue in parentsOf("DEMO-123")'
-$SKILL_DIR/scripts/jira.py search 'issue in subtasksOf("DEMO-123")'
-
-# Find issues commented on by a specific user
-$SKILL_DIR/scripts/jira.py search 'issue in commentedByUser("username")'
-
-# Find epics and their issues
-$SKILL_DIR/scripts/jira.py search 'issue in epicsOf("DEMO-123")'
-$SKILL_DIR/scripts/jira.py search 'issue in issuesInEpics("EPIC-123")'
-
-# Find issues with specific link types (dependencies, blocks, etc.)
-$SKILL_DIR/scripts/jira.py search 'issue in hasLinkType("Dependency")'
 ```
 
 **Arguments:**
-- `jql`: JQL query string (required unless `--contributor` is used) - supports ScriptRunner functions if installed
-- `--contributor`: Search for issues where this user is a contributor (reporter, assignee, or commenter). On Jira Cloud, automatically resolves email/name to accountId. Requires ScriptRunner for comment-based matching.
+- `jql`: JQL query string (required unless `--contributor` is used)
+- `--contributor`: Search for issues where this user is a contributor (reporter, assignee, or commenter). On Jira Cloud, automatically resolves email/name to accountId.
 - `--project`: Project key to scope a `--contributor` search
 - `--max-results`: Maximum number of results (default: 50)
 - `--fields`: Comma-separated list of fields to include
 
-**ScriptRunner Support:**
+**Deployment-specific queries:**
 
-The skill automatically detects if ScriptRunner Enhanced Search is installed and validates queries that use advanced JQL functions. If ScriptRunner functions are detected but the plugin is not available, you'll receive a warning.
+The available JQL functions depend on your Jira deployment type. Run
+`check` to see your deployment type and ScriptRunner availability.
 
-Common ScriptRunner functions include:
-- `linkedIssuesOf()`, `hasLinkType()` - Link and dependency queries
-- `subtasksOf()`, `parentsOf()`, `epicsOf()` - Hierarchy navigation
-- `commentedByUser()`, `transitionedBy()` - User activity tracking
-- And many more...
-
-**For complete ScriptRunner guidance** including user lookups, practical examples, and troubleshooting, read [scriptrunner.md](references/scriptrunner.md).
-
-Note: ScriptRunner works differently on Cloud vs Data Center/Server instances. The skill handles both automatically.
+- **All deployments**: See [jql-reference.md](references/jql-reference.md)
+  for standard JQL patterns (status, dates, fields, ordering).
+- **Data Center/Server with ScriptRunner**: See
+  [scriptrunner.md](references/scriptrunner.md) for advanced functions
+  like `linkedIssuesOf()`, `subtasksOf()`, `commentedByUser()`.
+- **Jira Cloud**: ScriptRunner functions are **not available**. Use the
+  Cloud-native alternatives documented in
+  [jql-reference.md](references/jql-reference.md#cloud-alternatives).
 
 ### issue
 
@@ -227,6 +208,21 @@ $SKILL_DIR/scripts/jira.py issue update DEMO-123 --summary "Updated summary"
 # Update custom fields
 $SKILL_DIR/scripts/jira.py issue update DEMO-123 --set-field assigned_team="Platform Team"
 
+# Create issue from a markdown file
+$SKILL_DIR/scripts/jira.py issue create --from-file issue.md
+
+# Create issue from file with CLI overrides
+$SKILL_DIR/scripts/jira.py issue create --from-file issue.md --priority Critical
+
+# Update issue from a markdown file
+$SKILL_DIR/scripts/jira.py issue update DEMO-123 --from-file changes.md
+
+# Create issue with links
+$SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task" --link "Blocks:DEMO-456" --link "Relates:DEMO-789"
+
+# Add links to existing issue
+$SKILL_DIR/scripts/jira.py issue update DEMO-123 --link "is blocked by:DEMO-456"
+
 # Add comment
 $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
 
@@ -239,9 +235,65 @@ $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "Internal note" --security-lev
 - `--fields`: Comma-separated list of fields to include (uses config default if not specified)
 - `--contributors`: Show unique contributors (reporter, assignee, comment authors). Opt-in; requires an extra API call.
 
+**Arguments for `issue create`:**
+- `--project`: Project key (required unless provided in `--from-file`)
+- `--type`: Issue type (required unless project default configured or provided in `--from-file`)
+- `--summary`: Issue summary (required unless provided in `--from-file`)
+- `--description`: Issue description (cannot be used with `--from-file`)
+- `--priority`: Priority name
+- `--labels`: Comma-separated labels
+- `--assignee`: Assignee account ID
+- `--set-field NAME=VALUE`: Set a custom field (repeatable)
+- `--from-file PATH`: Read issue fields and description from a markdown file (see below)
+- `--link TYPE:ISSUE`: Link to another issue (repeatable). Type can be a name, outward, or inward label (e.g. `Blocks`, `is blocked by`, `Relates`)
+- `--json`: Output as JSON
+
+**Arguments for `issue update`:**
+- `issue_key`: Issue key (required)
+- `--summary`: New summary
+- `--description`: New description (cannot be used with `--from-file`)
+- `--priority`: New priority
+- `--labels`: New labels (comma-separated)
+- `--assignee`: New assignee account ID
+- `--set-field NAME=VALUE`: Set a custom field (repeatable)
+- `--from-file PATH`: Read issue fields and description from a markdown file (see below)
+- `--link TYPE:ISSUE`: Link to another issue (repeatable)
+
 **Arguments for `issue comments`:**
 - `issue_key`: Issue key (required)
 - `--max-results`: Maximum number of comments (default: 50)
+
+**Markdown file format for `--from-file`:**
+
+The file uses YAML frontmatter (between `---` delimiters) for issue fields and
+the markdown body for the description. CLI arguments override frontmatter values.
+
+```yaml
+---
+summary: "Issue title"
+project: "DEMO"          # create only; ignored on update
+type: "Task"             # create only; ignored on update
+priority: "High"
+labels:
+  - label1
+  - label2
+assignee: "account-id"
+fields:                  # custom fields, same names as --set-field
+  story_points: 5
+  assigned_team: "Platform"
+links:                   # issue links (additive with --link CLI args)
+  - blocks: DEMO-456
+  - relates to: DEMO-789
+  - is cloned by: DEMO-100
+---
+
+Markdown body becomes the issue description.
+Supports headings, bold, links, lists, and tables.
+
+Link type names can be the type name, outward label, or inward label
+(e.g. `blocks`, `is blocked by`, `Relates`). The direction is resolved
+automatically based on which label matches.
+```
 
 ### transitions
 

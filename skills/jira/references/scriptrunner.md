@@ -1,15 +1,15 @@
 # ScriptRunner Enhanced Search Guide
 
-ScriptRunner Enhanced Search provides advanced JQL functions for complex queries that aren't possible with standard JQL.
+> **Data Center/Server only.** ScriptRunner Enhanced Search functions
+> are not available on Jira Cloud. If you are using Jira Cloud, see
+> [jql-reference.md](jql-reference.md#cloud-alternatives) for
+> alternative query patterns.
+
+ScriptRunner Enhanced Search provides advanced JQL functions for complex queries that aren't possible with standard JQL. These functions require the ScriptRunner plugin on a Jira Data Center/Server instance.
 
 ## Availability
 
-ScriptRunner works differently depending on your Jira deployment:
-
-- **Cloud**: Atlassian Marketplace app with REST API endpoints
-- **Data Center/Server**: Self-hosted plugin with different API structure
-
-The Jira skill automatically detects your deployment type and validates ScriptRunner availability.
+ScriptRunner is available on Jira Data Center/Server as a self-hosted plugin. The Jira skill automatically detects whether ScriptRunner is available and will reject queries that use ScriptRunner functions if the plugin is not installed.
 
 ## User Lookup for Advanced Queries
 
@@ -216,14 +216,11 @@ python jira.py search 'issuelinktype = "is blocked by" AND issue in linkedIssues
 
 **Error**: `Function 'linkedIssuesOf' not found`
 
-**Solution**: ScriptRunner is not installed on your Jira instance. Check with:
-```bash
-python jira.py check
-```
-
-If ScriptRunner is not detected, install it from:
-- **Cloud**: [Atlassian Marketplace](https://marketplace.atlassian.com/apps/6820/scriptrunner-for-jira)
-- **Data Center/Server**: Install via Universal Plugin Manager (UPM)
+**Solution**: ScriptRunner Enhanced Search is not available on your Jira
+instance. Run `check` to verify your deployment type and ScriptRunner
+availability. If you are using Jira Cloud, see
+[jql-reference.md](jql-reference.md#cloud-alternatives) for alternative
+query patterns.
 
 ### Invalid User Identifier
 

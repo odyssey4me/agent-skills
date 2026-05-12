@@ -918,7 +918,7 @@ def validate_jql_for_scriptrunner(jql: str) -> dict[str, Any]:
         warning = (
             f"This JQL query uses ScriptRunner functions ({', '.join(functions_detected)}) "
             f"but ScriptRunner Enhanced Search is not detected on this {deployment_type} instance. "
-            "The query may fail. Install ScriptRunner from Atlassian Marketplace to use these functions."
+            "The query may fail."
         )
 
     return {
@@ -1041,7 +1041,7 @@ def make_request(
             response=response.text,
         )
 
-    if response.status_code == 204:
+    if response.status_code == 204 or not response.text.strip():
         return {}
 
     return response.json()
@@ -1159,6 +1159,88 @@ def ensure_field_included(fields: list[str] | None, field: str) -> list[str]:
     if field not in fields:
         return [*fields, field]
     return fields
+
+
+_ISSUE_FILE_KNOWN_KEYS = frozenset(
+    {"summary", "project", "type", "priority", "labels", "assignee", "fields", "links"}
+)
+
+
+def parse_issue_file(file_path: str) -> tuple[dict[str, Any], str | None]:
+    """Parse a markdown file with YAML frontmatter into issue fields and description.
+
+    Args:
+        file_path: Path to the markdown file.
+
+    Returns:
+        Tuple of (fields_dict, body_text_or_none).
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If frontmatter is missing, empty, or contains invalid YAML.
+    """
+    path = Path(file_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    content = path.read_text(encoding="utf-8")
+    lines = content.split("\n")
+
+    if not lines or lines[0].strip() != "---":
+        raise ValueError("file must start with '---' frontmatter delimiter")
+
+    end_idx = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            end_idx = i
+            break
+
+    if end_idx is None:
+        raise ValueError("missing closing '---' frontmatter delimiter")
+
+    fm_text = "\n".join(lines[1:end_idx])
+    if not fm_text.strip():
+        raise ValueError("frontmatter is empty")
+
+    try:
+        fields = yaml.safe_load(fm_text)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid YAML in frontmatter: {exc}") from exc
+
+    if not isinstance(fields, dict):
+        raise ValueError("frontmatter must be a YAML mapping")
+
+    unknown = set(fields.keys()) - _ISSUE_FILE_KNOWN_KEYS
+    if unknown:
+        print(
+            f"Warning: unrecognized frontmatter keys: {', '.join(sorted(unknown))}",
+            file=sys.stderr,
+        )
+
+    for key in ("summary", "project", "type", "priority", "assignee"):
+        if key in fields and fields[key] is not None:
+            fields[key] = str(fields[key])
+
+    if "labels" in fields and isinstance(fields["labels"], str):
+        fields["labels"] = [lbl.strip() for lbl in fields["labels"].split(",")]
+
+    if "links" in fields:
+        raw_links = fields["links"]
+        if not isinstance(raw_links, list):
+            raise ValueError("'links' must be a list")
+        normalized: list[tuple[str, str]] = []
+        for i, entry in enumerate(raw_links):
+            if not isinstance(entry, dict) or len(entry) != 1:
+                raise ValueError(
+                    f"links[{i}]: each entry must be a single-key mapping (e.g. 'blocks: DEMO-456')"
+                )
+            link_type, target = next(iter(entry.items()))
+            normalized.append((str(link_type), str(target)))
+        fields["links"] = normalized
+
+    body = "\n".join(lines[end_idx + 1 :]).strip() or None
+
+    return fields, body
 
 
 def _normalize_field_name(name: str) -> str:
@@ -1412,17 +1494,29 @@ def search_issues(
         APIError: If the search fails.
 
     Example:
-        >>> # Standard JQL
         >>> search_issues("project = DEMO AND status = Open")
-
-        >>> # ScriptRunner Enhanced Search
-        >>> search_issues('issue in linkedIssuesOf("DEMO-123")')
     """
     fields = fields or DEFAULT_FIELDS
 
     validation = validate_jql_for_scriptrunner(jql)
-    if validation["warning"]:
-        print(f"Warning: {validation['warning']}", file=sys.stderr)
+    if validation["uses_scriptrunner"] and not validation["supported"]:
+        funcs = ", ".join(validation["functions_detected"])
+        msg = (
+            f"Error: Query uses ScriptRunner functions ({funcs}) "
+            f"which are not available on this Jira instance.\n"
+        )
+        if is_cloud():
+            msg += (
+                "ScriptRunner Enhanced Search is not supported on Jira Cloud.\n"
+                "See references/jql-reference.md for Cloud-native alternatives."
+            )
+        else:
+            msg += (
+                "ScriptRunner Enhanced Search is not available on this instance.\n"
+                "See references/jql-reference.md for standard JQL alternatives."
+            )
+        print(msg, file=sys.stderr)
+        return []
 
     if is_cloud():
         return _search_issues_cloud(jql, max_results, fields)
@@ -1522,6 +1616,24 @@ def get_issue(issue_key: str, fields: list[str] | None = None) -> dict[str, Any]
     if isinstance(response, dict):
         return response
     return {}
+
+
+def get_project_issue_types(project: str) -> list[str]:
+    """Get valid issue type names for a project via createmeta.
+
+    Returns an empty list if the lookup fails.
+    """
+    try:
+        response = get("jira", api_path(f"issue/createmeta/{project}/issuetypes"))
+        if isinstance(response, dict):
+            return [
+                it["name"]
+                for it in response.get("issueTypes", response.get("values", []))
+                if isinstance(it, dict) and "name" in it
+            ]
+    except Exception:
+        pass
+    return []
 
 
 def create_issue(
@@ -1626,6 +1738,77 @@ def update_issue(
     if isinstance(response, dict):
         return response
     return {}
+
+
+def get_link_types() -> list[dict[str, str]]:
+    """Get available issue link types.
+
+    Returns:
+        List of dicts with 'name', 'inward', and 'outward' keys.
+    """
+    response = get("jira", api_path("issueLinkType"))
+    if isinstance(response, dict):
+        return [
+            {
+                "name": lt["name"],
+                "inward": lt.get("inward", ""),
+                "outward": lt.get("outward", ""),
+            }
+            for lt in response.get("issueLinkTypes", [])
+            if isinstance(lt, dict) and "name" in lt
+        ]
+    return []
+
+
+def create_link(source_key: str, link_type: str, target_key: str) -> None:
+    """Create a link between two issues.
+
+    Resolves the link type name against available types (case-insensitive),
+    matching on name, inward, or outward labels to determine direction.
+
+    Args:
+        source_key: The issue being created/updated.
+        link_type: Link type name (e.g. 'Blocks', 'is blocked by', 'Relates').
+        target_key: The issue to link to.
+
+    Raises:
+        ValueError: If the link type is not recognized.
+    """
+    link_types = get_link_types()
+    lt_lower = link_type.lower()
+
+    resolved_name = None
+    outward_key = source_key
+    inward_key = target_key
+
+    for lt in link_types:
+        if lt_lower == lt["name"].lower():
+            resolved_name = lt["name"]
+            break
+        if lt_lower == lt["outward"].lower():
+            resolved_name = lt["name"]
+            break
+        if lt_lower == lt["inward"].lower():
+            resolved_name = lt["name"]
+            outward_key = target_key
+            inward_key = source_key
+            break
+
+    if not resolved_name:
+        valid = []
+        for lt in link_types:
+            valid.append(f"{lt['name']} (outward: {lt['outward']}, inward: {lt['inward']})")
+        raise ValueError(f"Unknown link type '{link_type}'. Valid types:\n  " + "\n  ".join(valid))
+
+    post(
+        "jira",
+        api_path("issueLink"),
+        {
+            "type": {"name": resolved_name},
+            "outwardIssue": {"key": outward_key},
+            "inwardIssue": {"key": inward_key},
+        },
+    )
 
 
 def add_comment(issue_key: str, body: str, security_level: str | None = None) -> dict[str, Any]:
@@ -2328,6 +2511,78 @@ def cmd_search(args: argparse.Namespace) -> int:
         return 1
 
 
+def _resolve_set_field_pairs(
+    pairs: list[str],
+    custom_fields: dict[str, str],
+    schemas: dict[str, str],
+) -> dict[str, Any] | str:
+    """Resolve --set-field NAME=VALUE pairs to field IDs with coerced values.
+
+    Returns the extra_fields dict on success, or an error message string on failure.
+    """
+    extra_fields: dict[str, Any] = {}
+    for pair in pairs:
+        if "=" not in pair:
+            return f"--set-field requires NAME=VALUE format, got: {pair}"
+        name, value = pair.split("=", 1)
+        key = _normalize_field_name(name)
+        field_id = resolve_or_discover_field(name, custom_fields)
+        if not field_id:
+            return f"could not resolve field '{name}'"
+        extra_fields[field_id] = coerce_field_value(
+            field_id,
+            value,
+            schema_type=schemas.get(key),
+        )
+        reloaded = (load_config("jira") or {}).get("defaults", {})
+        custom_fields = reloaded.get("custom_fields", {})
+        schemas = reloaded.get("custom_field_schemas", {})
+    return extra_fields
+
+
+def _parse_link_args(link_args: list[str] | None) -> list[tuple[str, str]] | str:
+    """Parse --link TYPE:ISSUE pairs from CLI args.
+
+    Returns list of (link_type, target_key) tuples, or an error message string.
+    """
+    if not link_args:
+        return []
+    links = []
+    for arg in link_args:
+        if ":" not in arg:
+            return f"--link requires TYPE:ISSUE format, got: {arg}"
+        link_type, target = arg.split(":", 1)
+        link_type = link_type.strip()
+        target = target.strip()
+        if not link_type or not target:
+            return f"--link requires TYPE:ISSUE format, got: {arg}"
+        links.append((link_type, target))
+    return links
+
+
+def _load_from_file(args: argparse.Namespace) -> tuple[dict[str, Any], str | None] | int:
+    """Load and validate --from-file if present on args.
+
+    Returns (file_fields, file_description) on success, or an int exit code on error.
+    """
+    from_file = getattr(args, "from_file", None)
+    if not from_file:
+        return {}, None
+
+    if args.description:
+        print("Error: --from-file and --description cannot be used together", file=sys.stderr)
+        return 1
+
+    try:
+        return parse_issue_file(from_file)
+    except FileNotFoundError:
+        print(f"Error: file not found: {from_file}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"Error: invalid issue file: {exc}", file=sys.stderr)
+        return 1
+
+
 def cmd_issue(args: argparse.Namespace) -> int:
     """Handle issue command."""
     try:
@@ -2371,101 +2626,180 @@ def cmd_issue(args: argparse.Namespace) -> int:
                 print(format_comments(comments, args.issue_key))
 
         elif args.issue_command == "create":
+            # Load --from-file if provided
+            result = _load_from_file(args)
+            if isinstance(result, int):
+                return result
+            file_fields, file_description = result
+
             # Load project-specific defaults
             defaults = get_jira_defaults()
-            project_defaults = get_project_defaults(args.project)
+            project = args.project or file_fields.get("project")
+            project_defaults = get_project_defaults(project) if project else ProjectDefaults()
 
-            # Apply defaults with CLI precedence
-            issue_type = args.issue_type or project_defaults.issue_type
-            priority = args.priority or project_defaults.priority
+            # Merge: CLI > frontmatter > project defaults
+            summary = args.summary or file_fields.get("summary")
+            issue_type = args.issue_type or file_fields.get("type") or project_defaults.issue_type
+            priority = args.priority or file_fields.get("priority") or project_defaults.priority
+            description = args.description or file_description
+            assignee = args.assignee or file_fields.get("assignee")
 
+            if args.labels:
+                labels = args.labels.split(",")
+            elif file_fields.get("labels"):
+                labels = file_fields["labels"]
+            else:
+                labels = None
+
+            if not project:
+                print(
+                    "Error: --project is required (provide via CLI or frontmatter)",
+                    file=sys.stderr,
+                )
+                return 1
+            if not summary:
+                print(
+                    "Error: --summary is required (provide via CLI or frontmatter)",
+                    file=sys.stderr,
+                )
+                return 1
             if not issue_type:
-                print("Error: --type is required (no project default configured)", file=sys.stderr)
+                print(
+                    "Error: --type is required (no project default configured,"
+                    " provide via CLI or frontmatter)",
+                    file=sys.stderr,
+                )
                 return 1
 
-            # Resolve --set-field values to field IDs
-            extra_fields = {}
+            # Resolve custom fields: frontmatter fields first, then --set-field overrides
             custom_fields = defaults.custom_fields or {}
             schemas = defaults.custom_field_schemas or {}
-            for pair in getattr(args, "set_field", None) or []:
-                if "=" not in pair:
-                    print(
-                        f"Error: --set-field requires NAME=VALUE format, got: {pair}",
-                        file=sys.stderr,
-                    )
-                    return 1
-                name, value = pair.split("=", 1)
-                key = _normalize_field_name(name)
-                field_id = resolve_or_discover_field(name, custom_fields)
-                if not field_id:
-                    print(f"Error: could not resolve field '{name}'", file=sys.stderr)
-                    return 1
-                extra_fields[field_id] = coerce_field_value(
-                    field_id,
-                    value,
-                    schema_type=schemas.get(key),
-                )
-                # Reload in case discovery just saved new mappings
-                reloaded = (load_config("jira") or {}).get("defaults", {})
-                custom_fields = reloaded.get("custom_fields", {})
-                schemas = reloaded.get("custom_field_schemas", {})
+            extra_fields: dict[str, Any] = {}
 
-            labels = args.labels.split(",") if args.labels else None
+            fm_fields = file_fields.get("fields") or {}
+            if fm_fields:
+                fm_pairs = [f"{k}={v}" for k, v in fm_fields.items()]
+                fm_result = _resolve_set_field_pairs(fm_pairs, custom_fields, schemas)
+                if isinstance(fm_result, str):
+                    print(f"Error: {fm_result}", file=sys.stderr)
+                    return 1
+                extra_fields.update(fm_result)
+                reloaded = (load_config("jira") or {}).get("defaults", {})
+                custom_fields = reloaded.get("custom_fields", custom_fields)
+                schemas = reloaded.get("custom_field_schemas", schemas)
+
+            cli_pairs = getattr(args, "set_field", None) or []
+            if cli_pairs:
+                cli_result = _resolve_set_field_pairs(cli_pairs, custom_fields, schemas)
+                if isinstance(cli_result, str):
+                    print(f"Error: {cli_result}", file=sys.stderr)
+                    return 1
+                extra_fields.update(cli_result)
+
             issue = create_issue(
-                project=args.project,
+                project=project,
                 issue_type=issue_type,
-                summary=args.summary,
-                description=args.description,
+                summary=summary,
+                description=description,
                 priority=priority,
                 labels=labels,
-                assignee=args.assignee,
+                assignee=assignee,
                 extra_fields=extra_fields or None,
             )
+            new_key = issue.get("key", "N/A")
             if args.json:
                 print(format_json(issue))
             else:
-                print(f"Created issue: {issue.get('key', 'N/A')}")
+                print(f"Created issue: {new_key}")
+
+            # Process links (frontmatter + CLI, additive)
+            all_links: list[tuple[str, str]] = list(file_fields.get("links") or [])
+            cli_links = _parse_link_args(getattr(args, "link", None))
+            if isinstance(cli_links, str):
+                print(f"Error: {cli_links}", file=sys.stderr)
+                return 1
+            all_links.extend(cli_links)
+            for link_type, target_key in all_links:
+                try:
+                    create_link(new_key, link_type, target_key)
+                    print(f"  Linked {new_key} --[{link_type}]--> {target_key}")
+                except (ValueError, APIError) as link_err:
+                    print(f"  Warning: failed to link to {target_key}: {link_err}", file=sys.stderr)
 
         elif args.issue_command == "update":
-            # Resolve --set-field values to field IDs
+            # Load --from-file if provided
+            result = _load_from_file(args)
+            if isinstance(result, int):
+                return result
+            file_fields, file_description = result
+
             defaults = get_jira_defaults()
-            extra_fields = {}
+
+            # Merge: CLI > frontmatter (project/type silently ignored for update)
+            summary = args.summary or file_fields.get("summary")
+            description = args.description or file_description
+            priority = args.priority or file_fields.get("priority")
+            assignee = args.assignee or file_fields.get("assignee")
+
+            if args.labels:
+                labels = args.labels.split(",")
+            elif file_fields.get("labels"):
+                labels = file_fields["labels"]
+            else:
+                labels = None
+
+            # Resolve custom fields: frontmatter fields first, then --set-field overrides
             custom_fields = defaults.custom_fields or {}
             schemas = defaults.custom_field_schemas or {}
-            for pair in getattr(args, "set_field", None) or []:
-                if "=" not in pair:
-                    print(
-                        f"Error: --set-field requires NAME=VALUE format, got: {pair}",
-                        file=sys.stderr,
-                    )
-                    return 1
-                name, value = pair.split("=", 1)
-                key = _normalize_field_name(name)
-                field_id = resolve_or_discover_field(name, custom_fields)
-                if not field_id:
-                    print(f"Error: could not resolve field '{name}'", file=sys.stderr)
-                    return 1
-                extra_fields[field_id] = coerce_field_value(
-                    field_id,
-                    value,
-                    schema_type=schemas.get(key),
-                )
-                # Reload in case discovery just saved new mappings
-                reloaded = (load_config("jira") or {}).get("defaults", {})
-                custom_fields = reloaded.get("custom_fields", {})
-                schemas = reloaded.get("custom_field_schemas", {})
+            extra_fields: dict[str, Any] = {}
 
-            labels = args.labels.split(",") if args.labels else None
+            fm_fields = file_fields.get("fields") or {}
+            if fm_fields:
+                fm_pairs = [f"{k}={v}" for k, v in fm_fields.items()]
+                fm_result = _resolve_set_field_pairs(fm_pairs, custom_fields, schemas)
+                if isinstance(fm_result, str):
+                    print(f"Error: {fm_result}", file=sys.stderr)
+                    return 1
+                extra_fields.update(fm_result)
+                reloaded = (load_config("jira") or {}).get("defaults", {})
+                custom_fields = reloaded.get("custom_fields", custom_fields)
+                schemas = reloaded.get("custom_field_schemas", schemas)
+
+            cli_pairs = getattr(args, "set_field", None) or []
+            if cli_pairs:
+                cli_result = _resolve_set_field_pairs(cli_pairs, custom_fields, schemas)
+                if isinstance(cli_result, str):
+                    print(f"Error: {cli_result}", file=sys.stderr)
+                    return 1
+                extra_fields.update(cli_result)
+
             update_issue(
                 issue_key=args.issue_key,
-                summary=args.summary,
-                description=args.description,
-                priority=args.priority,
+                summary=summary,
+                description=description,
+                priority=priority,
                 labels=labels,
-                assignee=args.assignee,
+                assignee=assignee,
                 extra_fields=extra_fields or None,
             )
             print(f"Updated issue: {args.issue_key}")
+
+            # Process links (frontmatter + CLI, additive)
+            all_links: list[tuple[str, str]] = list(file_fields.get("links") or [])
+            cli_links = _parse_link_args(getattr(args, "link", None))
+            if isinstance(cli_links, str):
+                print(f"Error: {cli_links}", file=sys.stderr)
+                return 1
+            all_links.extend(cli_links)
+            for link_type, target_key in all_links:
+                try:
+                    create_link(args.issue_key, link_type, target_key)
+                    print(f"  Linked {args.issue_key} --[{link_type}]--> {target_key}")
+                except (ValueError, APIError) as link_err:
+                    print(
+                        f"  Warning: failed to link to {target_key}: {link_err}",
+                        file=sys.stderr,
+                    )
 
         elif args.issue_command == "comment":
             defaults = get_jira_defaults()
@@ -2480,6 +2814,20 @@ def cmd_issue(args: argparse.Namespace) -> int:
 
         return 0
 
+    except APIError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        if e.response:
+            print(f"Response: {e.response}", file=sys.stderr)
+        if e.status_code == 400 and getattr(args, "issue_command", None) == "create":
+            project_key = locals().get("project") or getattr(args, "project", None)
+            if project_key:
+                valid_types = get_project_issue_types(project_key)
+                if valid_types:
+                    print(
+                        f"Valid issue types for {project_key}: {', '.join(valid_types)}",
+                        file=sys.stderr,
+                    )
+        return 1
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
@@ -2846,11 +3194,11 @@ def main() -> int:
 
     # Create subcommand
     create_parser = issue_subparsers.add_parser("create", help="Create new issue")
-    create_parser.add_argument("--project", required=True, help="Project key")
+    create_parser.add_argument("--project", help="Project key")
     create_parser.add_argument(
         "--type", dest="issue_type", help="Issue type (required unless project default configured)"
     )
-    create_parser.add_argument("--summary", required=True, help="Issue summary")
+    create_parser.add_argument("--summary", help="Issue summary")
     create_parser.add_argument("--description", help="Issue description")
     create_parser.add_argument("--priority", help="Priority name")
     create_parser.add_argument("--labels", help="Comma-separated labels")
@@ -2860,6 +3208,18 @@ def main() -> int:
         action="append",
         metavar="NAME=VALUE",
         help="Set a custom field (e.g. --set-field story_points=5)",
+    )
+    create_parser.add_argument(
+        "--from-file",
+        dest="from_file",
+        metavar="PATH",
+        help="Read issue fields and description from a markdown file with YAML frontmatter",
+    )
+    create_parser.add_argument(
+        "--link",
+        action="append",
+        metavar="TYPE:ISSUE",
+        help="Link to another issue (e.g. --link 'Blocks:DEMO-456')",
     )
     create_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
@@ -2876,6 +3236,18 @@ def main() -> int:
         action="append",
         metavar="NAME=VALUE",
         help="Set a custom field (e.g. --set-field story_points=5)",
+    )
+    update_parser.add_argument(
+        "--from-file",
+        dest="from_file",
+        metavar="PATH",
+        help="Read issue fields and description from a markdown file with YAML frontmatter",
+    )
+    update_parser.add_argument(
+        "--link",
+        action="append",
+        metavar="TYPE:ISSUE",
+        help="Link to another issue (e.g. --link 'Blocks:DEMO-456')",
     )
 
     # Comment subcommand

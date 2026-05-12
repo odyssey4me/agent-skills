@@ -62,3 +62,40 @@ project = DEMO AND sprint in openSprints()
 # High priority items not yet started
 priority in (High, Highest) AND statusCategory = "To Do"
 ```
+
+## Cloud Alternatives
+
+These standard JQL patterns replace ScriptRunner functions that are
+only available on Data Center/Server.
+
+### Finding linked issues
+
+ScriptRunner: `issue in linkedIssuesOf("PROJ-123")`
+
+Cloud alternative: Use `issue get PROJ-123` to read the issue's links,
+then search by the linked issue keys directly.
+
+### Finding subtasks
+
+ScriptRunner: `issue in subtasksOf("PROJ-123")`
+
+Cloud alternative: `parent = PROJ-123`
+
+### Finding parent issues
+
+ScriptRunner: `issue in parentsOf("PROJ-123")`
+
+Cloud alternative: Use `issue get PROJ-123` to read the parent field.
+
+### Finding epic children
+
+ScriptRunner: `issue in issuesInEpics("EPIC-123")`
+
+Cloud alternative: `"Epic Link" = EPIC-123` or `parentEpic = EPIC-123`
+
+### Finding issues by commenter
+
+ScriptRunner: `issue in commentedByUser("accountId")`
+
+Cloud alternative: No direct JQL equivalent. Use the `--contributor`
+flag which searches reporter and assignee fields.
