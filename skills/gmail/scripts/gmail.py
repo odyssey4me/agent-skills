@@ -25,6 +25,7 @@ import contextlib
 import json
 import os
 import sys
+import urllib.parse
 from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Any
@@ -419,15 +420,26 @@ def list_messages(
         GmailAPIError: If the API call fails.
     """
     try:
-        params: dict[str, Any] = {"userId": "me", "maxResults": max_results}
-        if query:
-            params["q"] = query
-        if label_ids:
-            params["labelIds"] = label_ids
+        results: list[dict[str, Any]] = []
+        page_token = None
 
-        result = service.users().messages().list(**params).execute()
-        messages = result.get("messages", [])
-        return messages
+        while len(results) < max_results:
+            remaining = min(max_results - len(results), 100)
+            params: dict[str, Any] = {"userId": "me", "maxResults": remaining}
+            if query:
+                params["q"] = query
+            if label_ids:
+                params["labelIds"] = label_ids
+            if page_token:
+                params["pageToken"] = page_token
+
+            result = service.users().messages().list(**params).execute()
+            results.extend(result.get("messages", []))
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
+
+        return results[:max_results]
     except HttpError as e:
         handle_api_error(e)
         return []  # Unreachable, but satisfies type checker
@@ -452,6 +464,26 @@ def get_message(service, message_id: str, format: str = "full") -> dict[str, Any
             service.users().messages().get(userId="me", id=message_id, format=format).execute()
         )
         return message
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
+def get_thread(service, thread_id: str) -> dict[str, Any]:
+    """Get a full Gmail thread with all messages.
+
+    Args:
+        service: Gmail API service object.
+        thread_id: The thread ID.
+
+    Returns:
+        Thread dictionary with all messages.
+
+    Raises:
+        GmailAPIError: If the API call fails.
+    """
+    try:
+        return service.users().threads().get(userId="me", id=thread_id, format="full").execute()
     except HttpError as e:
         handle_api_error(e)
         return {}  # Unreachable
@@ -674,6 +706,52 @@ def modify_message_labels(
 
 
 # ============================================================================
+# GOOGLE GROUPS URL CONSTRUCTION
+# ============================================================================
+
+
+def build_group_url(group_email: str) -> str:
+    """Build a URL to the Google Groups page for a group."""
+    local, domain = group_email.split("@", 1)
+    if domain == "googlegroups.com":
+        return f"https://groups.google.com/g/{local}"
+    return f"https://groups.google.com/a/{domain}/g/{local}"
+
+
+def build_message_permalink(group_email: str, message_id_header: str) -> str:
+    """Build a permalink to a specific message in Google Groups.
+
+    Uses the d/msgid URL format (the canonical format used in
+    Google Groups notification footers).
+    """
+    local, domain = group_email.split("@", 1)
+    encoded_mid = urllib.parse.quote(message_id_header, safe="")
+    if domain == "googlegroups.com":
+        return f"https://groups.google.com/d/msgid/{local}/{encoded_mid}"
+    return f"https://groups.google.com/a/{domain}/d/msgid/{local}/{encoded_mid}"
+
+
+def extract_group_email_from_headers(headers: dict[str, str]) -> str | None:
+    """Extract group email address from Gmail message headers.
+
+    Parses the List-ID header (e.g., '<team.example.com>') to derive
+    the group email address.
+    """
+    list_id = headers.get("List-Id", headers.get("List-ID", ""))
+    if not list_id:
+        return None
+
+    if "<" in list_id and ">" in list_id:
+        list_id = list_id[list_id.index("<") + 1 : list_id.index(">")]
+
+    parts = list_id.split(".", 1)
+    if len(parts) == 2:
+        return f"{parts[0]}@{parts[1]}"
+
+    return None
+
+
+# ============================================================================
 # OUTPUT FORMATTING
 # ============================================================================
 
@@ -749,6 +827,8 @@ def extract_message_body(message: dict[str, Any]) -> str:
 def format_message_summary(message: dict[str, Any]) -> str:
     """Format a message for display.
 
+    Includes a Google Groups permalink when the message has a List-ID header.
+
     Args:
         message: Message dictionary from Gmail API.
 
@@ -760,12 +840,24 @@ def format_message_summary(message: dict[str, Any]) -> str:
     from_addr = headers.get("From", "(Unknown)")
     date = headers.get("Date", "(Unknown)")
     snippet = message.get("snippet", "")
+    thread_id = message.get("threadId", "")
 
     output = (
         f"### {subject}\n- **ID:** {message['id']}\n- **From:** {from_addr}\n- **Date:** {date}"
     )
+    if thread_id:
+        output += f"\n- **Thread ID:** {thread_id}"
+
+    # Include Google Groups permalink when message is from a group
+    group_email = extract_group_email_from_headers(headers)
+    message_id_header = headers.get("Message-ID", headers.get("Message-Id", ""))
+    if message_id_header and group_email:
+        mid = message_id_header.strip("<>")
+        permalink = build_message_permalink(group_email, mid)
+        output += f"\n- **Link:** {permalink}"
+
     if snippet:
-        output += f"\n- **Preview:** {snippet[:100]}..."
+        output += f"\n- **Preview:** {snippet[:200]}"
     return output
 
 
@@ -782,6 +874,56 @@ def format_label(label: dict[str, Any]) -> str:
     label_id = label.get("id", "(Unknown)")
     label_type = label.get("type", "user")
     return f"- **{name}** (ID: {label_id}, Type: {label_type})"
+
+
+def format_thread(thread: dict[str, Any]) -> str:
+    """Format a full Gmail thread for markdown display.
+
+    Args:
+        thread: Thread dictionary from Gmail API with all messages.
+
+    Returns:
+        Formatted markdown string with all messages in the thread.
+    """
+    messages = thread.get("messages", [])
+    if not messages:
+        return "(Empty thread)"
+
+    first_headers = {
+        h["name"]: h["value"] for h in messages[0].get("payload", {}).get("headers", [])
+    }
+    subject = first_headers.get("Subject", "(No subject)")
+
+    # Determine group email from first message headers
+    group_email = extract_group_email_from_headers(first_headers)
+
+    output = f"## Thread: {subject}\n"
+    if group_email:
+        output += f"\n**Group:** {build_group_url(group_email)}"
+    output += f"\n**Messages:** {len(messages)}\n"
+
+    for i, msg in enumerate(messages, 1):
+        headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+        from_addr = headers.get("From", "(Unknown)")
+        date = headers.get("Date", "(Unknown)")
+
+        output += f"\n---\n\n### Message {i} of {len(messages)}"
+        output += f"\n- **From:** {from_addr}"
+        output += f"\n- **Date:** {date}"
+
+        # Permalink for this message
+        effective_group = group_email or extract_group_email_from_headers(headers)
+        message_id_header = headers.get("Message-ID", headers.get("Message-Id", ""))
+        if message_id_header and effective_group:
+            mid = message_id_header.strip("<>")
+            permalink = build_message_permalink(effective_group, mid)
+            output += f"\n- **Link:** {permalink}"
+
+        body = extract_message_body(msg)
+        if body:
+            output += f"\n\n{body}"
+
+    return output
 
 
 # ============================================================================
@@ -1015,6 +1157,22 @@ def cmd_messages_get(args):
     return 0
 
 
+def cmd_threads_get(args):
+    """Handle 'threads get' command."""
+    service = build_gmail_service(GMAIL_SCOPES_READONLY)
+    thread = get_thread(service, args.thread_id)
+
+    if args.json:
+        print(json.dumps(thread, indent=2))
+    elif not thread.get("messages"):
+        print(f"Thread not found or empty: {args.thread_id}")
+        return 1
+    else:
+        print(format_thread(thread))
+
+    return 0
+
+
 def cmd_send(args):
     """Handle 'send' command."""
     service = build_gmail_service(GMAIL_SCOPES_READONLY + GMAIL_SCOPES_SEND)
@@ -1159,6 +1317,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     get_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    # threads commands
+    threads_parser = subparsers.add_parser("threads", help="Thread operations")
+    threads_subparsers = threads_parser.add_subparsers(dest="threads_command")
+
+    threads_get_parser = threads_subparsers.add_parser(
+        "get", help="Get full thread with all messages"
+    )
+    threads_get_parser.add_argument("thread_id", help="Thread ID")
+    threads_get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # send command
     send_parser = subparsers.add_parser("send", help="Send an email")
     send_parser.add_argument("--to", required=True, help="Recipient email address")
@@ -1264,6 +1432,8 @@ def main():
                 return cmd_messages_list(args)
             elif args.messages_command == "get":
                 return cmd_messages_get(args)
+        elif args.command == "threads" and args.threads_command == "get":
+            return cmd_threads_get(args)
         elif args.command == "send":
             return cmd_send(args)
         elif args.command == "drafts":

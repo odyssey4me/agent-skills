@@ -16,6 +16,7 @@ enforce appropriate permission controls.
 | auth reset | write | Clear stored OAuth token |
 | messages list | read | List messages matching a query |
 | messages get | read | Get a message by ID |
+| threads get | read | Get full thread with all messages |
 | send | write | Send an email |
 | drafts list | read | List draft messages |
 | drafts create | write | Create a draft message |

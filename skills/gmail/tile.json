@@ -1,8 +1,8 @@
 {
   "name": "odyssey4me/gmail",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "private": false,
-  "summary": "Send, search, and organize Gmail messages, drafts, and labels. Use when asked to compose an email, reply to mail, forward a message, search inbox, manage attachments, or organize Gmail.",
+  "summary": "Send, search, and organize Gmail messages, drafts, and labels. Read full threads and get shareable Google Groups permalinks. Use when asked to compose an email, reply to mail, forward a message, search inbox, manage attachments, organize Gmail, read a thread, or find a Google Groups discussion link.",
   "skills": {
     "gmail": {
       "path": "SKILL.md"

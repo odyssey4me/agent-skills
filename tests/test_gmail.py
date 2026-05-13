@@ -14,6 +14,8 @@ from skills.gmail.scripts.gmail import (
     _decode_body_data,
     _extract_body_from_parts,
     build_gmail_service,
+    build_group_url,
+    build_message_permalink,
     build_parser,
     check_gmail_connectivity,
     cmd_auth_reset,
@@ -28,16 +30,20 @@ from skills.gmail.scripts.gmail import (
     cmd_messages_get,
     cmd_messages_list,
     cmd_send,
+    cmd_threads_get,
     create_draft,
     create_label,
     delete_credential,
+    extract_group_email_from_headers,
     extract_message_body,
     format_label,
     format_message_summary,
+    format_thread,
     get_credential,
     get_google_credentials,
     get_message,
     get_oauth_client_config,
+    get_thread,
     handle_api_error,
     list_drafts,
     list_labels,
@@ -1550,3 +1556,238 @@ class TestMainFunction:
         exit_code = gmail.main()
 
         assert exit_code == 1
+
+
+# ============================================================================
+# GOOGLE GROUPS URL TESTS
+# ============================================================================
+
+
+class TestGoogleGroupsUrls:
+    """Tests for Google Groups URL construction."""
+
+    def test_build_group_url_workspace(self):
+        assert (
+            build_group_url("team@example.com") == "https://groups.google.com/a/example.com/g/team"
+        )
+
+    def test_build_group_url_public(self):
+        assert build_group_url("mygroup@googlegroups.com") == "https://groups.google.com/g/mygroup"
+
+    def test_build_message_permalink_workspace(self):
+        result = build_message_permalink("team@example.com", "abc123@mail.gmail.com")
+        assert "groups.google.com/a/example.com/d/msgid/team/" in result
+        assert "abc123%40mail.gmail.com" in result
+
+    def test_build_message_permalink_public(self):
+        result = build_message_permalink("mygroup@googlegroups.com", "abc@mail.gmail.com")
+        assert "groups.google.com/d/msgid/mygroup/" in result
+
+    def test_extract_group_email_from_headers_with_list_id(self):
+        headers = {"List-Id": "Team <team.example.com>"}
+        assert extract_group_email_from_headers(headers) == "team@example.com"
+
+    def test_extract_group_email_from_headers_bare(self):
+        headers = {"List-Id": "<team.example.com>"}
+        assert extract_group_email_from_headers(headers) == "team@example.com"
+
+    def test_extract_group_email_from_headers_none(self):
+        headers = {"Subject": "Test"}
+        assert extract_group_email_from_headers(headers) is None
+
+    def test_extract_group_email_from_headers_no_dot(self):
+        headers = {"List-Id": "<nodot>"}
+        assert extract_group_email_from_headers(headers) is None
+
+
+# ============================================================================
+# THREAD OPERATION TESTS
+# ============================================================================
+
+
+class TestThreadOperations:
+    """Tests for thread operations."""
+
+    def test_get_thread(self):
+        mock_service = Mock()
+        mock_service.users().threads().get().execute.return_value = {
+            "id": "thread1",
+            "messages": [{"id": "msg1"}, {"id": "msg2"}],
+        }
+
+        thread = get_thread(mock_service, "thread1")
+
+        assert thread["id"] == "thread1"
+        assert len(thread["messages"]) == 2
+
+    def test_format_thread_empty(self):
+        assert format_thread({"messages": []}) == "(Empty thread)"
+
+    def test_format_thread_with_messages(self):
+        thread = {
+            "messages": [
+                {
+                    "id": "msg1",
+                    "payload": {
+                        "headers": [
+                            {"name": "Subject", "value": "Test Thread"},
+                            {"name": "From", "value": "alice@example.com"},
+                            {"name": "Date", "value": "Mon, 12 May 2026"},
+                        ],
+                        "body": {"data": ""},
+                    },
+                },
+                {
+                    "id": "msg2",
+                    "payload": {
+                        "headers": [
+                            {"name": "Subject", "value": "Re: Test Thread"},
+                            {"name": "From", "value": "bob@example.com"},
+                            {"name": "Date", "value": "Mon, 12 May 2026"},
+                        ],
+                        "body": {"data": ""},
+                    },
+                },
+            ]
+        }
+
+        result = format_thread(thread)
+
+        assert "## Thread: Test Thread" in result
+        assert "**Messages:** 2" in result
+        assert "Message 1 of 2" in result
+        assert "Message 2 of 2" in result
+        assert "alice@example.com" in result
+        assert "bob@example.com" in result
+
+    def test_format_thread_with_group_url(self):
+        thread = {
+            "messages": [
+                {
+                    "id": "msg1",
+                    "payload": {
+                        "headers": [
+                            {"name": "Subject", "value": "Group Thread"},
+                            {"name": "From", "value": "alice@example.com"},
+                            {"name": "Date", "value": "Mon, 12 May 2026"},
+                            {"name": "List-Id", "value": "<team.example.com>"},
+                            {"name": "Message-ID", "value": "<abc@mail.gmail.com>"},
+                        ],
+                        "body": {"data": ""},
+                    },
+                }
+            ]
+        }
+
+        result = format_thread(thread)
+
+        assert "**Group:** https://groups.google.com/a/example.com/g/team" in result
+        assert "**Link:**" in result
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.get_thread")
+    @patch("builtins.print")
+    def test_cmd_threads_get_json(self, _mock_print, mock_get_thread, _mock_build_service):
+        mock_get_thread.return_value = {
+            "id": "thread1",
+            "messages": [{"id": "msg1"}],
+        }
+
+        args = Mock()
+        args.thread_id = "thread1"
+        args.json = True
+
+        result = cmd_threads_get(args)
+
+        assert result == 0
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.get_thread")
+    @patch("builtins.print")
+    def test_cmd_threads_get_text(self, mock_print, mock_get_thread, _mock_build_service):
+        mock_get_thread.return_value = {
+            "id": "thread1",
+            "messages": [
+                {
+                    "id": "msg1",
+                    "payload": {
+                        "headers": [
+                            {"name": "Subject", "value": "Test"},
+                            {"name": "From", "value": "a@b.com"},
+                            {"name": "Date", "value": "Mon"},
+                        ],
+                        "body": {"data": ""},
+                    },
+                }
+            ],
+        }
+
+        args = Mock()
+        args.thread_id = "thread1"
+        args.json = False
+
+        result = cmd_threads_get(args)
+
+        assert result == 0
+        mock_print.assert_called_once()
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.get_thread")
+    @patch("builtins.print")
+    def test_cmd_threads_get_empty(self, _mock_print, mock_get_thread, _mock_build_service):
+        mock_get_thread.return_value = {"id": "thread1", "messages": []}
+
+        args = Mock()
+        args.thread_id = "thread1"
+        args.json = False
+
+        result = cmd_threads_get(args)
+
+        assert result == 1
+
+
+# ============================================================================
+# UPDATED FORMAT MESSAGE SUMMARY TESTS
+# ============================================================================
+
+
+class TestFormatMessageSummaryUpdated:
+    """Tests for updated format_message_summary with Google Groups support."""
+
+    def test_format_message_summary_with_thread_id(self):
+        message = {
+            "id": "msg1",
+            "threadId": "thread1",
+            "snippet": "Hello world",
+            "payload": {
+                "headers": [
+                    {"name": "Subject", "value": "Test"},
+                    {"name": "From", "value": "alice@example.com"},
+                    {"name": "Date", "value": "Mon, 12 May 2026"},
+                ]
+            },
+        }
+
+        result = format_message_summary(message)
+
+        assert "**Thread ID:** thread1" in result
+
+    def test_format_message_summary_with_group_link(self):
+        message = {
+            "id": "msg1",
+            "threadId": "thread1",
+            "snippet": "Hello world",
+            "payload": {
+                "headers": [
+                    {"name": "Subject", "value": "Test"},
+                    {"name": "From", "value": "alice@example.com"},
+                    {"name": "Date", "value": "Mon, 12 May 2026"},
+                    {"name": "List-Id", "value": "<team.example.com>"},
+                    {"name": "Message-ID", "value": "<abc@mail.gmail.com>"},
+                ]
+            },
+        }
+
+        result = format_message_summary(message)
+
+        assert "**Link:** https://groups.google.com/a/example.com/d/msgid/team/" in result
