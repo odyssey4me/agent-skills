@@ -757,9 +757,7 @@ def format_event(event: dict[str, Any]) -> str:
 
     description = event.get("description")
     if description:
-        # Truncate long descriptions
-        desc_preview = description[:100] + "..." if len(description) > 100 else description
-        output += f"\n- **Description:** {desc_preview}"
+        output += f"\n- **Description:** {description}"
 
     attendees = event.get("attendees", [])
     my_status = None
