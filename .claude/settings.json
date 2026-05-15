@@ -4,5 +4,20 @@
       "Edit(file_path:**/tile.json)",
       "Write(file_path:**/tile.json)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "if": "Bash(git commit*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/check-skill-versions.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }
