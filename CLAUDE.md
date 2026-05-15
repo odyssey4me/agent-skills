@@ -60,6 +60,9 @@ Review this file quarterly and after major Claude model releases. Remove
 rules that compensate for limitations the model or tooling no longer has —
 stale instructions can actively constrain newer models.
 
+Subdirectory CLAUDE.md files (e.g. `skills/CLAUDE.md`) follow the same
+refresh cadence — include them in quarterly reviews.
+
 ## Skill Invocation
 
 Use `/jira` to invoke the Jira skill, or describe what you want naturally:
