@@ -11,6 +11,7 @@ Complete guide for developing agent skills and contributing to this repository.
 - [Creating New Skills](#creating-new-skills)
 - [Design Guidelines](#design-guidelines)
 - [Testing and Validation](#testing-and-validation)
+- [Releasing](#releasing)
 - [References](#references)
 
 ## Architecture
@@ -606,6 +607,40 @@ npx skills add odyssey4me/agent-skills --skill myskill
 # Verify installation
 ls ~/.claude/skills/myskill
 ```
+
+## Releasing
+
+Follow these steps to cut a release.
+
+### 1. Validate versions
+
+Delegate to a **haiku** subagent (via the Task tool with `model: "haiku"`).
+The subagent should — in a single invocation:
+
+1. Run `scripts/check_versions.sh` and report which skills need a bump.
+2. For skills that already have a bump, validate the bump level by reviewing
+   `git diff <tag> -- skills/<name>/` and confirming patch/minor/major is
+   appropriate for the changes.
+3. Report any skills where the bump level looks wrong.
+
+Fix any issues before proceeding.
+
+### 2. Push, tag, and create the release
+
+1. Push all commits to `origin/main`.
+2. Choose the next semver tag: use **minor** if any skill has a minor bump,
+   **patch** if all bumps are patch-only.
+3. Create the tag locally: `git tag <version>`.
+4. Create the GitHub release **before pushing the tag** using
+   `gh release create <version> --target main` with a hand-written summary
+   including:
+   - Grouped changes (features, infrastructure, refactoring, fixes).
+   - A skill versions table showing each changed skill's old → new version.
+5. Push the tag: `git push origin <version>`.
+
+**Order matters:** the release must exist before the tag is pushed because
+the release workflow uploads assets to the existing release. If the tag is
+pushed first, the workflow will fail with "release not found".
 
 ## References
 

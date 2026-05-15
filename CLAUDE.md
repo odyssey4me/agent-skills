@@ -40,53 +40,13 @@ Follow [Semantic Versioning](https://semver.org/) when updating it:
 - **Major** (0.2.0 → 1.0.0): Breaking changes — removed or renamed commands,
   changed default behaviour, restructured arguments.
 
-**When to bump:** before committing changes to a skill, delegate a version
-check to a **haiku** subagent (via the Task tool with `model: "haiku"`). The
-subagent should run the script, read its stdout directly, and report back
-to the parent agent — **never write output to files**. Specifically:
-
-1. Run `scripts/check_versions.sh` and report which skills need a bump.
-2. For skills that already have a bump, **validate the bump level** is
-   appropriate for the combined changes since the release tag. Review the
-   diff (`git diff <tag> -- skills/<name>/`) and confirm the level matches:
-   patch for doc/bug fixes, minor for new features, major for breaking changes.
-3. Report any skills where the bump level looks wrong (e.g. a new command was
-   added but only a patch bump was applied).
+A Claude Code hook enforces this — commits with unbumped skill changes are
+blocked automatically. Run `scripts/check_versions.sh` to check manually.
 
 ## Releasing
 
-Follow these steps to cut a release. Delegate the version check to a
-single **haiku** subagent that performs **all** steps and reports back.
-
-### 1. Validate versions
-
-Delegate to a **haiku** subagent (via the Task tool with `model: "haiku"`).
-The subagent should — in a single invocation:
-
-1. Run `scripts/check_versions.sh` and report which skills need a bump.
-2. For skills that already have a bump, validate the bump level by reviewing
-   `git diff <tag> -- skills/<name>/` and confirming patch/minor/major is
-   appropriate for the changes.
-3. Report any skills where the bump level looks wrong.
-
-Fix any issues before proceeding.
-
-### 2. Push, tag, and create the release
-
-1. Push all commits to `origin/main`.
-2. Choose the next semver tag: use **minor** if any skill has a minor bump,
-   **patch** if all bumps are patch-only.
-3. Create the tag locally: `git tag <version>`.
-4. Create the GitHub release **before pushing the tag** using
-   `gh release create <version> --target main` with a hand-written summary
-   including:
-   - Grouped changes (features, infrastructure, refactoring, fixes).
-   - A skill versions table showing each changed skill's old → new version.
-5. Push the tag: `git push origin <version>`.
-
-**Order matters:** the release must exist before the tag is pushed because
-the release workflow uploads assets to the existing release. If the tag is
-pushed first, the workflow will fail with "release not found".
+See [docs/developer-guide.md](docs/developer-guide.md#releasing) for the
+full release procedure.
 
 ## TODO.md
 
