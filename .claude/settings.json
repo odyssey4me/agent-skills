@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(file_path:**/tile.json)",
+      "Write(file_path:**/tile.json)"
+    ]
+  }
+}
