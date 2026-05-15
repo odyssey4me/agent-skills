@@ -54,6 +54,12 @@ When completing items from TODO.md, **remove** the finished entries entirely
 rather than marking them `[x]`. If an entire section becomes empty, remove the
 section heading too. Only pending work belongs in TODO.md.
 
+## Maintenance
+
+Review this file quarterly and after major Claude model releases. Remove
+rules that compensate for limitations the model or tooling no longer has —
+stale instructions can actively constrain newer models.
+
 ## Skill Invocation
 
 Use `/jira` to invoke the Jira skill, or describe what you want naturally:
