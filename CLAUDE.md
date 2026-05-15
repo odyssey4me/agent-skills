@@ -4,6 +4,15 @@ Refer to [AGENTS.md](./AGENTS.md) for skill usage instructions.
 
 Refer to [CONTRIBUTING.md](./CONTRIBUTING.md) for development guidelines.
 
+## Repository Layout
+
+- `skills/` — Self-contained agent skills (jira, github, gmail, etc.)
+- `scripts/` — Development utilities (validation, versioning, pre-commit)
+- `templates/` — Starter templates for new skills (api, cli, workflow)
+- `tests/` — Pytest suite (one file per skill, 80% coverage required)
+- `docs/` — User guide, developer guide, OAuth setup
+- `.github/workflows/` — CI (lint/test/validate) and release pipelines
+
 ## Before Committing
 
 Pre-commit hooks are a failsafe, not a first pass. Always run checks before
