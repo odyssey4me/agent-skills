@@ -1413,12 +1413,13 @@ def format_issue(issue: dict[str, Any], custom_fields: dict[str, str] | None = N
     priority = fields.get("priority", {})
     priority_name = priority.get("name", "None") if priority else "None"
 
-    result = (
-        f"### {key}: {summary}\n"
-        f"- **Status:** {status}\n"
-        f"- **Assignee:** {assignee_name}\n"
-        f"- **Priority:** {priority_name}"
-    )
+    resolution_obj = fields.get("resolution")
+    resolution_name = resolution_obj.get("name") if resolution_obj else None
+
+    result = f"### {key}: {summary}\n- **Status:** {status}\n"
+    if resolution_name:
+        result += f"- **Resolution:** {resolution_name}\n"
+    result += f"- **Assignee:** {assignee_name}\n- **Priority:** {priority_name}"
 
     return _append_custom_fields(result, fields, custom_fields)
 
@@ -1446,7 +1447,12 @@ def format_issues_list(
         summary = fields.get("summary", "No summary")
         status = fields.get("status", {}).get("name", "Unknown")
         assignee_name = assignee.get("displayName", "Unassigned") if assignee else "Unassigned"
-        entry = f"### {key}: {summary}\n- **Status:** {status}\n- **Assignee:** {assignee_name}"
+        resolution_obj = fields.get("resolution")
+        resolution_name = resolution_obj.get("name") if resolution_obj else None
+        entry = f"### {key}: {summary}\n- **Status:** {status}\n"
+        if resolution_name:
+            entry += f"- **Resolution:** {resolution_name}\n"
+        entry += f"- **Assignee:** {assignee_name}"
         entry = _append_custom_fields(entry, fields, custom_fields)
         parts.append(entry)
 
