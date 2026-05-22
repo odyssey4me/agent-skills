@@ -314,6 +314,10 @@ def main() -> int:
             print(f"Skipping {skill_path}: does not exist")
             continue
 
+        if not skill_dir.is_dir():
+            print(f"Skipping {skill_path}: not a directory")
+            continue
+
         print(f"Validating {skill_dir.name}...")
         errors = validate_skill(skill_dir)
         all_errors.extend(errors)
