@@ -1,8 +1,8 @@
 {
   "permissions": {
     "deny": [
-      "Edit(file_path:**/tile.json)",
-      "Write(file_path:**/tile.json)"
+      "Edit(**/tile.json)",
+      "Write(**/tile.json)"
     ]
   },
   "hooks": {
