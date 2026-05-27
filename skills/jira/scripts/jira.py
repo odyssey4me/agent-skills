@@ -1529,6 +1529,17 @@ def search_issues(
     return _search_issues_datacenter(jql, max_results, fields)
 
 
+def _warn_truncated_results(count: int) -> None:
+    """Warn on stderr when results may be truncated by Jira's API limit."""
+    print(
+        f"Warning: Results may be truncated — Jira's API limits search to "
+        f"~1000 issues. {count} results returned. Narrow your query with "
+        f'date ranges (e.g. created >= "2025-01-01") or additional filters '
+        f"to get complete results.",
+        file=sys.stderr,
+    )
+
+
 def _search_issues_cloud(
     jql: str,
     max_results: int,
@@ -1560,7 +1571,10 @@ def _search_issues_cloud(
         if not next_page_token or not issues:
             break
 
-    return all_issues[:max_results]
+    result = all_issues[:max_results]
+    if len(result) >= 1000 and next_page_token:
+        _warn_truncated_results(len(result))
+    return result
 
 
 def _search_issues_datacenter(
@@ -1571,6 +1585,7 @@ def _search_issues_datacenter(
     """Search with pagination for Jira Data Center (uses startAt/total)."""
     all_issues: list[dict[str, Any]] = []
     start_at = 0
+    last_total = 0
 
     while len(all_issues) < max_results:
         page_size = min(max_results - len(all_issues), 100)
@@ -1591,13 +1606,16 @@ def _search_issues_datacenter(
         issues = response.get("issues", [])
         all_issues.extend(issues)
 
-        total = response.get("total", 0)
-        if not issues or start_at + len(issues) >= total:
+        last_total = response.get("total", 0)
+        if not issues or start_at + len(issues) >= last_total:
             break
 
         start_at += len(issues)
 
-    return all_issues[:max_results]
+    result = all_issues[:max_results]
+    if last_total >= 1000 and len(result) < last_total:
+        _warn_truncated_results(len(result))
+    return result
 
 
 # ============================================================================

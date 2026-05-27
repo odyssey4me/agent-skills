@@ -1096,6 +1096,50 @@ class TestApiOperations:
         assert len(result) == 2
         assert result[1]["key"] == "DEMO-2"
 
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_search_issues_cloud_truncation_warning(
+        self, mock_api_path, mock_post, mock_is_cloud, mock_scriptrunner, capsys
+    ):
+        """Test Cloud search warns when results are truncated at API limit."""
+        mock_api_path.return_value = "rest/api/3/search/jql"
+        mock_is_cloud.return_value = True
+        mock_scriptrunner.return_value = {"available": False}
+        batch = [{"key": f"DEMO-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(100)]
+        mock_post.side_effect = [
+            {"issues": batch, "nextPageToken": f"token{p}"} for p in range(10)
+        ] + [{"issues": batch, "nextPageToken": "more"}]
+
+        result = search_issues("project = DEMO", max_results=1000)
+
+        assert len(result) == 1000
+        captured = capsys.readouterr()
+        assert "Results may be truncated" in captured.err
+        assert "1000 results returned" in captured.err
+
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.is_cloud")
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_search_issues_datacenter_truncation_warning(
+        self, mock_api_path, mock_get, mock_is_cloud, mock_scriptrunner, capsys
+    ):
+        """Test Data Center search warns when results are truncated at API limit."""
+        mock_api_path.return_value = "rest/api/2/search"
+        mock_is_cloud.return_value = False
+        mock_scriptrunner.return_value = {"available": False}
+        batch = [{"key": f"DEMO-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(100)]
+        mock_get.side_effect = [{"issues": batch, "total": 1500} for _ in range(10)]
+
+        result = search_issues("project = DEMO", max_results=1000)
+
+        assert len(result) == 1000
+        captured = capsys.readouterr()
+        assert "Results may be truncated" in captured.err
+        assert "1000 results returned" in captured.err
+
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.api_path")
     def test_get_issue(self, mock_api_path, mock_get):
