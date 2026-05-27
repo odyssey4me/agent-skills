@@ -29,6 +29,7 @@ from skills.gmail.scripts.gmail import (
     cmd_labels_list,
     cmd_messages_get,
     cmd_messages_list,
+    cmd_messages_mark_read,
     cmd_send,
     cmd_threads_get,
     create_draft,
@@ -1199,6 +1200,42 @@ class TestMoreCLICommands:
         assert exit_code == 0
         # Should only call print once (summary only, no body for metadata format)
         assert mock_print.call_count == 1
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.modify_message_labels")
+    @patch("builtins.print")
+    def test_cmd_messages_mark_read(self, mock_print, mock_modify, _mock_build_service):
+        """Test messages mark-read command."""
+        mock_modify.return_value = {"id": "msg123", "labelIds": ["INBOX"]}
+
+        args = Mock()
+        args.message_id = "msg123"
+        args.json = False
+
+        exit_code = cmd_messages_mark_read(args)
+
+        assert exit_code == 0
+        mock_modify.assert_called_once_with(
+            _mock_build_service.return_value, "msg123", remove_labels=["UNREAD"]
+        )
+        mock_print.assert_called_once_with("Message msg123 marked as read.")
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.modify_message_labels")
+    @patch("builtins.print")
+    def test_cmd_messages_mark_read_json(self, mock_print, mock_modify, _mock_build_service):
+        """Test messages mark-read command with JSON output."""
+        mock_modify.return_value = {"id": "msg123", "labelIds": ["INBOX"]}
+
+        args = Mock()
+        args.message_id = "msg123"
+        args.json = True
+
+        exit_code = cmd_messages_mark_read(args)
+
+        assert exit_code == 0
+        printed = mock_print.call_args[0][0]
+        assert '"id": "msg123"' in printed
 
     @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("skills.gmail.scripts.gmail.create_draft")

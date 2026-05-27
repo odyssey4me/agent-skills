@@ -1157,6 +1157,19 @@ def cmd_messages_get(args):
     return 0
 
 
+def cmd_messages_mark_read(args):
+    """Handle 'messages mark-read' command."""
+    service = build_gmail_service(GMAIL_SCOPES_MODIFY)
+    result = modify_message_labels(service, args.message_id, remove_labels=["UNREAD"])
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"Message {args.message_id} marked as read.")
+
+    return 0
+
+
 def cmd_threads_get(args):
     """Handle 'threads get' command."""
     service = build_gmail_service(GMAIL_SCOPES_READONLY)
@@ -1317,6 +1330,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     get_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    mark_read_parser = messages_subparsers.add_parser("mark-read", help="Mark message as read")
+    mark_read_parser.add_argument("message_id", help="Message ID")
+    mark_read_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # threads commands
     threads_parser = subparsers.add_parser("threads", help="Thread operations")
     threads_subparsers = threads_parser.add_subparsers(dest="threads_command")
@@ -1432,6 +1449,8 @@ def main():
                 return cmd_messages_list(args)
             elif args.messages_command == "get":
                 return cmd_messages_get(args)
+            elif args.messages_command == "mark-read":
+                return cmd_messages_mark_read(args)
         elif args.command == "threads" and args.threads_command == "get":
             return cmd_threads_get(args)
         elif args.command == "send":

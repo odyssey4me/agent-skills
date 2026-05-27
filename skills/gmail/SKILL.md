@@ -3,7 +3,7 @@ name: gmail
 description: Send, search, and organize Gmail messages, drafts, and labels. Read full threads and get shareable Google Groups permalinks. Use when asked to compose an email, reply to mail, forward a message, search inbox, manage attachments, organize Gmail, read a thread, or find a Google Groups discussion link.
 metadata:
   author: odyssey4me
-  version: "0.2.0"
+  version: "0.3.0"
   category: communication
   tags: "email, drafts, labels"
   complexity: standard
@@ -150,6 +150,17 @@ $SKILL_DIR/scripts/gmail.py messages get MESSAGE_ID --format minimal
 **Arguments:**
 - `message_id`: The message ID (required)
 - `--format`: Message format (full, minimal, raw, metadata) - default: full
+
+### messages mark-read
+
+Mark a message as read by removing the UNREAD label.
+
+```bash
+$SKILL_DIR/scripts/gmail.py messages mark-read MESSAGE_ID
+```
+
+**Arguments:**
+- `message_id`: The message ID (required)
 
 ### threads get
 
