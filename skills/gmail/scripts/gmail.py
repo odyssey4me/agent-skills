@@ -13,7 +13,7 @@ Usage:
     python gmail.py labels list
 
 Requirements:
-    pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
+    pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml markdown
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ import json
 import os
 import sys
 import urllib.parse
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Any
@@ -64,6 +65,13 @@ try:
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
+
+try:
+    import markdown as md_lib
+
+    MARKDOWN_AVAILABLE = True
+except ImportError:
+    MARKDOWN_AVAILABLE = False
 
 
 # ============================================================================
@@ -489,6 +497,75 @@ def get_thread(service, thread_id: str) -> dict[str, Any]:
         return {}  # Unreachable
 
 
+_EMAIL_FILE_KNOWN_KEYS = frozenset({"to", "cc", "bcc", "subject"})
+
+
+def parse_email_file(content: str) -> tuple[dict[str, str], str]:
+    """Parse a markdown file with YAML frontmatter for email fields.
+
+    Args:
+        content: File content with ``---`` delimited YAML frontmatter.
+
+    Returns:
+        Tuple of (headers dict, body markdown string).
+
+    Raises:
+        ValueError: If frontmatter is missing or contains unknown keys.
+    """
+    if not content.startswith("---"):
+        raise ValueError("file must start with '---' frontmatter delimiter")
+
+    end = content.index("---", 3)
+    if end < 0:
+        raise ValueError("missing closing '---' frontmatter delimiter")
+
+    frontmatter = yaml.safe_load(content[3:end]) or {}
+
+    unknown = set(frontmatter.keys()) - _EMAIL_FILE_KNOWN_KEYS
+    if unknown:
+        raise ValueError(f"unknown frontmatter keys: {', '.join(sorted(unknown))}")
+
+    headers = {k: str(v) for k, v in frontmatter.items()}
+    body = content[end + 3 :].strip()
+    return headers, body
+
+
+def markdown_to_html(text: str) -> str:
+    """Convert markdown text to HTML using the markdown library."""
+    return md_lib.markdown(text, extensions=["tables", "fenced_code"])
+
+
+def build_mime_message(
+    to: str,
+    subject: str,
+    body_plain: str,
+    body_html: str | None = None,
+    cc: str | None = None,
+    bcc: str | None = None,
+) -> str:
+    """Build a MIME message and return the base64url-encoded raw string.
+
+    When ``body_html`` is provided, creates a multipart/alternative message
+    with both plain-text and HTML parts. Otherwise creates a plain-text
+    message.
+    """
+    if body_html:
+        message = MIMEMultipart("alternative")
+        message.attach(MIMEText(body_plain, "plain"))
+        message.attach(MIMEText(body_html, "html"))
+    else:
+        message = MIMEText(body_plain)
+
+    message["To"] = to
+    message["Subject"] = subject
+    if cc:
+        message["Cc"] = cc
+    if bcc:
+        message["Bcc"] = bcc
+
+    return base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+
+
 def send_message(
     service,
     to: str,
@@ -496,6 +573,7 @@ def send_message(
     body: str,
     cc: str | None = None,
     bcc: str | None = None,
+    body_html: str | None = None,
 ) -> dict[str, Any]:
     """Send an email message.
 
@@ -506,6 +584,7 @@ def send_message(
         body: Email body (plain text).
         cc: CC recipients (comma-separated).
         bcc: BCC recipients (comma-separated).
+        body_html: Optional HTML body for multipart/alternative.
 
     Returns:
         Sent message dictionary.
@@ -514,15 +593,7 @@ def send_message(
         GmailAPIError: If the API call fails.
     """
     try:
-        message = MIMEText(body)
-        message["To"] = to
-        message["Subject"] = subject
-        if cc:
-            message["Cc"] = cc
-        if bcc:
-            message["Bcc"] = bcc
-
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+        raw_message = build_mime_message(to, subject, body, body_html, cc, bcc)
         result = service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
         return result
     except HttpError as e:
@@ -542,6 +613,7 @@ def create_draft(
     body: str,
     cc: str | None = None,
     bcc: str | None = None,
+    body_html: str | None = None,
 ) -> dict[str, Any]:
     """Create a draft email.
 
@@ -552,6 +624,7 @@ def create_draft(
         body: Email body (plain text).
         cc: CC recipients (comma-separated).
         bcc: BCC recipients (comma-separated).
+        body_html: Optional HTML body for multipart/alternative.
 
     Returns:
         Draft dictionary.
@@ -560,15 +633,7 @@ def create_draft(
         GmailAPIError: If the API call fails.
     """
     try:
-        message = MIMEText(body)
-        message["To"] = to
-        message["Subject"] = subject
-        if cc:
-            message["Cc"] = cc
-        if bcc:
-            message["Bcc"] = bcc
-
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+        raw_message = build_mime_message(to, subject, body, body_html, cc, bcc)
         draft = (
             service.users()
             .drafts()
@@ -1204,11 +1269,70 @@ def cmd_threads_get(args):
     return 0
 
 
+def _resolve_email_args(args) -> tuple[dict[str, Any], int]:
+    """Resolve email fields from --from-file and/or CLI flags.
+
+    CLI flags override frontmatter values. Returns (fields_dict, exit_code).
+    exit_code is non-zero on error.
+    """
+    fields: dict[str, Any] = {}
+    body_html = None
+
+    from_file = getattr(args, "from_file", None)
+    if from_file and isinstance(from_file, str):
+        if not MARKDOWN_AVAILABLE:
+            print(
+                "Error: 'markdown' library required for --from-file. "
+                "Install with: pip install --user markdown",
+                file=sys.stderr,
+            )
+            return {}, 1
+
+        try:
+            content = Path(from_file).read_text()
+            headers, body_md = parse_email_file(content)
+        except (ValueError, FileNotFoundError, OSError) as e:
+            print(f"Error reading file: {e}", file=sys.stderr)
+            return {}, 1
+
+        fields.update(headers)
+        fields["body"] = body_md
+        body_html = markdown_to_html(body_md)
+
+    for key in ("to", "subject", "body", "cc", "bcc"):
+        cli_val = getattr(args, key, None)
+        if cli_val is not None:
+            fields[key] = cli_val
+            if key == "body":
+                body_html = None
+
+    for required in ("to", "subject", "body"):
+        if required not in fields:
+            print(
+                f"Error: --{required} is required (via flag or --from-file frontmatter)",
+                file=sys.stderr,
+            )
+            return {}, 1
+
+    fields["body_html"] = body_html
+    return fields, 0
+
+
 def cmd_send(args):
     """Handle 'send' command."""
+    fields, exit_code = _resolve_email_args(args)
+    if exit_code:
+        return exit_code
+
     service = build_gmail_service(GMAIL_SCOPES_READONLY + GMAIL_SCOPES_SEND)
     result = send_message(
-        service, to=args.to, subject=args.subject, body=args.body, cc=args.cc, bcc=args.bcc
+        service,
+        to=fields["to"],
+        subject=fields["subject"],
+        body=fields["body"],
+        cc=fields.get("cc"),
+        bcc=fields.get("bcc"),
+        body_html=fields.get("body_html"),
     )
 
     if args.json:
@@ -1243,9 +1367,19 @@ def cmd_drafts_list(args):
 
 def cmd_drafts_create(args):
     """Handle 'drafts create' command."""
+    fields, exit_code = _resolve_email_args(args)
+    if exit_code:
+        return exit_code
+
     service = build_gmail_service(GMAIL_SCOPES_READONLY + GMAIL_SCOPES_MODIFY)
     result = create_draft(
-        service, to=args.to, subject=args.subject, body=args.body, cc=args.cc, bcc=args.bcc
+        service,
+        to=fields["to"],
+        subject=fields["subject"],
+        body=fields["body"],
+        cc=fields.get("cc"),
+        bcc=fields.get("bcc"),
+        body_html=fields.get("body_html"),
     )
 
     if args.json:
@@ -1368,9 +1502,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     # send command
     send_parser = subparsers.add_parser("send", help="Send an email")
-    send_parser.add_argument("--to", required=True, help="Recipient email address")
-    send_parser.add_argument("--subject", required=True, help="Email subject")
-    send_parser.add_argument("--body", required=True, help="Email body")
+    send_parser.add_argument("--to", help="Recipient email address")
+    send_parser.add_argument("--subject", help="Email subject")
+    send_parser.add_argument("--body", help="Email body")
+    send_parser.add_argument("--from-file", help="Markdown file with YAML frontmatter")
     send_parser.add_argument("--cc", help="CC recipients (comma-separated)")
     send_parser.add_argument("--bcc", help="BCC recipients (comma-separated)")
     send_parser.add_argument("--json", action="store_true", help="Output as JSON")
@@ -1384,9 +1519,10 @@ def build_parser() -> argparse.ArgumentParser:
     drafts_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     drafts_create_parser = drafts_subparsers.add_parser("create", help="Create a draft")
-    drafts_create_parser.add_argument("--to", required=True, help="Recipient email address")
-    drafts_create_parser.add_argument("--subject", required=True, help="Email subject")
-    drafts_create_parser.add_argument("--body", required=True, help="Email body")
+    drafts_create_parser.add_argument("--to", help="Recipient email address")
+    drafts_create_parser.add_argument("--subject", help="Email subject")
+    drafts_create_parser.add_argument("--body", help="Email body")
+    drafts_create_parser.add_argument("--from-file", help="Markdown file with YAML frontmatter")
     drafts_create_parser.add_argument("--cc", help="CC recipients (comma-separated)")
     drafts_create_parser.add_argument("--bcc", help="BCC recipients (comma-separated)")
     drafts_create_parser.add_argument("--json", action="store_true", help="Output as JSON")

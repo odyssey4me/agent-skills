@@ -3,7 +3,7 @@ name: gmail
 description: Send, search, and organize Gmail messages, drafts, and labels. Read full threads and get shareable Google Groups permalinks. Use when asked to compose an email, reply to mail, forward a message, search inbox, manage attachments, organize Gmail, read a thread, or find a Google Groups discussion link.
 metadata:
   author: odyssey4me
-  version: "0.3.0"
+  version: "0.4.0"
   category: communication
   tags: "email, drafts, labels"
   complexity: standard
@@ -206,12 +206,47 @@ $SKILL_DIR/scripts/gmail.py send \
   --bcc boss@example.com
 ```
 
+```bash
+# Send from a markdown file with frontmatter
+$SKILL_DIR/scripts/gmail.py send --from-file update.md
+
+# Send from file with CLI overrides
+$SKILL_DIR/scripts/gmail.py send --from-file update.md --to override@example.com
+```
+
 **Arguments:**
-- `--to`: Recipient email address (required)
-- `--subject`: Email subject (required)
-- `--body`: Email body text (required)
+- `--to`: Recipient email address (required unless in `--from-file`)
+- `--subject`: Email subject (required unless in `--from-file`)
+- `--body`: Email body text (required unless in `--from-file`)
+- `--from-file`: Markdown file with YAML frontmatter (see format below)
 - `--cc`: CC recipients (comma-separated)
 - `--bcc`: BCC recipients (comma-separated)
+
+CLI flags override frontmatter values. When using `--from-file`, the markdown
+body is converted to HTML and sent as multipart/alternative (HTML + plain text
+fallback).
+
+**Markdown file format:**
+
+```markdown
+---
+to: recipient@example.com
+cc: team@example.com
+bcc: boss@example.com
+subject: Weekly Update
+---
+
+# Status Update
+
+Here's what happened this week:
+
+- **Feature A** shipped to production
+- Fixed the [login bug](https://jira.example.com/DEMO-123)
+
+| Task | Status |
+|------|--------|
+| Deploy | Done |
+```
 
 ### drafts list
 
@@ -247,10 +282,16 @@ $SKILL_DIR/scripts/gmail.py drafts create \
   --cc team@example.com
 ```
 
+```bash
+# Create draft from a markdown file
+$SKILL_DIR/scripts/gmail.py drafts create --from-file update.md
+```
+
 **Arguments:**
-- `--to`: Recipient email address (required)
-- `--subject`: Email subject (required)
-- `--body`: Email body text (required)
+- `--to`: Recipient email address (required unless in `--from-file`)
+- `--subject`: Email subject (required unless in `--from-file`)
+- `--body`: Email body text (required unless in `--from-file`)
+- `--from-file`: Markdown file with YAML frontmatter (same format as `send`)
 - `--cc`: CC recipients (comma-separated)
 - `--bcc`: BCC recipients (comma-separated)
 

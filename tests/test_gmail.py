@@ -16,6 +16,7 @@ from skills.gmail.scripts.gmail import (
     build_gmail_service,
     build_group_url,
     build_message_permalink,
+    build_mime_message,
     build_parser,
     check_gmail_connectivity,
     cmd_auth_reset,
@@ -50,7 +51,9 @@ from skills.gmail.scripts.gmail import (
     list_labels,
     list_messages,
     load_config,
+    markdown_to_html,
     modify_message_labels,
+    parse_email_file,
     save_config,
     send_draft,
     send_message,
@@ -1897,3 +1900,224 @@ class TestFormatMessageSummaryUpdated:
         result = format_message_summary(message)
 
         assert "**Link:** https://groups.google.com/a/example.com/d/msgid/team/" in result
+
+
+# ============================================================================
+# EMAIL FILE PARSING AND MARKDOWN CONVERSION TESTS
+# ============================================================================
+
+
+class TestParseEmailFile:
+    """Tests for parse_email_file()."""
+
+    def test_parse_email_file(self):
+        """Test parsing a markdown file with YAML frontmatter."""
+        content = "---\nto: a@example.com\nsubject: Hello\n---\n\n# Body\n\nSome text."
+        headers, body = parse_email_file(content)
+        assert headers == {"to": "a@example.com", "subject": "Hello"}
+        assert body == "# Body\n\nSome text."
+
+    def test_parse_email_file_all_fields(self):
+        """Test parsing with all supported frontmatter fields."""
+        content = "---\nto: a@b.com\ncc: c@b.com\nbcc: d@b.com\nsubject: Test\n---\nBody"
+        headers, body = parse_email_file(content)
+        assert headers["cc"] == "c@b.com"
+        assert headers["bcc"] == "d@b.com"
+
+    def test_parse_email_file_no_frontmatter(self):
+        """Test error when frontmatter is missing."""
+        with pytest.raises(ValueError, match="must start with '---'"):
+            parse_email_file("Just some text")
+
+    def test_parse_email_file_unknown_keys(self):
+        """Test error on unknown frontmatter keys."""
+        content = "---\nto: a@b.com\nfoo: bar\n---\nBody"
+        with pytest.raises(ValueError, match="unknown frontmatter keys"):
+            parse_email_file(content)
+
+
+class TestMarkdownToHtml:
+    """Tests for markdown_to_html()."""
+
+    def test_basic_conversion(self):
+        """Test basic markdown to HTML conversion."""
+        result = markdown_to_html("**bold** and *italic*")
+        assert "<strong>bold</strong>" in result
+        assert "<em>italic</em>" in result
+
+    def test_table_conversion(self):
+        """Test markdown table converts to HTML."""
+        md = "| A | B |\n|---|---|\n| 1 | 2 |"
+        result = markdown_to_html(md)
+        assert "<table>" in result
+        assert "<td>1</td>" in result
+
+    def test_fenced_code_block(self):
+        """Test fenced code blocks convert correctly."""
+        md = "```\nprint('hi')\n```"
+        result = markdown_to_html(md)
+        assert "<code>" in result
+
+
+class TestBuildMimeMessage:
+    """Tests for build_mime_message()."""
+
+    def test_plain_text_only(self):
+        """Test plain text message construction."""
+        raw = build_mime_message("a@b.com", "Subject", "Plain body")
+        import base64
+
+        decoded = base64.urlsafe_b64decode(raw).decode("utf-8")
+        assert "Subject" in decoded
+        assert "a@b.com" in decoded
+        assert "Plain body" in decoded
+        assert "multipart/alternative" not in decoded
+
+    def test_multipart_with_html(self):
+        """Test multipart/alternative message construction."""
+        raw = build_mime_message("a@b.com", "Subject", "Plain body", body_html="<p>HTML body</p>")
+        import base64
+
+        decoded = base64.urlsafe_b64decode(raw).decode("utf-8")
+        assert "multipart/alternative" in decoded
+        assert "Plain body" in decoded
+        assert "<p>HTML body</p>" in decoded
+
+    def test_cc_and_bcc(self):
+        """Test CC and BCC headers are set."""
+        raw = build_mime_message("a@b.com", "Sub", "Body", cc="cc@b.com", bcc="bcc@b.com")
+        import base64
+
+        decoded = base64.urlsafe_b64decode(raw).decode("utf-8")
+        assert "cc@b.com" in decoded
+        assert "bcc@b.com" in decoded
+
+
+class TestFromFile:
+    """Tests for --from-file in send and drafts create commands."""
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.send_message")
+    @patch("builtins.print")
+    def test_cmd_send_from_file(self, _mock_print, mock_send, _mock_build_service, tmp_path):
+        """Test send command with --from-file."""
+        md_file = tmp_path / "email.md"
+        md_file.write_text("---\nto: a@b.com\nsubject: Hi\n---\n\n**Bold** text")
+
+        mock_send.return_value = {"id": "msg1", "threadId": "t1"}
+
+        args = Mock()
+        args.from_file = str(md_file)
+        args.to = None
+        args.subject = None
+        args.body = None
+        args.cc = None
+        args.bcc = None
+        args.json = False
+
+        exit_code = cmd_send(args)
+
+        assert exit_code == 0
+        call_kwargs = mock_send.call_args[1]
+        assert call_kwargs["to"] == "a@b.com"
+        assert call_kwargs["subject"] == "Hi"
+        assert call_kwargs["body"] == "**Bold** text"
+        assert "<strong>Bold</strong>" in call_kwargs["body_html"]
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.send_message")
+    @patch("builtins.print")
+    def test_cmd_send_from_file_cli_overrides(
+        self, _mock_print, mock_send, _mock_build_service, tmp_path
+    ):
+        """Test CLI flags override frontmatter values."""
+        md_file = tmp_path / "email.md"
+        md_file.write_text("---\nto: file@b.com\nsubject: File Subject\n---\nBody")
+
+        mock_send.return_value = {"id": "msg1", "threadId": "t1"}
+
+        args = Mock()
+        args.from_file = str(md_file)
+        args.to = "override@b.com"
+        args.subject = None
+        args.body = None
+        args.cc = None
+        args.bcc = None
+        args.json = False
+
+        exit_code = cmd_send(args)
+
+        assert exit_code == 0
+        assert mock_send.call_args[1]["to"] == "override@b.com"
+        assert mock_send.call_args[1]["subject"] == "File Subject"
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.send_message")
+    @patch("builtins.print")
+    def test_cmd_send_from_file_body_override_clears_html(
+        self, _mock_print, mock_send, _mock_build_service, tmp_path
+    ):
+        """Test --body override sends plain text, not HTML from file."""
+        md_file = tmp_path / "email.md"
+        md_file.write_text("---\nto: a@b.com\nsubject: Hi\n---\n**Markdown**")
+
+        mock_send.return_value = {"id": "msg1", "threadId": "t1"}
+
+        args = Mock()
+        args.from_file = str(md_file)
+        args.to = None
+        args.subject = None
+        args.body = "Plain override"
+        args.cc = None
+        args.bcc = None
+        args.json = False
+
+        exit_code = cmd_send(args)
+
+        assert exit_code == 0
+        assert mock_send.call_args[1]["body"] == "Plain override"
+        assert mock_send.call_args[1]["body_html"] is None
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.create_draft")
+    @patch("builtins.print")
+    def test_cmd_drafts_create_from_file(
+        self, _mock_print, mock_create, _mock_build_service, tmp_path
+    ):
+        """Test drafts create command with --from-file."""
+        md_file = tmp_path / "email.md"
+        md_file.write_text("---\nto: a@b.com\nsubject: Draft\n---\n\nDraft body")
+
+        mock_create.return_value = {"id": "draft1"}
+
+        args = Mock()
+        args.from_file = str(md_file)
+        args.to = None
+        args.subject = None
+        args.body = None
+        args.cc = None
+        args.bcc = None
+        args.json = False
+
+        exit_code = cmd_drafts_create(args)
+
+        assert exit_code == 0
+        call_kwargs = mock_create.call_args[1]
+        assert call_kwargs["to"] == "a@b.com"
+        assert call_kwargs["body_html"] is not None
+
+    @patch("builtins.print")
+    def test_cmd_send_missing_required_fields(self, _mock_print):
+        """Test error when required fields are missing."""
+        args = Mock()
+        args.from_file = None
+        args.to = "a@b.com"
+        args.subject = None
+        args.body = None
+        args.cc = None
+        args.bcc = None
+        args.json = False
+
+        exit_code = cmd_send(args)
+
+        assert exit_code == 1
