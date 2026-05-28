@@ -1159,13 +1159,31 @@ def cmd_messages_get(args):
 
 def cmd_messages_mark_read(args):
     """Handle 'messages mark-read' command."""
-    service = build_gmail_service(GMAIL_SCOPES_MODIFY)
-    result = modify_message_labels(service, args.message_id, remove_labels=["UNREAD"])
+    message_ids = list(args.message_ids or [])
+
+    if args.query:
+        service = build_gmail_service(GMAIL_SCOPES_MODIFY)
+        max_results = getattr(args, "max_results", 100) or 100
+        matches = list_messages(service, query=args.query, max_results=max_results)
+        message_ids.extend(m["id"] for m in matches)
+    else:
+        service = build_gmail_service(GMAIL_SCOPES_MODIFY)
+
+    if not message_ids:
+        print("Error: provide message IDs or --query", file=sys.stderr)
+        return 1
+
+    results = []
+    for mid in message_ids:
+        result = modify_message_labels(service, mid, remove_labels=["UNREAD"])
+        results.append(result)
 
     if args.json:
-        print(json.dumps(result, indent=2))
+        print(json.dumps(results, indent=2))
     else:
-        print(f"Message {args.message_id} marked as read.")
+        count = len(results)
+        label = "message" if count == 1 else "messages"
+        print(f"{count} {label} marked as read.")
 
     return 0
 
@@ -1330,8 +1348,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     get_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
-    mark_read_parser = messages_subparsers.add_parser("mark-read", help="Mark message as read")
-    mark_read_parser.add_argument("message_id", help="Message ID")
+    mark_read_parser = messages_subparsers.add_parser("mark-read", help="Mark messages as read")
+    mark_read_parser.add_argument("message_ids", nargs="*", help="Message IDs")
+    mark_read_parser.add_argument("--query", help="Gmail search query to find messages")
+    mark_read_parser.add_argument(
+        "--max-results", type=int, default=100, help="Max messages for --query (default: 100)"
+    )
     mark_read_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # threads commands

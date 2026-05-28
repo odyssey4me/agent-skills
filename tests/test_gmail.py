@@ -1204,12 +1204,13 @@ class TestMoreCLICommands:
     @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("skills.gmail.scripts.gmail.modify_message_labels")
     @patch("builtins.print")
-    def test_cmd_messages_mark_read(self, mock_print, mock_modify, _mock_build_service):
-        """Test messages mark-read command."""
+    def test_cmd_messages_mark_read_single(self, mock_print, mock_modify, _mock_build_service):
+        """Test messages mark-read with a single ID."""
         mock_modify.return_value = {"id": "msg123", "labelIds": ["INBOX"]}
 
         args = Mock()
-        args.message_id = "msg123"
+        args.message_ids = ["msg123"]
+        args.query = None
         args.json = False
 
         exit_code = cmd_messages_mark_read(args)
@@ -1218,17 +1219,70 @@ class TestMoreCLICommands:
         mock_modify.assert_called_once_with(
             _mock_build_service.return_value, "msg123", remove_labels=["UNREAD"]
         )
-        mock_print.assert_called_once_with("Message msg123 marked as read.")
+        mock_print.assert_called_once_with("1 message marked as read.")
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.modify_message_labels")
+    @patch("builtins.print")
+    def test_cmd_messages_mark_read_multiple(self, mock_print, mock_modify, _mock_build_service):
+        """Test messages mark-read with multiple IDs."""
+        mock_modify.side_effect = [
+            {"id": "msg1", "labelIds": ["INBOX"]},
+            {"id": "msg2", "labelIds": ["INBOX"]},
+        ]
+
+        args = Mock()
+        args.message_ids = ["msg1", "msg2"]
+        args.query = None
+        args.json = False
+
+        exit_code = cmd_messages_mark_read(args)
+
+        assert exit_code == 0
+        assert mock_modify.call_count == 2
+        mock_print.assert_called_once_with("2 messages marked as read.")
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("skills.gmail.scripts.gmail.list_messages")
+    @patch("skills.gmail.scripts.gmail.modify_message_labels")
+    @patch("builtins.print")
+    def test_cmd_messages_mark_read_query(
+        self, mock_print, mock_modify, mock_list, _mock_build_service
+    ):
+        """Test messages mark-read with --query flag."""
+        mock_list.return_value = [{"id": "msg1"}, {"id": "msg2"}]
+        mock_modify.side_effect = [
+            {"id": "msg1", "labelIds": ["INBOX"]},
+            {"id": "msg2", "labelIds": ["INBOX"]},
+        ]
+
+        args = Mock()
+        args.message_ids = []
+        args.query = "is:unread from:test@example.com"
+        args.max_results = 100
+        args.json = False
+
+        exit_code = cmd_messages_mark_read(args)
+
+        assert exit_code == 0
+        mock_list.assert_called_once_with(
+            _mock_build_service.return_value,
+            query="is:unread from:test@example.com",
+            max_results=100,
+        )
+        assert mock_modify.call_count == 2
+        mock_print.assert_called_once_with("2 messages marked as read.")
 
     @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("skills.gmail.scripts.gmail.modify_message_labels")
     @patch("builtins.print")
     def test_cmd_messages_mark_read_json(self, mock_print, mock_modify, _mock_build_service):
-        """Test messages mark-read command with JSON output."""
+        """Test messages mark-read with JSON output."""
         mock_modify.return_value = {"id": "msg123", "labelIds": ["INBOX"]}
 
         args = Mock()
-        args.message_id = "msg123"
+        args.message_ids = ["msg123"]
+        args.query = None
         args.json = True
 
         exit_code = cmd_messages_mark_read(args)
@@ -1236,6 +1290,21 @@ class TestMoreCLICommands:
         assert exit_code == 0
         printed = mock_print.call_args[0][0]
         assert '"id": "msg123"' in printed
+
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
+    @patch("builtins.print")
+    def test_cmd_messages_mark_read_no_input(self, mock_print, _mock_build_service):
+        """Test messages mark-read with no IDs or query returns error."""
+        args = Mock()
+        args.message_ids = []
+        args.query = None
+        args.json = False
+
+        exit_code = cmd_messages_mark_read(args)
+
+        assert exit_code == 1
+        mock_print.assert_called_once()
+        assert "provide message IDs or --query" in mock_print.call_args[0][0]
 
     @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("skills.gmail.scripts.gmail.create_draft")

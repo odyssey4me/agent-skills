@@ -153,14 +153,26 @@ $SKILL_DIR/scripts/gmail.py messages get MESSAGE_ID --format minimal
 
 ### messages mark-read
 
-Mark a message as read by removing the UNREAD label.
+Mark one or more messages as read by removing the UNREAD label.
 
 ```bash
+# Mark a single message
 $SKILL_DIR/scripts/gmail.py messages mark-read MESSAGE_ID
+
+# Mark multiple messages
+$SKILL_DIR/scripts/gmail.py messages mark-read MSG1 MSG2 MSG3
+
+# Mark all unread messages from a sender
+$SKILL_DIR/scripts/gmail.py messages mark-read --query "is:unread from:user@example.com"
+
+# Combine IDs and query
+$SKILL_DIR/scripts/gmail.py messages mark-read MSG1 --query "is:unread label:updates"
 ```
 
 **Arguments:**
-- `message_id`: The message ID (required)
+- `message_ids`: One or more message IDs (optional if `--query` is used)
+- `--query`: Gmail search query to find messages to mark as read
+- `--max-results`: Maximum messages to mark from `--query` (default: 100)
 
 ### threads get
 
