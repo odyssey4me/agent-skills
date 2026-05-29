@@ -1901,6 +1901,101 @@ class TestFormatMessageSummaryUpdated:
 
         assert "**Link:** https://groups.google.com/a/example.com/d/msgid/team/" in result
 
+    def test_format_message_summary_with_recipients(self):
+        message = {
+            "id": "msg1",
+            "threadId": "thread1",
+            "snippet": "Hello world",
+            "payload": {
+                "headers": [
+                    {"name": "Subject", "value": "Test"},
+                    {"name": "From", "value": "alice@example.com"},
+                    {"name": "Date", "value": "Mon, 12 May 2026"},
+                    {"name": "To", "value": "bob@example.com, carol@example.com"},
+                    {"name": "Cc", "value": "dave@example.com"},
+                    {"name": "Bcc", "value": "eve@example.com"},
+                ]
+            },
+        }
+
+        result = format_message_summary(message)
+
+        assert "**To:** bob@example.com, carol@example.com" in result
+        assert "**Cc:** dave@example.com" in result
+        assert "**Bcc:** eve@example.com" in result
+
+    def test_format_message_summary_omits_empty_recipients(self):
+        message = {
+            "id": "msg1",
+            "threadId": "thread1",
+            "snippet": "Hello world",
+            "payload": {
+                "headers": [
+                    {"name": "Subject", "value": "Test"},
+                    {"name": "From", "value": "alice@example.com"},
+                    {"name": "Date", "value": "Mon, 12 May 2026"},
+                ]
+            },
+        }
+
+        result = format_message_summary(message)
+
+        assert "**To:**" not in result
+        assert "**Cc:**" not in result
+        assert "**Bcc:**" not in result
+
+
+class TestFormatThreadRecipients:
+    """Tests for recipient display in format_thread."""
+
+    def test_format_thread_with_recipients(self):
+        thread = {
+            "messages": [
+                {
+                    "id": "msg1",
+                    "payload": {
+                        "headers": [
+                            {"name": "Subject", "value": "Test Thread"},
+                            {"name": "From", "value": "alice@example.com"},
+                            {"name": "Date", "value": "Mon, 12 May 2026"},
+                            {"name": "To", "value": "bob@example.com"},
+                            {"name": "Cc", "value": "carol@example.com"},
+                        ],
+                        "body": {"data": ""},
+                    },
+                }
+            ]
+        }
+
+        result = format_thread(thread)
+
+        assert "**To:** bob@example.com" in result
+        assert "**Cc:** carol@example.com" in result
+        assert "**Bcc:**" not in result
+
+    def test_format_thread_omits_empty_recipients(self):
+        thread = {
+            "messages": [
+                {
+                    "id": "msg1",
+                    "payload": {
+                        "headers": [
+                            {"name": "Subject", "value": "Test Thread"},
+                            {"name": "From", "value": "alice@example.com"},
+                            {"name": "Date", "value": "Mon, 12 May 2026"},
+                        ],
+                        "body": {"data": ""},
+                    },
+                }
+            ]
+        }
+
+        result = format_thread(thread)
+
+        assert "**To:**" not in result
+        assert "**Cc:**" not in result
+        assert "**Bcc:**" not in result
+
 
 # ============================================================================
 # EMAIL FILE PARSING AND MARKDOWN CONVERSION TESTS

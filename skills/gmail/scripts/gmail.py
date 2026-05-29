@@ -910,6 +910,10 @@ def format_message_summary(message: dict[str, Any]) -> str:
     output = (
         f"### {subject}\n- **ID:** {message['id']}\n- **From:** {from_addr}\n- **Date:** {date}"
     )
+    for field in ("To", "Cc", "Bcc"):
+        value = headers.get(field, "")
+        if value:
+            output += f"\n- **{field}:** {value}"
     if thread_id:
         output += f"\n- **Thread ID:** {thread_id}"
 
@@ -975,6 +979,10 @@ def format_thread(thread: dict[str, Any]) -> str:
         output += f"\n---\n\n### Message {i} of {len(messages)}"
         output += f"\n- **From:** {from_addr}"
         output += f"\n- **Date:** {date}"
+        for field in ("To", "Cc", "Bcc"):
+            value = headers.get(field, "")
+            if value:
+                output += f"\n- **{field}:** {value}"
 
         # Permalink for this message
         effective_group = group_email or extract_group_email_from_headers(headers)
