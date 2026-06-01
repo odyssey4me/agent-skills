@@ -18,6 +18,15 @@ Usage:
     python google-drive.py share FILE_ID --email user@example.com --role writer
     python google-drive.py permissions list FILE_ID
     python google-drive.py comments list FILE_ID
+    python google-drive.py comments get FILE_ID COMMENT_ID
+    python google-drive.py comments create FILE_ID --content TEXT
+    python google-drive.py comments update FILE_ID COMMENT_ID --content TEXT
+    python google-drive.py comments delete FILE_ID COMMENT_ID
+    python google-drive.py replies list FILE_ID COMMENT_ID
+    python google-drive.py replies get FILE_ID COMMENT_ID REPLY_ID
+    python google-drive.py replies create FILE_ID COMMENT_ID --content TEXT [--action resolve|reopen]
+    python google-drive.py replies update FILE_ID COMMENT_ID REPLY_ID --content TEXT
+    python google-drive.py replies delete FILE_ID COMMENT_ID REPLY_ID
 
 Requirements:
     pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
@@ -92,6 +101,16 @@ DRIVE_SCOPES_DEFAULT = DRIVE_SCOPES_READONLY
 
 # Common MIME types
 MIME_TYPE_FOLDER = "application/vnd.google-apps.folder"
+
+# API field selectors for comments and replies
+COMMENT_FIELDS = (
+    "id,content,author(displayName,emailAddress),"
+    "resolved,quotedFileContent(value),"
+    "createdTime,modifiedTime,"
+    "replies(id,content,author(displayName,emailAddress),"
+    "action,createdTime)"
+)
+REPLY_FIELDS = "id,content,author(displayName,emailAddress),action,createdTime,modifiedTime"
 
 
 # ============================================================================
@@ -944,13 +963,6 @@ def list_comments(
     Raises:
         DriveAPIError: If the API call fails.
     """
-    comments_fields = (
-        "comments(id,content,author(displayName,emailAddress),"
-        "resolved,quotedFileContent(value),"
-        "createdTime,modifiedTime,"
-        "replies(id,content,author(displayName,emailAddress),"
-        "action,createdTime)),nextPageToken"
-    )
     try:
         comments: list[dict[str, Any]] = []
         page_token = None
@@ -958,7 +970,7 @@ def list_comments(
             page_size = min(100, max_results - len(comments))
             kwargs: dict[str, Any] = {
                 "fileId": file_id,
-                "fields": comments_fields,
+                "fields": f"comments({COMMENT_FIELDS}),nextPageToken",
                 "pageSize": page_size,
                 "includeDeleted": include_deleted,
             }
@@ -973,6 +985,281 @@ def list_comments(
     except HttpError as e:
         handle_api_error(e)
         return []  # Unreachable
+
+
+def get_comment(service, file_id: str, comment_id: str) -> dict[str, Any]:
+    """Get a single comment on a file.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        comment_id: The comment ID.
+
+    Returns:
+        Comment dictionary.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        return (
+            service.comments()
+            .get(fileId=file_id, commentId=comment_id, fields=COMMENT_FIELDS)
+            .execute()
+        )
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
+def create_comment(
+    service,
+    file_id: str,
+    content: str,
+    quoted_text: str | None = None,
+) -> dict[str, Any]:
+    """Create a comment on a file.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        content: The comment text. Use @email to mention users.
+        quoted_text: Optional quoted file content to anchor the comment.
+
+    Returns:
+        Created comment dictionary.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    body: dict[str, Any] = {"content": content}
+    if quoted_text:
+        body["quotedFileContent"] = {"value": quoted_text}
+    try:
+        return service.comments().create(fileId=file_id, body=body, fields=COMMENT_FIELDS).execute()
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
+def update_comment(service, file_id: str, comment_id: str, content: str) -> dict[str, Any]:
+    """Update a comment's text.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        comment_id: The comment ID.
+        content: The new comment text.
+
+    Returns:
+        Updated comment dictionary.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        return (
+            service.comments()
+            .update(
+                fileId=file_id,
+                commentId=comment_id,
+                body={"content": content},
+                fields=COMMENT_FIELDS,
+            )
+            .execute()
+        )
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
+def delete_comment(service, file_id: str, comment_id: str) -> None:
+    """Delete a comment from a file.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        comment_id: The comment ID.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        service.comments().delete(fileId=file_id, commentId=comment_id).execute()
+    except HttpError as e:
+        handle_api_error(e)
+
+
+def list_replies(
+    service,
+    file_id: str,
+    comment_id: str,
+    include_deleted: bool = False,
+    max_results: int = 100,
+) -> list[dict[str, Any]]:
+    """List replies on a comment.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        comment_id: The comment ID.
+        include_deleted: Whether to include deleted replies.
+        max_results: Maximum number of replies to return.
+
+    Returns:
+        List of reply dictionaries.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        replies: list[dict[str, Any]] = []
+        page_token = None
+        while len(replies) < max_results:
+            page_size = min(100, max_results - len(replies))
+            kwargs: dict[str, Any] = {
+                "fileId": file_id,
+                "commentId": comment_id,
+                "fields": f"replies({REPLY_FIELDS}),nextPageToken",
+                "pageSize": page_size,
+                "includeDeleted": include_deleted,
+            }
+            if page_token:
+                kwargs["pageToken"] = page_token
+            result = service.replies().list(**kwargs).execute()
+            replies.extend(result.get("replies", []))
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
+        return replies[:max_results]
+    except HttpError as e:
+        handle_api_error(e)
+        return []  # Unreachable
+
+
+def get_reply(service, file_id: str, comment_id: str, reply_id: str) -> dict[str, Any]:
+    """Get a single reply on a comment.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        comment_id: The comment ID.
+        reply_id: The reply ID.
+
+    Returns:
+        Reply dictionary.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        return (
+            service.replies()
+            .get(
+                fileId=file_id,
+                commentId=comment_id,
+                replyId=reply_id,
+                fields=REPLY_FIELDS,
+            )
+            .execute()
+        )
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
+def create_reply(
+    service,
+    file_id: str,
+    comment_id: str,
+    content: str,
+    action: str | None = None,
+) -> dict[str, Any]:
+    """Create a reply to a comment.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        comment_id: The comment ID.
+        content: The reply text. Use @email to mention users.
+        action: Optional action ("resolve" or "reopen").
+
+    Returns:
+        Created reply dictionary.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    body: dict[str, Any] = {"content": content}
+    if action:
+        body["action"] = action
+    try:
+        return (
+            service.replies()
+            .create(
+                fileId=file_id,
+                commentId=comment_id,
+                body=body,
+                fields=REPLY_FIELDS,
+            )
+            .execute()
+        )
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
+def update_reply(
+    service, file_id: str, comment_id: str, reply_id: str, content: str
+) -> dict[str, Any]:
+    """Update a reply's text.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        comment_id: The comment ID.
+        reply_id: The reply ID.
+        content: The new reply text.
+
+    Returns:
+        Updated reply dictionary.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        return (
+            service.replies()
+            .update(
+                fileId=file_id,
+                commentId=comment_id,
+                replyId=reply_id,
+                body={"content": content},
+                fields=REPLY_FIELDS,
+            )
+            .execute()
+        )
+    except HttpError as e:
+        handle_api_error(e)
+        return {}  # Unreachable
+
+
+def delete_reply(service, file_id: str, comment_id: str, reply_id: str) -> None:
+    """Delete a reply from a comment.
+
+    Args:
+        service: Google Drive API service object.
+        file_id: The file ID.
+        comment_id: The comment ID.
+        reply_id: The reply ID.
+
+    Raises:
+        DriveAPIError: If the API call fails.
+    """
+    try:
+        service.replies().delete(fileId=file_id, commentId=comment_id, replyId=reply_id).execute()
+    except HttpError as e:
+        handle_api_error(e)
 
 
 # ============================================================================
@@ -1083,6 +1370,36 @@ def format_comment(comment: dict[str, Any]) -> str:
         action = reply.get("action", "")
         action_str = f" [{action}]" if action else ""
         lines.append(f"  - **Reply by {reply_name}**{action_str}: {reply_content}")
+
+    return "\n".join(lines)
+
+
+def format_reply(reply: dict[str, Any]) -> str:
+    """Format a reply for display.
+
+    Args:
+        reply: Reply dictionary from Drive API.
+
+    Returns:
+        Formatted string.
+    """
+    author = reply.get("author", {})
+    author_name = author.get("displayName") or author.get("emailAddress", "Unknown")
+    created = reply.get("createdTime", "Unknown")
+    content = reply.get("content", "")
+    reply_id = reply.get("id", "")
+    action = reply.get("action", "")
+
+    lines = [
+        f"### Reply by {author_name}",
+        f"- **ID:** {reply_id}",
+        f"- **Created:** {created}",
+    ]
+
+    if action:
+        lines.append(f"- **Action:** {action}")
+
+    lines.append(f"- **Content:** {content}")
 
     return "\n".join(lines)
 
@@ -1627,6 +1944,156 @@ def cmd_comments_list(args):
     return 0
 
 
+def cmd_comments_get(args):
+    """Handle 'comments get' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY)
+    comment = get_comment(service, args.file_id, args.comment_id)
+
+    if args.json:
+        print(json.dumps(comment, indent=2))
+    else:
+        print(format_comment(comment))
+
+    return 0
+
+
+def cmd_comments_create(args):
+    """Handle 'comments create' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
+    result = create_comment(
+        service,
+        args.file_id,
+        args.content,
+        quoted_text=args.quoted_text,
+    )
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print("Comment created successfully")
+        print(f"  ID: {result.get('id')}")
+        print(f"  Content: {result.get('content')}")
+
+    return 0
+
+
+def cmd_comments_update(args):
+    """Handle 'comments update' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
+    result = update_comment(service, args.file_id, args.comment_id, args.content)
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print("Comment updated successfully")
+        print(f"  ID: {result.get('id')}")
+        print(f"  Content: {result.get('content')}")
+
+    return 0
+
+
+def cmd_comments_delete(args):
+    """Handle 'comments delete' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
+    delete_comment(service, args.file_id, args.comment_id)
+
+    if args.json:
+        print(json.dumps({"id": args.comment_id, "deleted": True}, indent=2))
+    else:
+        print("Comment deleted successfully")
+
+    return 0
+
+
+def cmd_replies_list(args):
+    """Handle 'replies list' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY)
+    replies = list_replies(
+        service,
+        args.file_id,
+        args.comment_id,
+        include_deleted=args.include_deleted,
+        max_results=args.max_results,
+    )
+
+    if args.json:
+        print(json.dumps(replies, indent=2))
+    else:
+        if not replies:
+            print("No replies found")
+        else:
+            print(f"Found {len(replies)} repl{'y' if len(replies) == 1 else 'ies'}:\n")
+            for reply in replies:
+                print(format_reply(reply))
+                print("-" * 80)
+
+    return 0
+
+
+def cmd_replies_get(args):
+    """Handle 'replies get' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY)
+    reply = get_reply(service, args.file_id, args.comment_id, args.reply_id)
+
+    if args.json:
+        print(json.dumps(reply, indent=2))
+    else:
+        print(format_reply(reply))
+
+    return 0
+
+
+def cmd_replies_create(args):
+    """Handle 'replies create' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
+    result = create_reply(
+        service,
+        args.file_id,
+        args.comment_id,
+        args.content,
+        action=args.action,
+    )
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        action = result.get("action", "")
+        action_str = f" [{action}]" if action else ""
+        print(f"Reply created successfully{action_str}")
+        print(f"  ID: {result.get('id')}")
+        print(f"  Content: {result.get('content')}")
+
+    return 0
+
+
+def cmd_replies_update(args):
+    """Handle 'replies update' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
+    result = update_reply(service, args.file_id, args.comment_id, args.reply_id, args.content)
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print("Reply updated successfully")
+        print(f"  ID: {result.get('id')}")
+        print(f"  Content: {result.get('content')}")
+
+    return 0
+
+
+def cmd_replies_delete(args):
+    """Handle 'replies delete' command."""
+    service = build_drive_service(DRIVE_SCOPES_READONLY + DRIVE_SCOPES_WRITE)
+    delete_reply(service, args.file_id, args.comment_id, args.reply_id)
+
+    if args.json:
+        print(json.dumps({"id": args.reply_id, "deleted": True}, indent=2))
+    else:
+        print("Reply deleted successfully")
+
+    return 0
+
+
 # ============================================================================
 # CLI ARGUMENT PARSER
 # ============================================================================
@@ -1783,6 +2250,79 @@ def build_parser() -> argparse.ArgumentParser:
     )
     comments_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    comments_get_parser = comments_subparsers.add_parser("get", help="Get a comment")
+    comments_get_parser.add_argument("file_id", help="File ID")
+    comments_get_parser.add_argument("comment_id", help="Comment ID")
+    comments_get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    comments_create_parser = comments_subparsers.add_parser("create", help="Create a comment")
+    comments_create_parser.add_argument("file_id", help="File ID")
+    comments_create_parser.add_argument(
+        "--content", required=True, help="Comment text (use @email to mention users)"
+    )
+    comments_create_parser.add_argument(
+        "--quoted-text", help="Quoted file content to anchor the comment"
+    )
+    comments_create_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    comments_update_parser = comments_subparsers.add_parser("update", help="Update a comment")
+    comments_update_parser.add_argument("file_id", help="File ID")
+    comments_update_parser.add_argument("comment_id", help="Comment ID")
+    comments_update_parser.add_argument("--content", required=True, help="New comment text")
+    comments_update_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    comments_delete_parser = comments_subparsers.add_parser("delete", help="Delete a comment")
+    comments_delete_parser.add_argument("file_id", help="File ID")
+    comments_delete_parser.add_argument("comment_id", help="Comment ID")
+    comments_delete_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # replies commands
+    replies_parser = subparsers.add_parser("replies", help="Reply operations")
+    replies_subparsers = replies_parser.add_subparsers(dest="replies_command")
+
+    replies_list_parser = replies_subparsers.add_parser("list", help="List replies")
+    replies_list_parser.add_argument("file_id", help="File ID")
+    replies_list_parser.add_argument("comment_id", help="Comment ID")
+    replies_list_parser.add_argument(
+        "--max-results", type=int, default=100, help="Maximum number of replies"
+    )
+    replies_list_parser.add_argument(
+        "--include-deleted", action="store_true", help="Include deleted replies"
+    )
+    replies_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    replies_get_parser = replies_subparsers.add_parser("get", help="Get a reply")
+    replies_get_parser.add_argument("file_id", help="File ID")
+    replies_get_parser.add_argument("comment_id", help="Comment ID")
+    replies_get_parser.add_argument("reply_id", help="Reply ID")
+    replies_get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    replies_create_parser = replies_subparsers.add_parser("create", help="Create a reply")
+    replies_create_parser.add_argument("file_id", help="File ID")
+    replies_create_parser.add_argument("comment_id", help="Comment ID")
+    replies_create_parser.add_argument(
+        "--content", required=True, help="Reply text (use @email to mention users)"
+    )
+    replies_create_parser.add_argument(
+        "--action",
+        choices=["resolve", "reopen"],
+        help="Resolve or reopen the comment",
+    )
+    replies_create_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    replies_update_parser = replies_subparsers.add_parser("update", help="Update a reply")
+    replies_update_parser.add_argument("file_id", help="File ID")
+    replies_update_parser.add_argument("comment_id", help="Comment ID")
+    replies_update_parser.add_argument("reply_id", help="Reply ID")
+    replies_update_parser.add_argument("--content", required=True, help="New reply text")
+    replies_update_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    replies_delete_parser = replies_subparsers.add_parser("delete", help="Delete a reply")
+    replies_delete_parser.add_argument("file_id", help="File ID")
+    replies_delete_parser.add_argument("comment_id", help="Comment ID")
+    replies_delete_parser.add_argument("reply_id", help="Reply ID")
+    replies_delete_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     return parser
 
 
@@ -1876,8 +2416,28 @@ def main():
                 return cmd_permissions_list(args)
             elif args.permissions_command == "delete":
                 return cmd_permissions_delete(args)
-        elif args.command == "comments" and args.comments_command == "list":
-            return cmd_comments_list(args)
+        elif args.command == "comments":
+            if args.comments_command == "list":
+                return cmd_comments_list(args)
+            elif args.comments_command == "get":
+                return cmd_comments_get(args)
+            elif args.comments_command == "create":
+                return cmd_comments_create(args)
+            elif args.comments_command == "update":
+                return cmd_comments_update(args)
+            elif args.comments_command == "delete":
+                return cmd_comments_delete(args)
+        elif args.command == "replies":
+            if args.replies_command == "list":
+                return cmd_replies_list(args)
+            elif args.replies_command == "get":
+                return cmd_replies_get(args)
+            elif args.replies_command == "create":
+                return cmd_replies_create(args)
+            elif args.replies_command == "update":
+                return cmd_replies_update(args)
+            elif args.replies_command == "delete":
+                return cmd_replies_delete(args)
 
         parser.print_help()
         return 1

@@ -1,9 +1,9 @@
 ---
 name: google-drive
-description: Upload, download, search, and share files on Google Drive. Create folders and manage permissions. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, or organize Google Drive files.
+description: Upload, download, search, and share files on Google Drive. Create folders, manage permissions, and manage comments and replies. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, organize Google Drive files, comment on a file, or reply to comments.
 metadata:
   author: odyssey4me
-  version: "0.4.0"
+  version: "0.5.0"
   category: google-workspace
   tags: "files, folders, sharing"
   complexity: standard
@@ -88,6 +88,17 @@ $SKILL_DIR/scripts/google-drive.py permissions delete FILE_ID PERMISSION_ID
 
 # Comments
 $SKILL_DIR/scripts/google-drive.py comments list FILE_ID [--max-results N] [--include-deleted]
+$SKILL_DIR/scripts/google-drive.py comments get FILE_ID COMMENT_ID
+$SKILL_DIR/scripts/google-drive.py comments create FILE_ID --content TEXT [--quoted-text TEXT]
+$SKILL_DIR/scripts/google-drive.py comments update FILE_ID COMMENT_ID --content TEXT
+$SKILL_DIR/scripts/google-drive.py comments delete FILE_ID COMMENT_ID
+
+# Replies
+$SKILL_DIR/scripts/google-drive.py replies list FILE_ID COMMENT_ID [--max-results N] [--include-deleted]
+$SKILL_DIR/scripts/google-drive.py replies get FILE_ID COMMENT_ID REPLY_ID
+$SKILL_DIR/scripts/google-drive.py replies create FILE_ID COMMENT_ID --content TEXT [--action resolve|reopen]
+$SKILL_DIR/scripts/google-drive.py replies update FILE_ID COMMENT_ID REPLY_ID --content TEXT
+$SKILL_DIR/scripts/google-drive.py replies delete FILE_ID COMMENT_ID REPLY_ID
 ```
 
 See [command-reference.md](references/command-reference.md) for full argument details and examples.
@@ -202,6 +213,29 @@ $SKILL_DIR/scripts/google-drive.py folders list FOLDER_ID
 
 ```bash
 $SKILL_DIR/scripts/google-drive.py comments list FILE_ID
+```
+
+### Add a comment with a mention
+
+To mention a user, include their email with an `@` prefix in the content text.
+
+```bash
+$SKILL_DIR/scripts/google-drive.py comments create FILE_ID \
+  --content "Hey @reviewer@example.com please review this section"
+```
+
+### Reply to a comment and resolve it
+
+```bash
+$SKILL_DIR/scripts/google-drive.py replies create FILE_ID COMMENT_ID \
+  --content "Fixed in latest revision" --action resolve
+```
+
+### Reopen a resolved comment
+
+```bash
+$SKILL_DIR/scripts/google-drive.py replies create FILE_ID COMMENT_ID \
+  --content "Actually this still needs work" --action reopen
 ```
 
 ## Drive Search Query Syntax

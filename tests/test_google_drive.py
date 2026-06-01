@@ -68,12 +68,31 @@ cmd_files_move = google_drive.cmd_files_move
 cmd_files_rename = google_drive.cmd_files_rename
 copy_file = google_drive.copy_file
 cmd_comments_list = google_drive.cmd_comments_list
+cmd_comments_get = google_drive.cmd_comments_get
+cmd_comments_create = google_drive.cmd_comments_create
+cmd_comments_update = google_drive.cmd_comments_update
+cmd_comments_delete = google_drive.cmd_comments_delete
+cmd_replies_list = google_drive.cmd_replies_list
+cmd_replies_get = google_drive.cmd_replies_get
+cmd_replies_create = google_drive.cmd_replies_create
+cmd_replies_update = google_drive.cmd_replies_update
+cmd_replies_delete = google_drive.cmd_replies_delete
 cmd_files_export = google_drive.cmd_files_export
-export_file = google_drive.export_file
+create_comment = google_drive.create_comment
+create_reply = google_drive.create_reply
+delete_comment = google_drive.delete_comment
 delete_file = google_drive.delete_file
+delete_reply = google_drive.delete_reply
+export_file = google_drive.export_file
 format_comment = google_drive.format_comment
+format_reply = google_drive.format_reply
+get_comment = google_drive.get_comment
+get_reply = google_drive.get_reply
 list_comments = google_drive.list_comments
+list_replies = google_drive.list_replies
 rename_file = google_drive.rename_file
+update_comment = google_drive.update_comment
+update_reply = google_drive.update_reply
 upload_file = google_drive.upload_file
 
 
@@ -933,6 +952,277 @@ class TestSharingOperations:
         with pytest.raises(DriveAPIError):
             list_comments(mock_service, "file123")
 
+    def test_get_comment(self):
+        """Test getting a single comment."""
+        mock_service = Mock()
+        mock_service.comments().get().execute.return_value = {
+            "id": "comment1",
+            "content": "Test comment",
+            "author": {"displayName": "Alice"},
+            "resolved": False,
+        }
+
+        result = get_comment(mock_service, "file123", "comment1")
+
+        assert result["id"] == "comment1"
+        assert result["content"] == "Test comment"
+
+    def test_get_comment_api_error(self):
+        """Test getting a comment with API error."""
+        mock_service = Mock()
+        mock_service.comments().get().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+
+        with pytest.raises(DriveAPIError):
+            get_comment(mock_service, "file123", "nonexistent")
+
+    def test_create_comment(self):
+        """Test creating a comment."""
+        mock_service = Mock()
+        mock_service.comments().create().execute.return_value = {
+            "id": "new_comment",
+            "content": "Nice work!",
+            "author": {"displayName": "Alice"},
+        }
+
+        result = create_comment(mock_service, "file123", "Nice work!")
+
+        assert result["id"] == "new_comment"
+        assert result["content"] == "Nice work!"
+
+    def test_create_comment_with_quoted_text(self):
+        """Test creating a comment with quoted file content."""
+        mock_service = Mock()
+        mock_service.comments().create().execute.return_value = {
+            "id": "new_comment",
+            "content": "Fix this",
+            "quotedFileContent": {"value": "the buggy line"},
+        }
+
+        result = create_comment(mock_service, "file123", "Fix this", quoted_text="the buggy line")
+
+        call_kwargs = mock_service.comments().create.call_args[1]
+        assert call_kwargs["body"]["quotedFileContent"] == {"value": "the buggy line"}
+        assert result["id"] == "new_comment"
+
+    def test_create_comment_api_error(self):
+        """Test creating a comment with API error."""
+        mock_service = Mock()
+        content = b'{"error": {"message": "Forbidden"}}'
+        mock_service.comments().create().execute.side_effect = HttpError(
+            resp=Mock(status=403), content=content
+        )
+
+        with pytest.raises(DriveAPIError):
+            create_comment(mock_service, "file123", "Test")
+
+    def test_update_comment(self):
+        """Test updating a comment."""
+        mock_service = Mock()
+        mock_service.comments().update().execute.return_value = {
+            "id": "comment1",
+            "content": "Updated text",
+        }
+
+        result = update_comment(mock_service, "file123", "comment1", "Updated text")
+
+        assert result["content"] == "Updated text"
+
+    def test_update_comment_api_error(self):
+        """Test updating a comment with API error."""
+        mock_service = Mock()
+        mock_service.comments().update().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+
+        with pytest.raises(DriveAPIError):
+            update_comment(mock_service, "file123", "nonexistent", "text")
+
+    def test_delete_comment(self):
+        """Test deleting a comment."""
+        mock_service = Mock()
+
+        delete_comment(mock_service, "file123", "comment1")
+
+        mock_service.comments().delete.assert_called_with(fileId="file123", commentId="comment1")
+
+    def test_delete_comment_api_error(self):
+        """Test deleting a comment with API error."""
+        mock_service = Mock()
+        mock_service.comments().delete().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+
+        with pytest.raises(DriveAPIError):
+            delete_comment(mock_service, "file123", "nonexistent")
+
+    def test_list_replies(self):
+        """Test listing replies on a comment."""
+        mock_service = Mock()
+        mock_service.replies().list().execute.return_value = {
+            "replies": [
+                {
+                    "id": "reply1",
+                    "content": "Thanks",
+                    "author": {"displayName": "Bob"},
+                },
+                {
+                    "id": "reply2",
+                    "content": "Fixed",
+                    "author": {"displayName": "Alice"},
+                    "action": "resolve",
+                },
+            ]
+        }
+
+        replies = list_replies(mock_service, "file123", "comment1")
+
+        assert len(replies) == 2
+        assert replies[0]["content"] == "Thanks"
+        assert replies[1]["action"] == "resolve"
+
+    def test_list_replies_pagination(self):
+        """Test listing replies with pagination."""
+        mock_service = Mock()
+        mock_service.replies().list().execute.side_effect = [
+            {
+                "replies": [{"id": "r1", "content": "First"}],
+                "nextPageToken": "token2",
+            },
+            {
+                "replies": [{"id": "r2", "content": "Second"}],
+            },
+        ]
+
+        replies = list_replies(mock_service, "file123", "comment1")
+
+        assert len(replies) == 2
+
+    def test_list_replies_empty(self):
+        """Test listing replies when there are none."""
+        mock_service = Mock()
+        mock_service.replies().list().execute.return_value = {"replies": []}
+
+        replies = list_replies(mock_service, "file123", "comment1")
+
+        assert replies == []
+
+    def test_list_replies_api_error(self):
+        """Test listing replies with API error."""
+        mock_service = Mock()
+        mock_service.replies().list().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+
+        with pytest.raises(DriveAPIError):
+            list_replies(mock_service, "file123", "comment1")
+
+    def test_get_reply(self):
+        """Test getting a single reply."""
+        mock_service = Mock()
+        mock_service.replies().get().execute.return_value = {
+            "id": "reply1",
+            "content": "Done",
+            "author": {"displayName": "Alice"},
+            "action": "resolve",
+        }
+
+        result = get_reply(mock_service, "file123", "comment1", "reply1")
+
+        assert result["id"] == "reply1"
+        assert result["action"] == "resolve"
+
+    def test_get_reply_api_error(self):
+        """Test getting a reply with API error."""
+        mock_service = Mock()
+        mock_service.replies().get().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+
+        with pytest.raises(DriveAPIError):
+            get_reply(mock_service, "file123", "comment1", "nonexistent")
+
+    def test_create_reply(self):
+        """Test creating a reply."""
+        mock_service = Mock()
+        mock_service.replies().create().execute.return_value = {
+            "id": "new_reply",
+            "content": "Acknowledged",
+        }
+
+        result = create_reply(mock_service, "file123", "comment1", "Acknowledged")
+
+        assert result["id"] == "new_reply"
+
+    def test_create_reply_with_action(self):
+        """Test creating a reply with resolve action."""
+        mock_service = Mock()
+        mock_service.replies().create().execute.return_value = {
+            "id": "new_reply",
+            "content": "Fixed",
+            "action": "resolve",
+        }
+
+        result = create_reply(mock_service, "file123", "comment1", "Fixed", action="resolve")
+
+        call_kwargs = mock_service.replies().create.call_args[1]
+        assert call_kwargs["body"]["action"] == "resolve"
+        assert result["action"] == "resolve"
+
+    def test_create_reply_api_error(self):
+        """Test creating a reply with API error."""
+        mock_service = Mock()
+        content = b'{"error": {"message": "Forbidden"}}'
+        mock_service.replies().create().execute.side_effect = HttpError(
+            resp=Mock(status=403), content=content
+        )
+
+        with pytest.raises(DriveAPIError):
+            create_reply(mock_service, "file123", "comment1", "Test")
+
+    def test_update_reply(self):
+        """Test updating a reply."""
+        mock_service = Mock()
+        mock_service.replies().update().execute.return_value = {
+            "id": "reply1",
+            "content": "Updated reply",
+        }
+
+        result = update_reply(mock_service, "file123", "comment1", "reply1", "Updated reply")
+
+        assert result["content"] == "Updated reply"
+
+    def test_update_reply_api_error(self):
+        """Test updating a reply with API error."""
+        mock_service = Mock()
+        mock_service.replies().update().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+
+        with pytest.raises(DriveAPIError):
+            update_reply(mock_service, "file123", "comment1", "nonexistent", "text")
+
+    def test_delete_reply(self):
+        """Test deleting a reply."""
+        mock_service = Mock()
+
+        delete_reply(mock_service, "file123", "comment1", "reply1")
+
+        mock_service.replies().delete.assert_called_with(
+            fileId="file123", commentId="comment1", replyId="reply1"
+        )
+
+    def test_delete_reply_api_error(self):
+        """Test deleting a reply with API error."""
+        mock_service = Mock()
+        mock_service.replies().delete().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+
+        with pytest.raises(DriveAPIError):
+            delete_reply(mock_service, "file123", "comment1", "nonexistent")
+
 
 # ============================================================================
 # FORMATTING TESTS
@@ -1061,6 +1351,51 @@ class TestFormatting:
         formatted = format_comment(comment)
 
         assert "### Comment by user@example.com (open)" in formatted
+
+    def test_format_reply(self):
+        """Test formatting a reply as markdown."""
+        reply = {
+            "id": "reply123",
+            "content": "Looks good to me",
+            "author": {"displayName": "Bob", "emailAddress": "bob@example.com"},
+            "createdTime": "2024-01-15T11:00:00Z",
+        }
+
+        formatted = format_reply(reply)
+
+        assert formatted.startswith("### Reply by Bob\n")
+        assert "- **ID:** reply123" in formatted
+        assert "- **Created:** 2024-01-15T11:00:00Z" in formatted
+        assert "- **Content:** Looks good to me" in formatted
+        assert "Action" not in formatted
+
+    def test_format_reply_with_action(self):
+        """Test formatting a reply with resolve action."""
+        reply = {
+            "id": "reply456",
+            "content": "Fixed",
+            "author": {"displayName": "Alice"},
+            "action": "resolve",
+            "createdTime": "2024-01-15T12:00:00Z",
+        }
+
+        formatted = format_reply(reply)
+
+        assert "### Reply by Alice" in formatted
+        assert "- **Action:** resolve" in formatted
+
+    def test_format_reply_email_fallback(self):
+        """Test formatting reply with email instead of display name."""
+        reply = {
+            "id": "r1",
+            "content": "OK",
+            "author": {"emailAddress": "user@example.com"},
+            "createdTime": "2024-01-15T10:00:00Z",
+        }
+
+        formatted = format_reply(reply)
+
+        assert "### Reply by user@example.com" in formatted
 
 
 # ============================================================================
@@ -2071,6 +2406,370 @@ class TestAdditionalCLICommands:
         args.max_results = 100
 
         exit_code = cmd_comments_list(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_comment")
+    @patch("builtins.print")
+    def test_cmd_comments_get(self, _mock_print, mock_get_comment, __mock_build_service):
+        """Test comments get command."""
+        mock_get_comment.return_value = {
+            "id": "c1",
+            "content": "Nice work",
+            "author": {"displayName": "Alice"},
+            "resolved": False,
+            "createdTime": "2024-01-15T10:00:00Z",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.json = False
+
+        exit_code = cmd_comments_get(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_comment")
+    @patch("builtins.print")
+    def test_cmd_comments_get_json(self, _mock_print, mock_get_comment, __mock_build_service):
+        """Test comments get command with JSON output."""
+        mock_get_comment.return_value = {"id": "c1", "content": "Nice work"}
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.json = True
+
+        exit_code = cmd_comments_get(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "create_comment")
+    @patch("builtins.print")
+    def test_cmd_comments_create(self, _mock_print, mock_create, __mock_build_service):
+        """Test comments create command."""
+        mock_create.return_value = {
+            "id": "new_comment",
+            "content": "Great!",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.content = "Great!"
+        args.quoted_text = None
+        args.json = False
+
+        exit_code = cmd_comments_create(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "create_comment")
+    @patch("builtins.print")
+    def test_cmd_comments_create_json(self, _mock_print, mock_create, __mock_build_service):
+        """Test comments create command with JSON output."""
+        mock_create.return_value = {"id": "new_comment", "content": "Great!"}
+
+        args = Mock()
+        args.file_id = "file123"
+        args.content = "Great!"
+        args.quoted_text = None
+        args.json = True
+
+        exit_code = cmd_comments_create(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "update_comment")
+    @patch("builtins.print")
+    def test_cmd_comments_update(self, _mock_print, mock_update, __mock_build_service):
+        """Test comments update command."""
+        mock_update.return_value = {"id": "c1", "content": "Updated"}
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.content = "Updated"
+        args.json = False
+
+        exit_code = cmd_comments_update(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "update_comment")
+    @patch("builtins.print")
+    def test_cmd_comments_update_json(self, _mock_print, mock_update, __mock_build_service):
+        """Test comments update command with JSON output."""
+        mock_update.return_value = {"id": "c1", "content": "Updated"}
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.content = "Updated"
+        args.json = True
+
+        exit_code = cmd_comments_update(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "delete_comment")
+    @patch("builtins.print")
+    def test_cmd_comments_delete(self, _mock_print, _mock_delete, __mock_build_service):
+        """Test comments delete command."""
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.json = False
+
+        exit_code = cmd_comments_delete(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "delete_comment")
+    @patch("builtins.print")
+    def test_cmd_comments_delete_json(self, _mock_print, _mock_delete, __mock_build_service):
+        """Test comments delete command with JSON output."""
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.json = True
+
+        exit_code = cmd_comments_delete(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "list_replies")
+    @patch("builtins.print")
+    def test_cmd_replies_list(self, _mock_print, mock_list_replies, __mock_build_service):
+        """Test replies list command."""
+        mock_list_replies.return_value = [
+            {
+                "id": "r1",
+                "content": "Thanks",
+                "author": {"displayName": "Bob"},
+                "createdTime": "2024-01-15T11:00:00Z",
+            }
+        ]
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.json = False
+        args.include_deleted = False
+        args.max_results = 100
+
+        exit_code = cmd_replies_list(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "list_replies")
+    @patch("builtins.print")
+    def test_cmd_replies_list_json(self, _mock_print, mock_list_replies, __mock_build_service):
+        """Test replies list command with JSON output."""
+        mock_list_replies.return_value = []
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.json = True
+        args.include_deleted = False
+        args.max_results = 100
+
+        exit_code = cmd_replies_list(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "list_replies")
+    @patch("builtins.print")
+    def test_cmd_replies_list_empty(self, _mock_print, mock_list_replies, __mock_build_service):
+        """Test replies list command with no replies."""
+        mock_list_replies.return_value = []
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.json = False
+        args.include_deleted = False
+        args.max_results = 100
+
+        exit_code = cmd_replies_list(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_reply")
+    @patch("builtins.print")
+    def test_cmd_replies_get(self, _mock_print, mock_get_reply, __mock_build_service):
+        """Test replies get command."""
+        mock_get_reply.return_value = {
+            "id": "r1",
+            "content": "Done",
+            "author": {"displayName": "Alice"},
+            "createdTime": "2024-01-15T11:00:00Z",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.reply_id = "r1"
+        args.json = False
+
+        exit_code = cmd_replies_get(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "get_reply")
+    @patch("builtins.print")
+    def test_cmd_replies_get_json(self, _mock_print, mock_get_reply, __mock_build_service):
+        """Test replies get command with JSON output."""
+        mock_get_reply.return_value = {"id": "r1", "content": "Done"}
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.reply_id = "r1"
+        args.json = True
+
+        exit_code = cmd_replies_get(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "create_reply")
+    @patch("builtins.print")
+    def test_cmd_replies_create(self, _mock_print, mock_create, __mock_build_service):
+        """Test replies create command."""
+        mock_create.return_value = {
+            "id": "new_reply",
+            "content": "Acknowledged",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.content = "Acknowledged"
+        args.action = None
+        args.json = False
+
+        exit_code = cmd_replies_create(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "create_reply")
+    @patch("builtins.print")
+    def test_cmd_replies_create_with_action(self, _mock_print, mock_create, __mock_build_service):
+        """Test replies create command with resolve action."""
+        mock_create.return_value = {
+            "id": "new_reply",
+            "content": "Fixed",
+            "action": "resolve",
+        }
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.content = "Fixed"
+        args.action = "resolve"
+        args.json = False
+
+        exit_code = cmd_replies_create(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "create_reply")
+    @patch("builtins.print")
+    def test_cmd_replies_create_json(self, _mock_print, mock_create, __mock_build_service):
+        """Test replies create command with JSON output."""
+        mock_create.return_value = {"id": "new_reply", "content": "OK"}
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.content = "OK"
+        args.action = None
+        args.json = True
+
+        exit_code = cmd_replies_create(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "update_reply")
+    @patch("builtins.print")
+    def test_cmd_replies_update(self, _mock_print, mock_update, __mock_build_service):
+        """Test replies update command."""
+        mock_update.return_value = {"id": "r1", "content": "Updated"}
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.reply_id = "r1"
+        args.content = "Updated"
+        args.json = False
+
+        exit_code = cmd_replies_update(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "update_reply")
+    @patch("builtins.print")
+    def test_cmd_replies_update_json(self, _mock_print, mock_update, __mock_build_service):
+        """Test replies update command with JSON output."""
+        mock_update.return_value = {"id": "r1", "content": "Updated"}
+
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.reply_id = "r1"
+        args.content = "Updated"
+        args.json = True
+
+        exit_code = cmd_replies_update(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "delete_reply")
+    @patch("builtins.print")
+    def test_cmd_replies_delete(self, _mock_print, _mock_delete, __mock_build_service):
+        """Test replies delete command."""
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.reply_id = "r1"
+        args.json = False
+
+        exit_code = cmd_replies_delete(args)
+
+        assert exit_code == 0
+
+    @patch.object(google_drive, "build_drive_service")
+    @patch.object(google_drive, "delete_reply")
+    @patch("builtins.print")
+    def test_cmd_replies_delete_json(self, _mock_print, _mock_delete, __mock_build_service):
+        """Test replies delete command with JSON output."""
+        args = Mock()
+        args.file_id = "file123"
+        args.comment_id = "c1"
+        args.reply_id = "r1"
+        args.json = True
+
+        exit_code = cmd_replies_delete(args)
 
         assert exit_code == 0
 

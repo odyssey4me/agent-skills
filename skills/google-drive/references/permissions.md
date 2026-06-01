@@ -33,3 +33,12 @@ data without modifying remote state.
 | share | write | Share a file with users |
 | permissions delete | write | Remove sharing permissions |
 | comments list | read | List comments on a file |
+| comments get | read | Get a single comment |
+| comments create | write | Create a comment on a file |
+| comments update | write | Update comment text |
+| comments delete | write | Delete a comment |
+| replies list | read | List replies on a comment |
+| replies get | read | Get a single reply |
+| replies create | write | Reply to a comment |
+| replies update | write | Update reply text |
+| replies delete | write | Delete a reply |

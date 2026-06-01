@@ -336,3 +336,148 @@ $SKILL_DIR/scripts/google-drive.py comments list FILE_ID --max-results 10
 - `file_id`: The file ID (required)
 - `--max-results`: Maximum number of comments (default: 100)
 - `--include-deleted`: Include deleted comments (they will lack content)
+
+## comments get
+
+Get a single comment with its replies.
+
+```bash
+$SKILL_DIR/scripts/google-drive.py comments get FILE_ID COMMENT_ID
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `comment_id`: The comment ID (required)
+
+## comments create
+
+Create a comment on a file. To mention a user, include their email in the
+content text with an `@` prefix (e.g., `@user@example.com`).
+
+```bash
+# Simple comment
+$SKILL_DIR/scripts/google-drive.py comments create FILE_ID --content "Looks good!"
+
+# Comment anchored to specific text
+$SKILL_DIR/scripts/google-drive.py comments create FILE_ID \
+  --content "This needs clarification" --quoted-text "the ambiguous sentence"
+
+# Comment with a mention
+$SKILL_DIR/scripts/google-drive.py comments create FILE_ID \
+  --content "Hey @reviewer@example.com please take a look"
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `--content`: Comment text (required)
+- `--quoted-text`: Quoted file content to anchor the comment
+
+## comments update
+
+Update a comment's text.
+
+```bash
+$SKILL_DIR/scripts/google-drive.py comments update FILE_ID COMMENT_ID \
+  --content "Updated comment text"
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `comment_id`: The comment ID (required)
+- `--content`: New comment text (required)
+
+## comments delete
+
+Delete a comment from a file.
+
+```bash
+$SKILL_DIR/scripts/google-drive.py comments delete FILE_ID COMMENT_ID
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `comment_id`: The comment ID (required)
+
+## replies list
+
+List replies on a comment.
+
+```bash
+# List all replies
+$SKILL_DIR/scripts/google-drive.py replies list FILE_ID COMMENT_ID
+
+# Include deleted replies
+$SKILL_DIR/scripts/google-drive.py replies list FILE_ID COMMENT_ID --include-deleted
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `comment_id`: The comment ID (required)
+- `--max-results`: Maximum number of replies (default: 100)
+- `--include-deleted`: Include deleted replies
+
+## replies get
+
+Get a single reply.
+
+```bash
+$SKILL_DIR/scripts/google-drive.py replies get FILE_ID COMMENT_ID REPLY_ID
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `comment_id`: The comment ID (required)
+- `reply_id`: The reply ID (required)
+
+## replies create
+
+Reply to a comment. Use `--action resolve` to resolve the comment or
+`--action reopen` to reopen a resolved comment.
+
+```bash
+# Simple reply
+$SKILL_DIR/scripts/google-drive.py replies create FILE_ID COMMENT_ID \
+  --content "Thanks, I'll fix this"
+
+# Reply and resolve the comment
+$SKILL_DIR/scripts/google-drive.py replies create FILE_ID COMMENT_ID \
+  --content "Fixed in latest revision" --action resolve
+
+# Reopen a resolved comment
+$SKILL_DIR/scripts/google-drive.py replies create FILE_ID COMMENT_ID \
+  --content "Actually this still needs work" --action reopen
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `comment_id`: The comment ID (required)
+- `--content`: Reply text (required)
+- `--action`: `resolve` or `reopen` — resolve or reopen the parent comment
+
+## replies update
+
+Update a reply's text.
+
+```bash
+$SKILL_DIR/scripts/google-drive.py replies update FILE_ID COMMENT_ID REPLY_ID \
+  --content "Updated reply text"
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `comment_id`: The comment ID (required)
+- `reply_id`: The reply ID (required)
+- `--content`: New reply text (required)
+
+## replies delete
+
+Delete a reply from a comment.
+
+```bash
+$SKILL_DIR/scripts/google-drive.py replies delete FILE_ID COMMENT_ID REPLY_ID
+```
+
+**Arguments:**
+- `file_id`: The file ID (required)
+- `comment_id`: The comment ID (required)
+- `reply_id`: The reply ID (required)
