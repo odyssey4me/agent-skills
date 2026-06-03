@@ -589,6 +589,21 @@ class TestAPIFunctions:
         assert page["title"] == "New Title"
         assert page["version"]["number"] == 2
 
+    @patch("skills.confluence.scripts.confluence.delete")
+    @patch("skills.confluence.scripts.confluence.get_api_base")
+    def test_delete_page(self, mock_get_api_base, mock_delete):
+        """Test deleting a page."""
+        from skills.confluence.scripts.confluence import delete_page
+
+        mock_get_api_base.return_value = "https://example.atlassian.net/wiki"
+        mock_delete.return_value = {}
+
+        result = delete_page("123")
+        assert result == {}
+        mock_delete.assert_called_once()
+        call_args = mock_delete.call_args
+        assert "content/123" in call_args[0][1]
+
 
 class TestFormatFunctions:
     """Tests for page formatting functions."""
@@ -1042,6 +1057,24 @@ class TestCommandHandlers:
 
         result = cmd_page(args)
         assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.delete_page")
+    def test_cmd_page_delete(self, mock_delete):
+        """Test page delete command."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_page
+
+        mock_delete.return_value = {}
+
+        args = argparse.Namespace(
+            page_command="delete",
+            page_id="123",
+        )
+
+        result = cmd_page(args)
+        assert result == 0
+        mock_delete.assert_called_once_with("123")
 
     @patch("skills.confluence.scripts.confluence.list_spaces")
     def test_cmd_space_list(self, mock_list):

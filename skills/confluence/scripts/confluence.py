@@ -1701,6 +1701,21 @@ def update_page(
     return {}
 
 
+def delete_page(page_id: str) -> dict[str, Any]:
+    """Delete a page (moves to trash on Cloud).
+
+    Args:
+        page_id: Page ID to delete.
+
+    Returns:
+        Empty dict on success (204 No Content).
+
+    Raises:
+        APIError: If deletion fails.
+    """
+    return delete("confluence", api_path(f"content/{page_id}"))
+
+
 # ============================================================================
 # SPACE MANAGEMENT
 # ============================================================================
@@ -2007,6 +2022,10 @@ def cmd_page(args: argparse.Namespace) -> int:
                 print(f"Updated page: {page.get('id', 'N/A')}")
                 print(f"New version: {page.get('version', {}).get('number', 'N/A')}")
 
+        elif args.page_command == "delete":
+            delete_page(args.page_id)
+            print(f"Deleted page: {args.page_id}")
+
         return 0
 
     except Exception as e:
@@ -2242,6 +2261,10 @@ def main() -> int:
         "--version", type=int, help="Current version (auto-detect if not provided)"
     )
     update_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Delete subcommand
+    delete_parser = page_subparsers.add_parser("delete", help="Delete a page")
+    delete_parser.add_argument("page_id", help="Page ID to delete")
 
     # ========================================================================
     # SPACE COMMAND
