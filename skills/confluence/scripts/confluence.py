@@ -60,6 +60,20 @@ except ImportError:
     )
     sys.exit(1)
 
+try:
+    from marklassian import markdown_to_adf as _marklassian_md_to_adf
+
+    MARKLASSIAN_AVAILABLE = True
+except ImportError:
+    MARKLASSIAN_AVAILABLE = False
+
+try:
+    import markdown as md_lib
+
+    MARKDOWN_AVAILABLE = True
+except ImportError:
+    MARKDOWN_AVAILABLE = False
+
 
 # ============================================================================
 # KEYRING CREDENTIAL STORAGE
@@ -576,6 +590,9 @@ def markdown_to_storage(markdown: str) -> str:
     Returns:
         XHTML string for storage format.
     """
+    if MARKDOWN_AVAILABLE:
+        return md_lib.markdown(markdown, extensions=["tables", "fenced_code"])
+
     lines = markdown.split("\n")
     result = []
     in_code_block = False
@@ -804,6 +821,9 @@ def markdown_to_adf(markdown: str) -> dict[str, Any]:
     Returns:
         ADF JSON structure.
     """
+    if MARKLASSIAN_AVAILABLE:
+        return dict(_marklassian_md_to_adf(markdown))
+
     lines = markdown.split("\n")
     content = []
     in_code_block = False
@@ -1097,10 +1117,34 @@ def format_content(
 class APIError(Exception):
     """Exception raised for API errors."""
 
-    def __init__(self, message: str, status_code: int | None = None, response: Any = None):
+    def __init__(
+        self,
+        message: str,
+        status_code: int | None = None,
+        response: Any = None,
+        request_body: Any = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.response = response
+        self.request_body = request_body
+
+    def verbose_message(self) -> str:
+        parts = [str(self)]
+        if self.response:
+            try:
+                body = (
+                    json.loads(self.response) if isinstance(self.response, str) else self.response
+                )
+                parts.append(f"Response: {json.dumps(body, indent=2)}")
+            except (json.JSONDecodeError, TypeError):
+                parts.append(f"Response: {self.response}")
+        if self.request_body:
+            try:
+                parts.append(f"Request body: {json.dumps(self.request_body, indent=2)}")
+            except (TypeError, ValueError):
+                parts.append(f"Request body: {self.request_body}")
+        return "\n".join(parts)
 
 
 def _get_confluence_auth_method(
@@ -1203,6 +1247,7 @@ def make_request(
             f"{method.upper()} {endpoint} failed: {response.status_code} {response.reason}",
             status_code=response.status_code,
             response=response.text,
+            request_body=json_data,
         )
 
     if response.status_code == 204:
@@ -1536,8 +1581,8 @@ def create_page(
     # Convert body to appropriate format
     if body_format == "markdown":
         if is_cloud():
-            # Cloud: use editor format (ADF)
-            body_content = markdown_to_adf(body)
+            # Cloud: use editor format (ADF) — value must be a JSON string
+            body_content = json.dumps(markdown_to_adf(body))
             body_representation = "atlas_doc_format"
             body_key = "editor"
         else:
@@ -1550,7 +1595,7 @@ def create_page(
         body_representation = "storage"
         body_key = "storage"
     elif body_format == "editor":
-        body_content = json.loads(body) if isinstance(body, str) else body
+        body_content = body if isinstance(body, str) else json.dumps(body)
         body_representation = "atlas_doc_format"
         body_key = "editor"
     else:
@@ -1604,26 +1649,27 @@ def update_page(
     Raises:
         APIError: If update fails or version conflict.
     """
-    # Get current page to determine version if not provided
-    if version is None:
+    # Fetch current page for version and title when not explicitly provided
+    if version is None or title is None:
         current_page = get_page(page_id, expand=["version"])
-        version = current_page.get("version", {}).get("number", 1)
+        if version is None:
+            version = current_page.get("version", {}).get("number", 1)
+        if title is None:
+            title = current_page.get("title", "")
 
     # Build update data
     update_data: dict[str, Any] = {
         "version": {"number": version + 1},
         "type": "page",
+        "title": title,
     }
-
-    if title:
-        update_data["title"] = title
 
     if body:
         # Convert body to appropriate format
         if body_format == "markdown":
             if is_cloud():
-                # Cloud: use editor format (ADF)
-                body_content = markdown_to_adf(body)
+                # Cloud: use editor format (ADF) — value must be a JSON string
+                body_content = json.dumps(markdown_to_adf(body))
                 body_representation = "atlas_doc_format"
                 body_key = "editor"
             else:
@@ -1636,7 +1682,7 @@ def update_page(
             body_representation = "storage"
             body_key = "storage"
         elif body_format == "editor":
-            body_content = json.loads(body) if isinstance(body, str) else body
+            body_content = body if isinstance(body, str) else json.dumps(body)
             body_representation = "atlas_doc_format"
             body_key = "editor"
         else:
@@ -1829,7 +1875,7 @@ def cmd_check() -> int:
         else:
             print("   WARNING: Unexpected response format")
     except APIError as e:
-        print(f"   ERROR: {e}")
+        print(f"   ERROR: {e.verbose_message()}")
         return 1
     except Exception as e:
         print(f"   ERROR: {e}")
@@ -1877,7 +1923,8 @@ def cmd_search(args: argparse.Namespace) -> int:
         return 0
 
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        msg = e.verbose_message() if isinstance(e, APIError) else str(e)
+        print(f"Error: {msg}", file=sys.stderr)
         return 1
 
 
@@ -1963,7 +2010,8 @@ def cmd_page(args: argparse.Namespace) -> int:
         return 0
 
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        msg = e.verbose_message() if isinstance(e, APIError) else str(e)
+        print(f"Error: {msg}", file=sys.stderr)
         return 1
 
 
@@ -2031,7 +2079,8 @@ def cmd_space(args: argparse.Namespace) -> int:
         return 0
 
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        msg = e.verbose_message() if isinstance(e, APIError) else str(e)
+        print(f"Error: {msg}", file=sys.stderr)
         return 1
 
 
@@ -2087,7 +2136,8 @@ def cmd_config(args: argparse.Namespace) -> int:
             return 0
 
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        msg = e.verbose_message() if isinstance(e, APIError) else str(e)
+        print(f"Error: {msg}", file=sys.stderr)
         return 1
 
 

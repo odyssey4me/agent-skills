@@ -8,6 +8,7 @@ import pytest
 
 # Import from skills module
 from skills.confluence.scripts.confluence import (
+    APIError,
     ConfluenceDefaults,
     Credentials,
     SpaceDefaults,
@@ -1400,7 +1401,7 @@ class TestMarkdownEdgeCases:
         """Test mixed ordered and unordered lists."""
         from skills.confluence.scripts.confluence import markdown_to_storage
 
-        markdown = "- Bullet\n\n1. Number"
+        markdown = "- Bullet\n\nSome text\n\n1. Number"
         storage = markdown_to_storage(markdown)
         assert "<ul>" in storage
         assert "<ol>" in storage
@@ -2085,3 +2086,109 @@ class TestAdditionalCoverage:
         content = "test content"
         result = format_content(content, input_format="markdown", output_format="markdown")
         assert result == content
+
+
+class TestAPIErrorVerboseMessage:
+    """Tests for APIError.verbose_message()."""
+
+    def test_verbose_with_json_response(self):
+        err = APIError("failed", status_code=400, response='{"message": "bad"}')
+        msg = err.verbose_message()
+        assert "failed" in msg
+        assert '"message": "bad"' in msg
+        assert "Response:" in msg
+
+    def test_verbose_with_plain_response(self):
+        err = APIError("failed", status_code=500, response="Server error text")
+        msg = err.verbose_message()
+        assert "Server error text" in msg
+
+    def test_verbose_with_request_body(self):
+        err = APIError("failed", request_body={"type": "page", "title": "Test"})
+        msg = err.verbose_message()
+        assert "Request body:" in msg
+        assert '"title": "Test"' in msg
+
+    def test_verbose_no_extras(self):
+        err = APIError("simple error")
+        msg = err.verbose_message()
+        assert msg == "simple error"
+
+    def test_verbose_non_serializable_request_body(self):
+        err = APIError("failed", request_body=object())
+        msg = err.verbose_message()
+        assert "Request body:" in msg
+
+
+class TestUpdatePageTitleFallback:
+    """Tests for update_page title auto-fetch."""
+
+    @patch("skills.confluence.scripts.confluence.put")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    @patch("skills.confluence.scripts.confluence.is_cloud")
+    @patch("skills.confluence.scripts.confluence.get_api_base")
+    def test_update_page_without_title(self, mock_base, mock_cloud, mock_get, mock_put):
+        """update_page includes current title when --title not provided."""
+        from skills.confluence.scripts.confluence import update_page
+
+        mock_base.return_value = "https://example.atlassian.net/wiki"
+        mock_cloud.return_value = True
+        mock_get.return_value = {
+            "id": "123",
+            "title": "Existing Title",
+            "version": {"number": 5},
+        }
+        mock_put.return_value = {"id": "123", "title": "Existing Title", "version": {"number": 6}}
+
+        update_page("123", body="# Updated content")
+        call_args = mock_put.call_args
+        payload = call_args[0][2]
+        assert payload["title"] == "Existing Title"
+        assert payload["version"]["number"] == 6
+
+    @patch("skills.confluence.scripts.confluence.put")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    @patch("skills.confluence.scripts.confluence.is_cloud")
+    @patch("skills.confluence.scripts.confluence.get_api_base")
+    def test_update_page_with_body_cloud(self, mock_base, mock_cloud, mock_get, mock_put):
+        """update_page sends ADF as JSON string on Cloud."""
+        import json
+
+        from skills.confluence.scripts.confluence import update_page
+
+        mock_base.return_value = "https://example.atlassian.net/wiki"
+        mock_cloud.return_value = True
+        mock_get.return_value = {
+            "id": "456",
+            "title": "Page",
+            "version": {"number": 1},
+        }
+        mock_put.return_value = {"id": "456", "version": {"number": 2}}
+
+        update_page("456", body="Hello")
+        payload = mock_put.call_args[0][2]
+        value = payload["body"]["editor"]["value"]
+        assert isinstance(value, str)
+        parsed = json.loads(value)
+        assert parsed["type"] == "doc"
+
+    @patch("skills.confluence.scripts.confluence.put")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    @patch("skills.confluence.scripts.confluence.is_cloud")
+    @patch("skills.confluence.scripts.confluence.get_api_base")
+    def test_update_page_with_body_dc(self, mock_base, mock_cloud, mock_get, mock_put):
+        """update_page sends storage format on DC/Server."""
+        from skills.confluence.scripts.confluence import update_page
+
+        mock_base.return_value = "https://confluence.example.com"
+        mock_cloud.return_value = False
+        mock_get.return_value = {
+            "id": "789",
+            "title": "Page",
+            "version": {"number": 1},
+        }
+        mock_put.return_value = {"id": "789", "version": {"number": 2}}
+
+        update_page("789", body="Hello")
+        payload = mock_put.call_args[0][2]
+        assert "storage" in payload["body"]
