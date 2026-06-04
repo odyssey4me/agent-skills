@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "0.5.0"
+  version: "0.6.0"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -255,6 +255,36 @@ $SKILL_DIR/scripts/confluence.py space get DEMO
 - `get <space-key>`: Get space details
 
 For creating spaces, see [references/creating-content.md](references/creating-content.md).
+
+### space permissions
+
+View, add, and remove space permissions.
+
+```bash
+# List all permissions for a space
+$SKILL_DIR/scripts/confluence.py space permissions list DEMO
+
+# Filter by subject type
+$SKILL_DIR/scripts/confluence.py space permissions list DEMO --subject-type group
+
+# Add a permission
+$SKILL_DIR/scripts/confluence.py space permissions add DEMO \
+  --subject-type user --subject "5a1234abc" --operation read --target space
+
+# Remove a permission by ID
+$SKILL_DIR/scripts/confluence.py space permissions remove DEMO --id 2154
+```
+
+**Arguments:**
+- `list <space-key>`: List permissions
+  - `--subject-type`: Filter by user or group
+- `add <space-key>`: Add a permission
+  - `--subject-type`: user or group (required)
+  - `--subject`: User account ID or group name/ID (required)
+  - `--operation`: read, create, delete, export, administer, archive, restrict_content (required)
+  - `--target`: space, page, blogpost, comment, attachment (required)
+- `remove <space-key>`: Remove a permission
+  - `--id`: Permission ID (required)
 
 ### config
 

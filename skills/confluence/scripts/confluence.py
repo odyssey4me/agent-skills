@@ -1840,6 +1840,74 @@ def create_space(
     return {}
 
 
+def get_space_permissions(space_key: str) -> list[dict[str, Any]]:
+    """Get permissions for a space.
+
+    Args:
+        space_key: Space key.
+
+    Returns:
+        List of permission dictionaries.
+    """
+    space = get_space(space_key, expand=["permissions"])
+    return space.get("permissions", [])
+
+
+def add_space_permission(
+    space_key: str,
+    subject_type: str,
+    subject_id: str,
+    operation_key: str,
+    target: str,
+) -> dict[str, Any]:
+    """Add a permission to a space.
+
+    Args:
+        space_key: Space key.
+        subject_type: "user" or "group".
+        subject_id: User account ID or group name/ID.
+        operation_key: Operation key (read, create, delete, administer, etc.).
+        target: Target type (space, page, blogpost, comment, attachment).
+
+    Returns:
+        Created permission dictionary.
+
+    Raises:
+        APIError: If creation fails.
+    """
+    permission_data = {
+        "subject": {
+            "type": subject_type,
+            "identifier": subject_id,
+        },
+        "operation": {
+            "key": operation_key,
+            "target": target,
+        },
+    }
+
+    response = post("confluence", api_path(f"space/{space_key}/permission"), permission_data)
+    if isinstance(response, dict):
+        return response
+    return {}
+
+
+def remove_space_permission(space_key: str, permission_id: int) -> dict[str, Any]:
+    """Remove a permission from a space.
+
+    Args:
+        space_key: Space key.
+        permission_id: Permission ID to remove.
+
+    Returns:
+        Empty dict on success (204 No Content).
+
+    Raises:
+        APIError: If deletion fails.
+    """
+    return delete("confluence", api_path(f"space/{space_key}/permission/{permission_id}"))
+
+
 # ============================================================================
 # CHECK COMMAND - Validates configuration and connectivity
 # ============================================================================
@@ -2134,12 +2202,85 @@ def cmd_space(args: argparse.Namespace) -> int:
                 print(f"Created space: {space.get('key', 'N/A')}")
                 print(f"Name: {space.get('name', 'N/A')}")
 
+        elif args.space_command == "permissions":
+            return cmd_space_permissions(args)
+
         return 0
 
     except Exception as e:
         msg = e.verbose_message() if isinstance(e, APIError) else str(e)
         print(f"Error: {msg}", file=sys.stderr)
         return 1
+
+
+def cmd_space_permissions(args: argparse.Namespace) -> int:
+    """Handle space permissions command."""
+    if args.perm_command == "list":
+        permissions = get_space_permissions(args.space_key)
+
+        if args.subject_type:
+            permissions = [
+                p
+                for p in permissions
+                if p.get("subjects", {}).get(args.subject_type)
+                or p.get("subject", {}).get("type") == args.subject_type
+            ]
+
+        if args.json:
+            print(format_json(permissions))
+        else:
+            if not permissions:
+                print("No permissions found")
+                return 0
+
+            rows = []
+            for perm in permissions:
+                subject = perm.get("subject", {})
+                operation = perm.get("operation", {})
+                rows.append(
+                    {
+                        "id": str(perm.get("id", "N/A")),
+                        "subject_type": subject.get("type", "N/A"),
+                        "subject_id": subject.get("identifier", "N/A"),
+                        "operation": operation.get("key", "N/A"),
+                        "target": operation.get("target", "N/A"),
+                    }
+                )
+
+            print(
+                format_table(
+                    rows,
+                    ["id", "subject_type", "subject_id", "operation", "target"],
+                    headers={
+                        "id": "ID",
+                        "subject_type": "Subject Type",
+                        "subject_id": "Subject",
+                        "operation": "Operation",
+                        "target": "Target",
+                    },
+                )
+            )
+
+    elif args.perm_command == "add":
+        perm = add_space_permission(
+            space_key=args.space_key,
+            subject_type=args.subject_type,
+            subject_id=args.subject,
+            operation_key=args.operation,
+            target=args.target,
+        )
+
+        if args.json:
+            print(format_json(perm))
+        else:
+            print(f"Added permission: {perm.get('id', 'N/A')}")
+            print(f"  {args.subject_type} '{args.subject}' can {args.operation} {args.target}")
+
+    elif args.perm_command == "remove":
+        remove_space_permission(args.space_key, args.id)
+        print(f"Removed permission: {args.id}")
+
+    return 0
 
 
 def cmd_config(args: argparse.Namespace) -> int:
@@ -2341,6 +2482,46 @@ def main() -> int:
         "--type", choices=["global", "personal"], help="Space type (default: global)"
     )
     space_create_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Permissions subcommand
+    perm_parser = space_subparsers.add_parser("permissions", help="Manage space permissions")
+    perm_subparsers = perm_parser.add_subparsers(dest="perm_command", required=True)
+
+    # Permissions list
+    perm_list_parser = perm_subparsers.add_parser("list", help="List space permissions")
+    perm_list_parser.add_argument("space_key", help="Space key")
+    perm_list_parser.add_argument(
+        "--subject-type", choices=["user", "group"], help="Filter by subject type"
+    )
+    perm_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Permissions add
+    perm_add_parser = perm_subparsers.add_parser("add", help="Add a space permission")
+    perm_add_parser.add_argument("space_key", help="Space key")
+    perm_add_parser.add_argument(
+        "--subject-type", required=True, choices=["user", "group"], help="Subject type"
+    )
+    perm_add_parser.add_argument(
+        "--subject", required=True, help="User account ID or group name/ID"
+    )
+    perm_add_parser.add_argument(
+        "--operation",
+        required=True,
+        choices=["read", "create", "delete", "export", "administer", "archive", "restrict_content"],
+        help="Operation to grant",
+    )
+    perm_add_parser.add_argument(
+        "--target",
+        required=True,
+        choices=["space", "page", "blogpost", "comment", "attachment"],
+        help="Target type",
+    )
+    perm_add_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Permissions remove
+    perm_remove_parser = perm_subparsers.add_parser("remove", help="Remove a space permission")
+    perm_remove_parser.add_argument("space_key", help="Space key")
+    perm_remove_parser.add_argument("--id", required=True, type=int, help="Permission ID to remove")
 
     # ========================================================================
     # CONFIG COMMAND

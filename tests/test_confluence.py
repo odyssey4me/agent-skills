@@ -2286,3 +2286,252 @@ class TestUpdatePageTitleFallback:
         update_page("789", body="Hello")
         payload = mock_put.call_args[0][2]
         assert "storage" in payload["body"]
+
+
+class TestSpacePermissions:
+    """Tests for space permission functions."""
+
+    @patch("skills.confluence.scripts.confluence.get_space")
+    def test_get_space_permissions(self, mock_get_space):
+        """Test listing space permissions."""
+        from skills.confluence.scripts.confluence import get_space_permissions
+
+        mock_get_space.return_value = {
+            "key": "DEMO",
+            "permissions": [
+                {
+                    "id": 1,
+                    "subject": {"type": "user", "identifier": "abc123"},
+                    "operation": {"key": "read", "target": "space"},
+                },
+                {
+                    "id": 2,
+                    "subject": {"type": "group", "identifier": "developers"},
+                    "operation": {"key": "create", "target": "page"},
+                },
+            ],
+        }
+
+        perms = get_space_permissions("DEMO")
+        assert len(perms) == 2
+        assert perms[0]["subject"]["type"] == "user"
+        mock_get_space.assert_called_once_with("DEMO", expand=["permissions"])
+
+    @patch("skills.confluence.scripts.confluence.post")
+    @patch("skills.confluence.scripts.confluence.get_api_base")
+    def test_add_space_permission(self, mock_base, mock_post):
+        """Test adding a space permission."""
+        from skills.confluence.scripts.confluence import add_space_permission
+
+        mock_base.return_value = "https://example.atlassian.net/wiki"
+        mock_post.return_value = {
+            "id": 42,
+            "subject": {"type": "user", "identifier": "abc123"},
+            "operation": {"key": "read", "target": "space"},
+        }
+
+        result = add_space_permission("DEMO", "user", "abc123", "read", "space")
+        assert result["id"] == 42
+        payload = mock_post.call_args[0][2]
+        assert payload["subject"]["type"] == "user"
+        assert payload["subject"]["identifier"] == "abc123"
+        assert payload["operation"]["key"] == "read"
+        assert payload["operation"]["target"] == "space"
+
+    @patch("skills.confluence.scripts.confluence.delete")
+    @patch("skills.confluence.scripts.confluence.get_api_base")
+    def test_remove_space_permission(self, mock_base, mock_delete):
+        """Test removing a space permission."""
+        from skills.confluence.scripts.confluence import remove_space_permission
+
+        mock_base.return_value = "https://example.atlassian.net/wiki"
+        mock_delete.return_value = {}
+
+        result = remove_space_permission("DEMO", 42)
+        assert result == {}
+        call_args = mock_delete.call_args
+        assert "space/DEMO/permission/42" in call_args[0][1]
+
+    @patch("skills.confluence.scripts.confluence.cmd_space_permissions")
+    def test_cmd_space_dispatches_permissions(self, mock_perm_cmd):
+        """Test cmd_space dispatches to cmd_space_permissions."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_space
+
+        mock_perm_cmd.return_value = 0
+
+        args = argparse.Namespace(space_command="permissions")
+
+        result = cmd_space(args)
+        assert result == 0
+        mock_perm_cmd.assert_called_once_with(args)
+
+    @patch("skills.confluence.scripts.confluence.get_space_permissions")
+    def test_cmd_space_permissions_list(self, mock_perms):
+        """Test space permissions list command."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_space_permissions
+
+        mock_perms.return_value = [
+            {
+                "id": 1,
+                "subject": {"type": "user", "identifier": "abc123"},
+                "operation": {"key": "read", "target": "space"},
+            },
+        ]
+
+        args = argparse.Namespace(
+            perm_command="list",
+            space_key="DEMO",
+            subject_type=None,
+            json=False,
+        )
+
+        result = cmd_space_permissions(args)
+        assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.get_space_permissions")
+    def test_cmd_space_permissions_list_filter_by_type(self, mock_perms):
+        """Test space permissions list filtered by subject type."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_space_permissions
+
+        mock_perms.return_value = [
+            {
+                "id": 1,
+                "subject": {"type": "user", "identifier": "abc123"},
+                "operation": {"key": "read", "target": "space"},
+            },
+            {
+                "id": 2,
+                "subject": {"type": "group", "identifier": "devs"},
+                "operation": {"key": "create", "target": "page"},
+            },
+        ]
+
+        args = argparse.Namespace(
+            perm_command="list",
+            space_key="DEMO",
+            subject_type="user",
+            json=False,
+        )
+
+        result = cmd_space_permissions(args)
+        assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.get_space_permissions")
+    def test_cmd_space_permissions_list_empty(self, mock_perms):
+        """Test space permissions list with no results."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_space_permissions
+
+        mock_perms.return_value = []
+
+        args = argparse.Namespace(
+            perm_command="list",
+            space_key="DEMO",
+            subject_type=None,
+            json=False,
+        )
+
+        result = cmd_space_permissions(args)
+        assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.get_space_permissions")
+    def test_cmd_space_permissions_list_json(self, mock_perms):
+        """Test space permissions list with JSON output."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_space_permissions
+
+        mock_perms.return_value = [
+            {
+                "id": 1,
+                "subject": {"type": "user", "identifier": "abc123"},
+                "operation": {"key": "read", "target": "space"},
+            },
+        ]
+
+        args = argparse.Namespace(
+            perm_command="list",
+            space_key="DEMO",
+            subject_type=None,
+            json=True,
+        )
+
+        result = cmd_space_permissions(args)
+        assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.add_space_permission")
+    def test_cmd_space_permissions_add(self, mock_add):
+        """Test space permissions add command."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_space_permissions
+
+        mock_add.return_value = {"id": 42}
+
+        args = argparse.Namespace(
+            perm_command="add",
+            space_key="DEMO",
+            subject_type="user",
+            subject="abc123",
+            operation="read",
+            target="space",
+            json=False,
+        )
+
+        result = cmd_space_permissions(args)
+        assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.add_space_permission")
+    def test_cmd_space_permissions_add_json(self, mock_add):
+        """Test space permissions add with JSON output."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_space_permissions
+
+        mock_add.return_value = {"id": 42}
+
+        args = argparse.Namespace(
+            perm_command="add",
+            space_key="DEMO",
+            subject_type="user",
+            subject="abc123",
+            operation="read",
+            target="space",
+            json=True,
+        )
+
+        result = cmd_space_permissions(args)
+        assert result == 0
+        mock_add.assert_called_once_with(
+            space_key="DEMO",
+            subject_type="user",
+            subject_id="abc123",
+            operation_key="read",
+            target="space",
+        )
+
+    @patch("skills.confluence.scripts.confluence.remove_space_permission")
+    def test_cmd_space_permissions_remove(self, mock_remove):
+        """Test space permissions remove command."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_space_permissions
+
+        mock_remove.return_value = {}
+
+        args = argparse.Namespace(
+            perm_command="remove",
+            space_key="DEMO",
+            id=42,
+        )
+
+        result = cmd_space_permissions(args)
+        assert result == 0
+        mock_remove.assert_called_once_with("DEMO", 42)
