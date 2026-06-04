@@ -12,7 +12,6 @@ from skills.confluence.scripts.confluence import (
     ConfluenceDefaults,
     Credentials,
     SpaceDefaults,
-    _html_to_markdown,
     _truncate,
     adf_to_markdown,
     delete_credential,
@@ -208,18 +207,6 @@ class TestMarkdownConversion:
         }
         markdown = adf_to_markdown(adf)
         assert "# Heading 1" in markdown
-
-    def test_html_to_markdown_bold(self):
-        """Test HTML bold to markdown conversion."""
-        html = "This is <strong>bold</strong> text"
-        markdown = _html_to_markdown(html)
-        assert "**bold**" in markdown
-
-    def test_html_to_markdown_link(self):
-        """Test HTML link to markdown conversion."""
-        html = '<a href="https://example.com">link</a>'
-        markdown = _html_to_markdown(html)
-        assert "[link](https://example.com)" in markdown
 
     def test_markdown_to_storage_list(self):
         """Test markdown list to storage conversion."""
@@ -2033,6 +2020,40 @@ class TestAdditionalCoverage:
         markdown = storage_to_markdown(storage)
         assert "```" in markdown
         assert "test code" in markdown
+
+    def test_storage_to_markdown_code_macro_no_language(self):
+        """Test code macro without language parameter."""
+        from skills.confluence.scripts.confluence import storage_to_markdown
+
+        storage = (
+            '<ac:structured-macro ac:name="code">'
+            "<ac:plain-text-body><![CDATA[hello()]]></ac:plain-text-body>"
+            "</ac:structured-macro>"
+        )
+        markdown = storage_to_markdown(storage)
+        assert "```" in markdown
+        assert "hello()" in markdown
+
+    def test_storage_to_markdown_ac_link(self):
+        """Test ac:link elements converted to markdown links."""
+        from skills.confluence.scripts.confluence import storage_to_markdown
+
+        storage = (
+            '<ac:link><ri:content-page ri:content-id="456" />'
+            "<ac:plain-text-link-body><![CDATA[My Page]]>"
+            "</ac:plain-text-link-body></ac:link>"
+        )
+        markdown = storage_to_markdown(storage)
+        assert "My Page" in markdown
+        assert "page:456" in markdown
+
+    def test_storage_to_markdown_ac_link_no_text(self):
+        """Test ac:link without link text body."""
+        from skills.confluence.scripts.confluence import storage_to_markdown
+
+        storage = '<ac:link><ri:content-page ri:content-id="789" /></ac:link>'
+        markdown = storage_to_markdown(storage)
+        assert "789" in markdown
 
     def test_adf_content_to_text_with_all_marks(self):
         """Test ADF content with all mark types."""

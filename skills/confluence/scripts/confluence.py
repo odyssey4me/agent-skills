@@ -61,6 +61,15 @@ except ImportError:
     sys.exit(1)
 
 try:
+    from markdownify import markdownify as _markdownify_html
+except ImportError:
+    print(
+        "Error: 'markdownify' library not found. Install with: pip install --user markdownify",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+try:
     from marklassian import markdown_to_adf as _marklassian_md_to_adf
 except ImportError:
     print(
@@ -716,7 +725,8 @@ def _finalize_storage(html_content: str, *, include_toc: bool = False) -> str:
 def storage_to_markdown(storage: str) -> str:
     """Convert Confluence storage format (XHTML) to Markdown.
 
-    Best-effort conversion of common XHTML elements.
+    Uses markdownify for HTML-to-Markdown conversion, with pre-processing
+    for Confluence-specific macros (code blocks).
 
     Args:
         storage: XHTML storage format string.
@@ -725,93 +735,76 @@ def storage_to_markdown(storage: str) -> str:
         Markdown string.
     """
     text = storage
+    code_blocks: list[str] = []
 
-    # Code blocks (Confluence macros)
-    def replace_code_macro(match):
+    def _extract_code_macro(match: re.Match) -> str:
         lang = match.group(1) if match.group(1) else ""
-        code = match.group(2)
-        # Unescape CDATA content
-        code = code.replace("<![CDATA[", "").replace("]]>", "")
+        code = match.group(2).replace("<![CDATA[", "").replace("]]>", "")
         code = html.unescape(code)
-        return f"```{lang}\n{code}\n```"
+        block = f"```{lang}\n{code}\n```"
+        idx = len(code_blocks)
+        code_blocks.append(block)
+        return f"\n\nCODEBLOCKPH{idx}END\n\n"
 
     text = re.sub(
-        r'<ac:structured-macro ac:name="code">.*?<ac:parameter ac:name="language">([^<]*)</ac:parameter>.*?<ac:plain-text-body>(.*?)</ac:plain-text-body>.*?</ac:structured-macro>',
-        replace_code_macro,
+        r'<ac:structured-macro ac:name="code">'
+        r'.*?<ac:parameter ac:name="language">([^<]*)</ac:parameter>'
+        r".*?<ac:plain-text-body>(.*?)</ac:plain-text-body>"
+        r".*?</ac:structured-macro>",
+        _extract_code_macro,
         text,
         flags=re.DOTALL,
     )
 
-    # Simple code blocks
+    def _extract_code_macro_no_lang(match: re.Match) -> str:
+        code = match.group(1).replace("<![CDATA[", "").replace("]]>", "")
+        code = html.unescape(code)
+        block = f"```\n{code}\n```"
+        idx = len(code_blocks)
+        code_blocks.append(block)
+        return f"\n\nCODEBLOCKPH{idx}END\n\n"
+
     text = re.sub(
-        r"<pre><code>(.*?)</code></pre>",
-        lambda m: f"```\n{html.unescape(m.group(1))}\n```",
+        r'<ac:structured-macro ac:name="code">'
+        r".*?<ac:plain-text-body>(.*?)</ac:plain-text-body>"
+        r".*?</ac:structured-macro>",
+        _extract_code_macro_no_lang,
         text,
         flags=re.DOTALL,
     )
 
-    # Headers
-    for i in range(6, 0, -1):
-        text = re.sub(
-            f"<h{i}>(.*?)</h{i}>",
-            lambda m, level=i: f"{'#' * level} {_html_to_markdown(m.group(1))}\n",
-            text,
-        )
-
-    # Lists
+    # Remove other Confluence macros (TOC, etc.) — they have no markdown equivalent
     text = re.sub(
-        r"<ul>(.*?)</ul>", lambda m: _convert_list(m.group(1), ordered=False), text, flags=re.DOTALL
-    )
-    text = re.sub(
-        r"<ol>(.*?)</ol>", lambda m: _convert_list(m.group(1), ordered=True), text, flags=re.DOTALL
+        r"<ac:structured-macro[^>]*>.*?</ac:structured-macro>",
+        "",
+        text,
+        flags=re.DOTALL,
     )
 
-    # Paragraphs
+    # Convert ac:link elements back to markdown links
+    def replace_ac_link(match):
+        content_id = match.group(1)
+        link_text = match.group(2) if match.group(2) else f"Page {content_id}"
+        return f'<a href="page:{content_id}">{link_text}</a>'
+
     text = re.sub(
-        r"<p>(.*?)</p>", lambda m: _html_to_markdown(m.group(1)) + "\n", text, flags=re.DOTALL
+        r"<ac:link>"
+        r'<ri:content-page ri:content-id="(\d+)"[^/]*/>'
+        r"(?:<ac:plain-text-link-body>"
+        r"<!\[CDATA\[(.*?)\]\]>"
+        r"</ac:plain-text-link-body>)?"
+        r"</ac:link>",
+        replace_ac_link,
+        text,
+        flags=re.DOTALL,
     )
 
-    # Clean up extra newlines
-    text = re.sub(r"\n{3,}", "\n\n", text)
+    result = _markdownify_html(text, heading_style="ATX", strip=["img"])
 
-    return text.strip()
+    for idx, block in enumerate(code_blocks):
+        result = result.replace(f"CODEBLOCKPH{idx}END", block)
 
-
-def _html_to_markdown(html_text: str) -> str:
-    """Convert inline HTML to Markdown."""
-    text = html_text
-
-    # Bold
-    text = re.sub(r"<strong>(.*?)</strong>", r"**\1**", text)
-    text = re.sub(r"<b>(.*?)</b>", r"**\1**", text)
-
-    # Italic
-    text = re.sub(r"<em>(.*?)</em>", r"*\1*", text)
-    text = re.sub(r"<i>(.*?)</i>", r"*\1*", text)
-
-    # Code
-    text = re.sub(r"<code>(.*?)</code>", r"`\1`", text)
-
-    # Links
-    text = re.sub(r'<a href="([^"]+)">([^<]+)</a>', r"[\2](\1)", text)
-
-    # Unescape HTML entities
-    text = html.unescape(text)
-
-    return text.strip()
-
-
-def _convert_list(list_content: str, ordered: bool = False) -> str:
-    """Convert HTML list items to Markdown."""
-    items = re.findall(r"<li>(.*?)</li>", list_content, flags=re.DOTALL)
-    result = []
-    for idx, item in enumerate(items, 1):
-        item_text = _html_to_markdown(item.strip())
-        if ordered:
-            result.append(f"{idx}. {item_text}")
-        else:
-            result.append(f"- {item_text}")
-    return "\n".join(result) + "\n"
+    return re.sub(r"\n{3,}", "\n\n", result).strip()
 
 
 def markdown_to_adf(markdown: str, *, include_toc: bool = False) -> dict[str, Any]:
