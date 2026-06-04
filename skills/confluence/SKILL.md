@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "0.7.0"
+  version: "0.8.0"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -160,6 +160,9 @@ $SKILL_DIR/scripts/confluence.py page get "My Page" --no-body
 
 # Get in original format (not Markdown)
 $SKILL_DIR/scripts/confluence.py page get "My Page" --raw
+
+# Export with YAML frontmatter (for round-tripping)
+$SKILL_DIR/scripts/confluence.py page get 123456 --frontmatter > page.md
 ```
 
 **Output**: By default, displays page metadata and body content converted to Markdown for readability.
@@ -169,6 +172,7 @@ $SKILL_DIR/scripts/confluence.py page get "My Page" --raw
 - `--markdown`: Output body as Markdown (default)
 - `--raw`: Output in original format
 - `--no-body`: Don't include body content
+- `--frontmatter`: Output as markdown with YAML frontmatter (title, space, labels, parent) for round-tripping with `page create`/`page update`
 
 #### Example Output
 
@@ -214,7 +218,22 @@ $SKILL_DIR/scripts/confluence.py page create --space DEMO --title "Guide" \
 $SKILL_DIR/scripts/confluence.py page update 123456 --body-file updated.md
 ```
 
-**Table of contents:** Use `--toc` to prepend a TOC macro that auto-generates from headings.
+**Frontmatter support:** Markdown files can include YAML frontmatter with page metadata. CLI flags take precedence over frontmatter values. Supported fields: `title`, `space`, `labels`, `parent`, `toc`.
+
+```yaml
+---
+title: API Documentation
+space: DEMO
+labels: docs, api
+parent: 123456
+toc: true
+---
+
+# Introduction
+...
+```
+
+**Table of contents:** Use `--toc` (or `toc: true` in frontmatter) to prepend a TOC macro.
 
 **Internal link conversion:** Links pointing to pages on the same Confluence instance are automatically converted to native Confluence links during markdown conversion. The linked page is validated before conversion — invalid links are left as-is.
 

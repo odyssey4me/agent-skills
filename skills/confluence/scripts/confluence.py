@@ -645,6 +645,39 @@ def _prepend_toc_adf(adf: dict[str, Any]) -> dict[str, Any]:
     return adf
 
 
+def extract_frontmatter(text: str) -> tuple[str, dict[str, str]]:
+    """Extract frontmatter metadata from markdown text.
+
+    Supports both ``---`` delimited YAML frontmatter and the Python-Markdown
+    meta extension format (``Key: Value`` lines at the start).
+
+    Args:
+        text: Markdown text, possibly with frontmatter.
+
+    Returns:
+        Tuple of (body without frontmatter, metadata dict).
+        Metadata values are strings (lists joined with commas).
+    """
+    if MARKDOWN_AVAILABLE:
+        md = md_lib.Markdown(extensions=["meta"])
+        md.convert(text)
+        meta_raw: dict[str, list[str]] = getattr(md, "Meta", {})
+        meta = {k: ", ".join(v) for k, v in meta_raw.items()}
+        stripped = _strip_frontmatter(text)
+        return stripped, meta
+
+    return _strip_frontmatter(text), {}
+
+
+def _strip_frontmatter(text: str) -> str:
+    """Remove YAML frontmatter (``---`` delimited) from text."""
+    if text.startswith("---"):
+        end = text.find("---", 3)
+        if end != -1:
+            return text[end + 3 :].lstrip("\n")
+    return text
+
+
 def markdown_to_storage(markdown: str, *, include_toc: bool = False) -> str:
     """Convert Markdown to Confluence storage format (XHTML).
 
@@ -1506,6 +1539,53 @@ def format_page(
     return result
 
 
+def format_page_with_frontmatter(page: dict[str, Any]) -> str:
+    """Format a page as markdown with YAML frontmatter for round-tripping."""
+    page_id = page.get("id", "")
+    title = page.get("title", "")
+    space = page.get("space", {})
+    space_key = space.get("key", "") if space else ""
+    version_info = page.get("version", {})
+    version = version_info.get("number", 1) if version_info else 1
+
+    # Extract labels if expanded
+    labels_list = []
+    metadata = page.get("metadata", {})
+    if metadata:
+        label_objs = metadata.get("labels", {}).get("results", [])
+        labels_list = [lb.get("name", "") for lb in label_objs if lb.get("name")]
+
+    # Extract ancestors (parent)
+    ancestors = page.get("ancestors", [])
+    parent_id = ancestors[-1].get("id", "") if ancestors else ""
+
+    # Build frontmatter
+    fm_lines = ["---"]
+    fm_lines.append(f"title: {title}")
+    fm_lines.append(f"space: {space_key}")
+    fm_lines.append(f"page_id: {page_id}")
+    fm_lines.append(f"version: {version}")
+    if parent_id:
+        fm_lines.append(f"parent: {parent_id}")
+    if labels_list:
+        fm_lines.append(f"labels: {', '.join(labels_list)}")
+    fm_lines.append("---")
+
+    # Extract body as markdown
+    body = page.get("body", {})
+    if "storage" in body:
+        md_body = storage_to_markdown(body["storage"].get("value", ""))
+    elif "editor" in body:
+        editor_value = body["editor"].get("value", {})
+        if isinstance(editor_value, str):
+            editor_value = json.loads(editor_value)
+        md_body = adf_to_markdown(editor_value)
+    else:
+        md_body = ""
+
+    return "\n".join(fm_lines) + "\n\n" + md_body
+
+
 def format_pages_list(pages: list[dict[str, Any]]) -> str:
     """Format a list of Confluence pages for display.
 
@@ -2147,9 +2227,21 @@ def cmd_page(args: argparse.Namespace) -> int:
             if args.expand:
                 expand = args.expand.split(",")
 
+            if args.frontmatter:
+                expand = [
+                    "body.storage",
+                    "body.editor",
+                    "version",
+                    "space",
+                    "metadata.labels",
+                    "ancestors",
+                ]
+
             page = get_page(args.page_identifier, expand=expand)
 
-            if args.json:
+            if args.frontmatter:
+                print(format_page_with_frontmatter(page))
+            elif args.json:
                 print(format_json(page))
             else:
                 # Format with body as Markdown by default
@@ -2158,9 +2250,6 @@ def cmd_page(args: argparse.Namespace) -> int:
                 print(format_page(page, include_body=include_body, as_markdown=as_markdown))
 
         elif args.page_command == "create":
-            # Load space defaults
-            space_defaults = get_space_defaults(args.space)
-
             # Get body content
             if args.body_file:
                 with open(args.body_file) as f:
@@ -2170,22 +2259,36 @@ def cmd_page(args: argparse.Namespace) -> int:
             else:
                 body = ""
 
+            # Extract frontmatter metadata (CLI flags take precedence)
+            meta: dict[str, str] = {}
+            if args.format == "markdown":
+                body, meta = extract_frontmatter(body)
+
+            space = args.space or meta.get("space", "")
+            title = args.title or meta.get("title", "")
+            include_toc = args.toc or meta.get("toc", "").lower() in ("true", "yes", "1")
+
+            # Load space defaults
+            space_defaults = get_space_defaults(space)
+
             # Apply defaults
-            parent_id = args.parent or space_defaults.default_parent
+            parent_id = args.parent or meta.get("parent") or space_defaults.default_parent
             labels = None
             if args.labels:
                 labels = args.labels.split(",")
+            elif meta.get("labels"):
+                labels = [lb.strip() for lb in meta["labels"].split(",")]
             elif space_defaults.default_labels:
                 labels = space_defaults.default_labels
 
             page = create_page(
-                space=args.space,
-                title=args.title,
+                space=space,
+                title=title,
                 body=body,
                 parent_id=parent_id,
                 body_format=args.format,
                 labels=labels,
-                include_toc=args.toc,
+                include_toc=include_toc,
             )
 
             if args.json:
@@ -2204,13 +2307,25 @@ def cmd_page(args: argparse.Namespace) -> int:
             elif args.body:
                 body = args.body
 
+            # Extract frontmatter metadata (CLI flags take precedence)
+            meta = {}
+            if body and args.format == "markdown":
+                body, meta = extract_frontmatter(body)
+
+            title = args.title or meta.get("title")
+            include_toc = args.toc or meta.get("toc", "").lower() in (
+                "true",
+                "yes",
+                "1",
+            )
+
             page = update_page(
                 page_id=args.page_id,
-                title=args.title,
+                title=title,
                 body=body,
                 body_format=args.format,
                 version=args.version,
-                include_toc=args.toc,
+                include_toc=include_toc,
             )
 
             if args.json:
@@ -2506,12 +2621,17 @@ def main() -> int:
     )
     get_parser.add_argument("--raw", action="store_true", help="Output in original format")
     get_parser.add_argument("--no-body", action="store_true", help="Don't include body content")
+    get_parser.add_argument(
+        "--frontmatter",
+        action="store_true",
+        help="Output as markdown with YAML frontmatter (for round-tripping)",
+    )
     get_parser.add_argument("--expand", help="Fields to expand (comma-separated)")
 
     # Create subcommand
     create_parser = page_subparsers.add_parser("create", help="Create new page")
-    create_parser.add_argument("--space", required=True, help="Space key")
-    create_parser.add_argument("--title", required=True, help="Page title")
+    create_parser.add_argument("--space", help="Space key (or set in frontmatter)")
+    create_parser.add_argument("--title", help="Page title (or set in frontmatter)")
     create_parser.add_argument("--body", help="Page content (Markdown by default)")
     create_parser.add_argument("--body-file", help="Read content from file (Markdown)")
     create_parser.add_argument(

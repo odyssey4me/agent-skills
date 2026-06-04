@@ -982,6 +982,7 @@ class TestCommandHandlers:
             markdown=False,
             raw=False,
             no_body=False,
+            frontmatter=False,
             expand=None,
         )
 
@@ -1007,6 +1008,7 @@ class TestCommandHandlers:
             markdown=False,
             raw=False,
             no_body=False,
+            frontmatter=False,
             expand="body.storage,version",
         )
 
@@ -2638,3 +2640,115 @@ class TestInternalLinksAndToc:
         mock_creds.return_value = Credentials(url="https://example.atlassian.net")
         result = markdown_to_storage("# Hello")
         assert "toc" not in result
+
+
+class TestFrontmatter:
+    """Tests for frontmatter extraction and round-tripping."""
+
+    def test_extract_frontmatter_yaml(self):
+        from skills.confluence.scripts.confluence import extract_frontmatter
+
+        text = "---\ntitle: My Page\nspace: DEMO\nlabels: docs, api\ntoc: true\n---\n\n# Content"
+        body, meta = extract_frontmatter(text)
+        assert meta["title"] == "My Page"
+        assert meta["space"] == "DEMO"
+        assert meta["labels"] == "docs, api"
+        assert meta["toc"] == "true"
+        assert "---" not in body
+        assert "Content" in body
+
+    def test_extract_frontmatter_none(self):
+        from skills.confluence.scripts.confluence import extract_frontmatter
+
+        body, meta = extract_frontmatter("# Just content")
+        assert meta == {}
+        assert "Just content" in body
+
+    def test_strip_frontmatter(self):
+        from skills.confluence.scripts.confluence import _strip_frontmatter
+
+        text = "---\ntitle: Test\n---\n\nBody here"
+        assert "Body here" in _strip_frontmatter(text)
+        assert "title" not in _strip_frontmatter(text)
+
+    def test_strip_frontmatter_no_frontmatter(self):
+        from skills.confluence.scripts.confluence import _strip_frontmatter
+
+        text = "# No frontmatter"
+        assert _strip_frontmatter(text) == text
+
+    def test_format_page_with_frontmatter(self):
+        from skills.confluence.scripts.confluence import format_page_with_frontmatter
+
+        page = {
+            "id": "123",
+            "title": "Test Page",
+            "space": {"key": "DEMO"},
+            "version": {"number": 3},
+            "ancestors": [{"id": "100"}, {"id": "200"}],
+            "metadata": {
+                "labels": {
+                    "results": [{"name": "docs"}, {"name": "api"}],
+                }
+            },
+            "body": {
+                "storage": {"value": "<p>Hello world</p>"},
+            },
+        }
+
+        result = format_page_with_frontmatter(page)
+        assert result.startswith("---")
+        assert "title: Test Page" in result
+        assert "space: DEMO" in result
+        assert "page_id: 123" in result
+        assert "version: 3" in result
+        assert "parent: 200" in result
+        assert "labels: docs, api" in result
+        assert "Hello world" in result
+
+    def test_format_page_with_frontmatter_no_parent(self):
+        from skills.confluence.scripts.confluence import format_page_with_frontmatter
+
+        page = {
+            "id": "456",
+            "title": "Root Page",
+            "space": {"key": "TEST"},
+            "version": {"number": 1},
+            "ancestors": [],
+            "metadata": {"labels": {"results": []}},
+            "body": {"storage": {"value": "<p>Content</p>"}},
+        }
+
+        result = format_page_with_frontmatter(page)
+        assert "parent:" not in result
+        assert "labels:" not in result
+
+    @patch("skills.confluence.scripts.confluence.get_page")
+    def test_cmd_page_get_frontmatter(self, mock_get):
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_page
+
+        mock_get.return_value = {
+            "id": "123",
+            "title": "Test",
+            "space": {"key": "DEMO"},
+            "version": {"number": 1},
+            "ancestors": [],
+            "metadata": {"labels": {"results": []}},
+            "body": {"storage": {"value": "<p>Hello</p>"}},
+        }
+
+        args = argparse.Namespace(
+            page_command="get",
+            page_identifier="123",
+            json=False,
+            markdown=False,
+            raw=False,
+            no_body=False,
+            frontmatter=True,
+            expand=None,
+        )
+
+        result = cmd_page(args)
+        assert result == 0
