@@ -62,17 +62,21 @@ except ImportError:
 
 try:
     from marklassian import markdown_to_adf as _marklassian_md_to_adf
-
-    MARKLASSIAN_AVAILABLE = True
 except ImportError:
-    MARKLASSIAN_AVAILABLE = False
+    print(
+        "Error: 'marklassian' library not found. Install with: pip install --user marklassian",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 try:
     import markdown as md_lib
-
-    MARKDOWN_AVAILABLE = True
 except ImportError:
-    MARKDOWN_AVAILABLE = False
+    print(
+        "Error: 'markdown' library not found. Install with: pip install --user markdown",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 # ============================================================================
@@ -658,15 +662,12 @@ def extract_frontmatter(text: str) -> tuple[str, dict[str, str]]:
         Tuple of (body without frontmatter, metadata dict).
         Metadata values are strings (lists joined with commas).
     """
-    if MARKDOWN_AVAILABLE:
-        md = md_lib.Markdown(extensions=["meta"])
-        md.convert(text)
-        meta_raw: dict[str, list[str]] = getattr(md, "Meta", {})
-        meta = {k: ", ".join(v) for k, v in meta_raw.items()}
-        stripped = _strip_frontmatter(text)
-        return stripped, meta
-
-    return _strip_frontmatter(text), {}
+    md = md_lib.Markdown(extensions=["meta"])
+    md.convert(text)
+    meta_raw: dict[str, list[str]] = getattr(md, "Meta", {})
+    meta = {k: ", ".join(v) for k, v in meta_raw.items()}
+    stripped = _strip_frontmatter(text)
+    return stripped, meta
 
 
 def _strip_frontmatter(text: str) -> str:
@@ -698,101 +699,8 @@ def markdown_to_storage(markdown: str, *, include_toc: bool = False) -> str:
     Returns:
         XHTML string for storage format.
     """
-    if MARKDOWN_AVAILABLE:
-        result = md_lib.markdown(markdown, extensions=["tables", "fenced_code"])
-        return _finalize_storage(result, include_toc=include_toc)
-
-    lines = markdown.split("\n")
-    result = []
-    in_code_block = False
-    code_block_lines = []
-    code_lang = ""
-    in_list = False
-    in_ordered_list = False
-    list_items = []
-
-    for line in lines:
-        # Code block detection
-        if line.strip().startswith("```"):
-            if not in_code_block:
-                # Starting code block
-                in_code_block = True
-                code_lang = line.strip()[3:].strip()
-                code_block_lines = []
-            else:
-                # Ending code block
-                in_code_block = False
-                code_content = "\n".join(code_block_lines)
-                code_content = html.escape(code_content)
-                if code_lang:
-                    result.append(
-                        f'<ac:structured-macro ac:name="code">'
-                        f'<ac:parameter ac:name="language">{html.escape(code_lang)}</ac:parameter>'
-                        f"<ac:plain-text-body><![CDATA[{code_content}]]></ac:plain-text-body>"
-                        f"</ac:structured-macro>"
-                    )
-                else:
-                    result.append(f"<pre><code>{code_content}</code></pre>")
-            continue
-
-        if in_code_block:
-            code_block_lines.append(line)
-            continue
-
-        # Flush list if we're no longer in one
-        if in_list and not (line.strip().startswith("- ") or line.strip().startswith("* ")):
-            list_html = "<ul>" + "".join(f"<li>{item}</li>" for item in list_items) + "</ul>"
-            result.append(list_html)
-            list_items = []
-            in_list = False
-
-        if in_ordered_list and not re.match(r"^\d+\.\s", line.strip()):
-            list_html = "<ol>" + "".join(f"<li>{item}</li>" for item in list_items) + "</ol>"
-            result.append(list_html)
-            list_items = []
-            in_ordered_list = False
-
-        # Headers
-        header_match = re.match(r"^(#{1,6})\s+(.+)$", line)
-        if header_match:
-            level = len(header_match.group(1))
-            text = _inline_markdown_to_html(header_match.group(2))
-            result.append(f"<h{level}>{text}</h{level}>")
-            continue
-
-        # Unordered lists
-        if line.strip().startswith("- ") or line.strip().startswith("* "):
-            in_list = True
-            item_text = line.strip()[2:]
-            list_items.append(_inline_markdown_to_html(item_text))
-            continue
-
-        # Ordered lists
-        ordered_match = re.match(r"^(\d+)\.\s+(.+)$", line.strip())
-        if ordered_match:
-            in_ordered_list = True
-            item_text = ordered_match.group(2)
-            list_items.append(_inline_markdown_to_html(item_text))
-            continue
-
-        # Empty lines
-        if not line.strip():
-            result.append("")
-            continue
-
-        # Paragraphs
-        para_text = _inline_markdown_to_html(line)
-        result.append(f"<p>{para_text}</p>")
-
-    # Flush any remaining list
-    if in_list:
-        list_html = "<ul>" + "".join(f"<li>{item}</li>" for item in list_items) + "</ul>"
-        result.append(list_html)
-    if in_ordered_list:
-        list_html = "<ol>" + "".join(f"<li>{item}</li>" for item in list_items) + "</ol>"
-        result.append(list_html)
-
-    return _finalize_storage("\n".join(result), include_toc=include_toc)
+    result = md_lib.markdown(markdown, extensions=["tables", "fenced_code"])
+    return _finalize_storage(result, include_toc=include_toc)
 
 
 def _finalize_storage(html_content: str, *, include_toc: bool = False) -> str:
@@ -803,31 +711,6 @@ def _finalize_storage(html_content: str, *, include_toc: bool = False) -> str:
     if include_toc:
         html_content = _prepend_toc_storage(html_content)
     return html_content
-
-
-def _inline_markdown_to_html(text: str) -> str:
-    """Convert inline Markdown to HTML.
-
-    Handles: bold, italic, inline code, links.
-    """
-    # Escape HTML first
-    text = html.escape(text)
-
-    # Bold: **text** or __text__
-    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-    text = re.sub(r"__(.+?)__", r"<strong>\1</strong>", text)
-
-    # Italic: *text* or _text_ (not inside word boundaries)
-    text = re.sub(r"(?<!\w)\*(.+?)\*(?!\w)", r"<em>\1</em>", text)
-    text = re.sub(r"(?<!\w)_(.+?)_(?!\w)", r"<em>\1</em>", text)
-
-    # Inline code: `code`
-    text = re.sub(r"`(.+?)`", r"<code>\1</code>", text)
-
-    # Links: [text](url)
-    text = re.sub(r"\[([^\]]+)\]\(([^\)]+)\)", r'<a href="\2">\1</a>', text)
-
-    return text
 
 
 def storage_to_markdown(storage: str) -> str:
@@ -941,172 +824,10 @@ def markdown_to_adf(markdown: str, *, include_toc: bool = False) -> dict[str, An
     Returns:
         ADF JSON structure.
     """
-    if MARKLASSIAN_AVAILABLE:
-        adf = dict(_marklassian_md_to_adf(markdown))
-        if include_toc:
-            _prepend_toc_adf(adf)
-        return adf
-
-    lines = markdown.split("\n")
-    content = []
-    in_code_block = False
-    code_block_lines = []
-    code_lang = ""
-
-    for line in lines:
-        # Code block detection
-        if line.strip().startswith("```"):
-            if not in_code_block:
-                in_code_block = True
-                code_lang = line.strip()[3:].strip()
-                code_block_lines = []
-            else:
-                in_code_block = False
-                code_content = "\n".join(code_block_lines)
-                code_node = {
-                    "type": "codeBlock",
-                    "content": [{"type": "text", "text": code_content}],
-                }
-                if code_lang:
-                    code_node["attrs"] = {"language": code_lang}
-                content.append(code_node)
-            continue
-
-        if in_code_block:
-            code_block_lines.append(line)
-            continue
-
-        # Headers
-        header_match = re.match(r"^(#{1,6})\s+(.+)$", line)
-        if header_match:
-            level = len(header_match.group(1))
-            text_content = _inline_markdown_to_adf(header_match.group(2))
-            content.append({"type": "heading", "attrs": {"level": level}, "content": text_content})
-            continue
-
-        # Unordered lists
-        if line.strip().startswith("- ") or line.strip().startswith("* "):
-            # Simple list item
-            item_text = line.strip()[2:]
-            list_content = _inline_markdown_to_adf(item_text)
-            content.append(
-                {
-                    "type": "bulletList",
-                    "content": [
-                        {
-                            "type": "listItem",
-                            "content": [{"type": "paragraph", "content": list_content}],
-                        }
-                    ],
-                }
-            )
-            continue
-
-        # Ordered lists
-        ordered_match = re.match(r"^(\d+)\.\s+(.+)$", line.strip())
-        if ordered_match:
-            item_text = ordered_match.group(2)
-            list_content = _inline_markdown_to_adf(item_text)
-            content.append(
-                {
-                    "type": "orderedList",
-                    "content": [
-                        {
-                            "type": "listItem",
-                            "content": [{"type": "paragraph", "content": list_content}],
-                        }
-                    ],
-                }
-            )
-            continue
-
-        # Empty lines
-        if not line.strip():
-            continue
-
-        # Paragraphs
-        para_content = _inline_markdown_to_adf(line)
-        if para_content:
-            content.append({"type": "paragraph", "content": para_content})
-
-    adf = {"version": 1, "type": "doc", "content": content}
+    adf = dict(_marklassian_md_to_adf(markdown))
     if include_toc:
         _prepend_toc_adf(adf)
     return adf
-
-
-def _inline_markdown_to_adf(text: str) -> list[dict[str, Any]]:
-    """Convert inline Markdown to ADF nodes.
-
-    Handles: bold, italic, inline code, links, plain text.
-    """
-    result = []
-    current_text = ""
-    i = 0
-
-    while i < len(text):
-        # Bold: **text**
-        if text[i : i + 2] == "**":
-            if current_text:
-                result.append({"type": "text", "text": current_text})
-                current_text = ""
-            end = text.find("**", i + 2)
-            if end != -1:
-                bold_text = text[i + 2 : end]
-                result.append({"type": "text", "text": bold_text, "marks": [{"type": "strong"}]})
-                i = end + 2
-                continue
-
-        # Italic: *text*
-        if text[i] == "*" and (i == 0 or not text[i - 1].isalnum()) and text[i : i + 2] != "**":
-            if current_text:
-                result.append({"type": "text", "text": current_text})
-                current_text = ""
-            end = text.find("*", i + 1)
-            if end != -1 and (end == len(text) - 1 or not text[end + 1].isalnum()):
-                italic_text = text[i + 1 : end]
-                result.append({"type": "text", "text": italic_text, "marks": [{"type": "em"}]})
-                i = end + 1
-                continue
-
-        # Inline code: `code`
-        if text[i] == "`":
-            if current_text:
-                result.append({"type": "text", "text": current_text})
-                current_text = ""
-            end = text.find("`", i + 1)
-            if end != -1:
-                code_text = text[i + 1 : end]
-                result.append({"type": "text", "text": code_text, "marks": [{"type": "code"}]})
-                i = end + 1
-                continue
-
-        # Links: [text](url)
-        if text[i] == "[":
-            link_match = re.match(r"\[([^\]]+)\]\(([^\)]+)\)", text[i:])
-            if link_match:
-                if current_text:
-                    result.append({"type": "text", "text": current_text})
-                    current_text = ""
-                link_text = link_match.group(1)
-                link_url = link_match.group(2)
-                result.append(
-                    {
-                        "type": "text",
-                        "text": link_text,
-                        "marks": [{"type": "link", "attrs": {"href": link_url}}],
-                    }
-                )
-                i += len(link_match.group(0))
-                continue
-
-        current_text += text[i]
-        i += 1
-
-    if current_text:
-        result.append({"type": "text", "text": current_text})
-
-    return result
 
 
 def adf_to_markdown(adf: dict[str, Any]) -> str:

@@ -13,7 +13,6 @@ from skills.confluence.scripts.confluence import (
     Credentials,
     SpaceDefaults,
     _html_to_markdown,
-    _inline_markdown_to_html,
     _truncate,
     adf_to_markdown,
     delete_credential,
@@ -209,24 +208,6 @@ class TestMarkdownConversion:
         }
         markdown = adf_to_markdown(adf)
         assert "# Heading 1" in markdown
-
-    def test_inline_markdown_bold(self):
-        """Test inline markdown bold conversion."""
-        text = "This is **bold** text"
-        html = _inline_markdown_to_html(text)
-        assert "<strong>bold</strong>" in html
-
-    def test_inline_markdown_italic(self):
-        """Test inline markdown italic conversion."""
-        text = "This is *italic* text"
-        html = _inline_markdown_to_html(text)
-        assert "<em>italic</em>" in html
-
-    def test_inline_markdown_code(self):
-        """Test inline markdown code conversion."""
-        text = "This is `code` text"
-        html = _inline_markdown_to_html(text)
-        assert "<code>code</code>" in html
 
     def test_html_to_markdown_bold(self):
         """Test HTML bold to markdown conversion."""
@@ -1622,24 +1603,6 @@ class TestMarkdownEdgeCases:
         markdown = adf_to_markdown(adf)
         assert markdown == ""
 
-    def test_inline_markdown_link(self):
-        """Test inline markdown link."""
-        from skills.confluence.scripts.confluence import _inline_markdown_to_adf
-
-        result = _inline_markdown_to_adf("[example](https://example.com)")
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        assert result[0]["text"] == "example"
-        assert result[0]["marks"][0]["type"] == "link"
-        assert result[0]["marks"][0]["attrs"]["href"] == "https://example.com"
-
-    def test_inline_markdown_multiple_marks(self):
-        """Test multiple inline marks."""
-        from skills.confluence.scripts.confluence import _inline_markdown_to_adf
-
-        result = _inline_markdown_to_adf("**bold** and *italic* and `code`")
-        assert len(result) == 5  # bold, text, italic, text, code
-
     def test_format_content_storage_to_editor(self):
         """Test storage to editor conversion."""
         from skills.confluence.scripts.confluence import format_content
@@ -2062,22 +2025,6 @@ class TestAdditionalCoverage:
         result = format_table([], ["col1", "col2"])
         assert result == "No data"
 
-    def test_inline_markdown_italic_with_underscore(self):
-        """Test italic with underscore."""
-        from skills.confluence.scripts.confluence import _inline_markdown_to_html
-
-        text = "This is _italic_ text"
-        html = _inline_markdown_to_html(text)
-        assert "<em>italic</em>" in html
-
-    def test_inline_markdown_bold_with_underscore(self):
-        """Test bold with double underscore."""
-        from skills.confluence.scripts.confluence import _inline_markdown_to_html
-
-        text = "This is __bold__ text"
-        html = _inline_markdown_to_html(text)
-        assert "<strong>bold</strong>" in html
-
     def test_storage_to_markdown_simple_code_block(self):
         """Test simple code block without CDATA."""
         from skills.confluence.scripts.confluence import storage_to_markdown
@@ -2110,46 +2057,6 @@ class TestAdditionalCoverage:
         assert "*italic*" in result
         assert "`code`" in result
         assert "[link](https://example.com)" in result
-
-    def test_inline_markdown_to_adf_bold(self):
-        """Test bold text to ADF."""
-        from skills.confluence.scripts.confluence import _inline_markdown_to_adf
-
-        result = _inline_markdown_to_adf("**bold text**")
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        assert result[0]["text"] == "bold text"
-        assert result[0]["marks"][0]["type"] == "strong"
-
-    def test_inline_markdown_to_adf_italic(self):
-        """Test italic text to ADF."""
-        from skills.confluence.scripts.confluence import _inline_markdown_to_adf
-
-        result = _inline_markdown_to_adf("*italic text*")
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        assert result[0]["text"] == "italic text"
-        assert result[0]["marks"][0]["type"] == "em"
-
-    def test_inline_markdown_to_adf_code(self):
-        """Test inline code to ADF."""
-        from skills.confluence.scripts.confluence import _inline_markdown_to_adf
-
-        result = _inline_markdown_to_adf("`code text`")
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        assert result[0]["text"] == "code text"
-        assert result[0]["marks"][0]["type"] == "code"
-
-    def test_inline_markdown_to_adf_plain_text(self):
-        """Test plain text to ADF."""
-        from skills.confluence.scripts.confluence import _inline_markdown_to_adf
-
-        result = _inline_markdown_to_adf("plain text")
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        assert result[0]["text"] == "plain text"
-        assert "marks" not in result[0]
 
     @patch("skills.confluence.scripts.confluence.is_cloud")
     def test_format_content_editor_as_string(self, mock_is_cloud):
