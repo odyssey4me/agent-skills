@@ -1037,6 +1037,7 @@ class TestCommandHandlers:
             format="markdown",
             parent=None,
             labels=None,
+            toc=False,
             json=False,
         )
 
@@ -1067,6 +1068,7 @@ class TestCommandHandlers:
             format="markdown",
             parent="123",
             labels="docs,test",
+            toc=False,
             json=True,
         )
 
@@ -1093,6 +1095,7 @@ class TestCommandHandlers:
             body_file=None,
             format="markdown",
             version=None,
+            toc=False,
             json=False,
         )
 
@@ -1368,6 +1371,7 @@ class TestCommandHandlers:
             body_file=str(body_file),
             format="markdown",
             version=1,
+            toc=False,
             json=True,
         )
 
@@ -2535,3 +2539,102 @@ class TestSpacePermissions:
         result = cmd_space_permissions(args)
         assert result == 0
         mock_remove.assert_called_once_with("DEMO", 42)
+
+
+class TestInternalLinksAndToc:
+    """Tests for internal link conversion and TOC macro."""
+
+    def test_extract_page_id_cloud_url(self):
+        from skills.confluence.scripts.confluence import _extract_page_id_from_url
+
+        url = "https://example.atlassian.net/wiki/spaces/DEMO/pages/123456/My+Page"
+        assert _extract_page_id_from_url(url, "https://example.atlassian.net") == "123456"
+
+    def test_extract_page_id_cloud_no_title(self):
+        from skills.confluence.scripts.confluence import _extract_page_id_from_url
+
+        url = "https://example.atlassian.net/wiki/spaces/DEMO/pages/789"
+        assert _extract_page_id_from_url(url, "https://example.atlassian.net") == "789"
+
+    def test_extract_page_id_dc_url(self):
+        from skills.confluence.scripts.confluence import _extract_page_id_from_url
+
+        url = "https://confluence.internal.com/pages/viewpage.action?pageId=42"
+        assert _extract_page_id_from_url(url, "https://confluence.internal.com") == "42"
+
+    def test_extract_page_id_different_instance(self):
+        from skills.confluence.scripts.confluence import _extract_page_id_from_url
+
+        url = "https://other.atlassian.net/wiki/spaces/DEMO/pages/123"
+        assert _extract_page_id_from_url(url, "https://example.atlassian.net") is None
+
+    def test_extract_page_id_non_confluence_url(self):
+        from skills.confluence.scripts.confluence import _extract_page_id_from_url
+
+        assert (
+            _extract_page_id_from_url("https://google.com", "https://example.atlassian.net") is None
+        )
+
+    @patch("skills.confluence.scripts.confluence._validate_page_exists")
+    def test_convert_internal_links_storage_valid(self, mock_validate):
+        from skills.confluence.scripts.confluence import _convert_internal_links_storage
+
+        mock_validate.return_value = {"id": "123", "title": "My Page"}
+        html = '<a href="https://ex.atlassian.net/wiki/spaces/DEMO/pages/123">My Page</a>'
+        result = _convert_internal_links_storage(html, "https://ex.atlassian.net")
+        assert "<ac:link>" in result
+        assert 'ri:content-id="123"' in result
+        assert "My Page" in result
+
+    @patch("skills.confluence.scripts.confluence._validate_page_exists")
+    def test_convert_internal_links_storage_invalid(self, mock_validate):
+        from skills.confluence.scripts.confluence import _convert_internal_links_storage
+
+        mock_validate.return_value = None
+        html = '<a href="https://ex.atlassian.net/wiki/spaces/DEMO/pages/999">Missing</a>'
+        result = _convert_internal_links_storage(html, "https://ex.atlassian.net")
+        assert "<ac:link>" not in result
+        assert "<a href=" in result
+
+    @patch("skills.confluence.scripts.confluence._validate_page_exists")
+    def test_convert_internal_links_external_unchanged(self, mock_validate):
+        from skills.confluence.scripts.confluence import _convert_internal_links_storage
+
+        html = '<a href="https://google.com">Google</a>'
+        result = _convert_internal_links_storage(html, "https://ex.atlassian.net")
+        assert result == html
+        mock_validate.assert_not_called()
+
+    def test_prepend_toc_storage(self):
+        from skills.confluence.scripts.confluence import _prepend_toc_storage
+
+        result = _prepend_toc_storage("<p>Hello</p>")
+        assert result.startswith('<ac:structured-macro ac:name="toc">')
+        assert "<p>Hello</p>" in result
+
+    def test_prepend_toc_adf(self):
+        from skills.confluence.scripts.confluence import _prepend_toc_adf
+
+        adf = {"version": 1, "type": "doc", "content": [{"type": "paragraph"}]}
+        result = _prepend_toc_adf(adf)
+        assert result["content"][0]["type"] == "extension"
+        assert result["content"][0]["attrs"]["extensionKey"] == "toc"
+        assert result["content"][1]["type"] == "paragraph"
+
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_markdown_to_storage_with_toc(self, mock_creds):
+        mock_creds.return_value = Credentials(url="https://example.atlassian.net")
+        result = markdown_to_storage("# Hello", include_toc=True)
+        assert '<ac:structured-macro ac:name="toc">' in result
+        assert "Hello" in result
+
+    def test_markdown_to_adf_with_toc(self):
+        result = markdown_to_adf("# Hello", include_toc=True)
+        assert result["content"][0]["type"] == "extension"
+        assert result["content"][0]["attrs"]["extensionKey"] == "toc"
+
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_markdown_to_storage_without_toc(self, mock_creds):
+        mock_creds.return_value = Credentials(url="https://example.atlassian.net")
+        result = markdown_to_storage("# Hello")
+        assert "toc" not in result

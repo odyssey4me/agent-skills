@@ -569,8 +569,83 @@ def clear_cache() -> None:
 # MARKDOWN CONVERSION UTILITIES
 # ============================================================================
 
+_TOC_STORAGE = (
+    '<ac:structured-macro ac:name="toc">'
+    '<ac:parameter ac:name="maxLevel">3</ac:parameter>'
+    "</ac:structured-macro>"
+)
 
-def markdown_to_storage(markdown: str) -> str:
+_TOC_ADF_NODE: dict[str, Any] = {
+    "type": "extension",
+    "attrs": {
+        "extensionType": "com.atlassian.confluence.macro.core",
+        "extensionKey": "toc",
+        "parameters": {"macroParams": {"maxLevel": {"value": "3"}}},
+    },
+}
+
+_CLOUD_PAGE_URL_RE = re.compile(r"/wiki/spaces/[^/]+/pages/(\d+)")
+_DC_PAGE_ID_URL_RE = re.compile(r"[?&]pageId=(\d+)")
+
+
+def _extract_page_id_from_url(url: str, confluence_url: str) -> str | None:
+    """Extract a page ID from a Confluence URL if it belongs to this instance."""
+    base = confluence_url.rstrip("/")
+    if not url.startswith(base):
+        return None
+
+    match = _CLOUD_PAGE_URL_RE.search(url)
+    if match:
+        return match.group(1)
+
+    match = _DC_PAGE_ID_URL_RE.search(url)
+    if match:
+        return match.group(1)
+
+    return None
+
+
+def _validate_page_exists(page_id: str) -> dict[str, Any] | None:
+    """Check if a page exists, returning the page dict or None."""
+    try:
+        return get_page(page_id)
+    except APIError:
+        return None
+
+
+def _convert_internal_links_storage(html_content: str, confluence_url: str) -> str:
+    """Convert internal Confluence links in HTML to native ac:link elements."""
+
+    def _replace_link(match: re.Match) -> str:
+        url = match.group(1)
+        link_text = match.group(2)
+        page_id = _extract_page_id_from_url(url, confluence_url)
+        if page_id and _validate_page_exists(page_id):
+            return (
+                f"<ac:link>"
+                f'<ri:content-page ri:content-id="{page_id}" />'
+                f"<ac:plain-text-link-body>"
+                f"<![CDATA[{link_text}]]>"
+                f"</ac:plain-text-link-body>"
+                f"</ac:link>"
+            )
+        return match.group(0)
+
+    return re.sub(r'<a href="([^"]+)">([^<]+)</a>', _replace_link, html_content)
+
+
+def _prepend_toc_storage(html_content: str) -> str:
+    """Prepend a table of contents macro to storage format HTML."""
+    return _TOC_STORAGE + "\n" + html_content
+
+
+def _prepend_toc_adf(adf: dict[str, Any]) -> dict[str, Any]:
+    """Insert a TOC extension node at the start of ADF content."""
+    adf["content"] = [_TOC_ADF_NODE, *adf["content"]]
+    return adf
+
+
+def markdown_to_storage(markdown: str, *, include_toc: bool = False) -> str:
     """Convert Markdown to Confluence storage format (XHTML).
 
     Supports:
@@ -591,7 +666,8 @@ def markdown_to_storage(markdown: str) -> str:
         XHTML string for storage format.
     """
     if MARKDOWN_AVAILABLE:
-        return md_lib.markdown(markdown, extensions=["tables", "fenced_code"])
+        result = md_lib.markdown(markdown, extensions=["tables", "fenced_code"])
+        return _finalize_storage(result, include_toc=include_toc)
 
     lines = markdown.split("\n")
     result = []
@@ -683,7 +759,17 @@ def markdown_to_storage(markdown: str) -> str:
         list_html = "<ol>" + "".join(f"<li>{item}</li>" for item in list_items) + "</ol>"
         result.append(list_html)
 
-    return "\n".join(result)
+    return _finalize_storage("\n".join(result), include_toc=include_toc)
+
+
+def _finalize_storage(html_content: str, *, include_toc: bool = False) -> str:
+    """Apply internal link conversion and optional TOC to storage HTML."""
+    creds = get_credentials("confluence")
+    if creds.url:
+        html_content = _convert_internal_links_storage(html_content, creds.url)
+    if include_toc:
+        html_content = _prepend_toc_storage(html_content)
+    return html_content
 
 
 def _inline_markdown_to_html(text: str) -> str:
@@ -812,17 +898,21 @@ def _convert_list(list_content: str, ordered: bool = False) -> str:
     return "\n".join(result) + "\n"
 
 
-def markdown_to_adf(markdown: str) -> dict[str, Any]:
+def markdown_to_adf(markdown: str, *, include_toc: bool = False) -> dict[str, Any]:
     """Convert Markdown to ADF (Atlassian Document Format).
 
     Args:
         markdown: Markdown string.
+        include_toc: Prepend a table of contents macro.
 
     Returns:
         ADF JSON structure.
     """
     if MARKLASSIAN_AVAILABLE:
-        return dict(_marklassian_md_to_adf(markdown))
+        adf = dict(_marklassian_md_to_adf(markdown))
+        if include_toc:
+            _prepend_toc_adf(adf)
+        return adf
 
     lines = markdown.split("\n")
     content = []
@@ -906,7 +996,10 @@ def markdown_to_adf(markdown: str) -> dict[str, Any]:
         if para_content:
             content.append({"type": "paragraph", "content": para_content})
 
-    return {"version": 1, "type": "doc", "content": content}
+    adf = {"version": 1, "type": "doc", "content": content}
+    if include_toc:
+        _prepend_toc_adf(adf)
+    return adf
 
 
 def _inline_markdown_to_adf(text: str) -> list[dict[str, Any]]:
@@ -1561,6 +1654,7 @@ def create_page(
     parent_id: str | None = None,
     body_format: str = "markdown",
     labels: list[str] | None = None,
+    include_toc: bool = False,
 ) -> dict[str, Any]:
     """Create a new page.
 
@@ -1571,6 +1665,7 @@ def create_page(
         parent_id: Parent page ID for hierarchy.
         body_format: Format of body content ("markdown", "storage", "editor").
         labels: List of labels to add.
+        include_toc: Prepend a table of contents macro.
 
     Returns:
         Created page dictionary.
@@ -1582,12 +1677,12 @@ def create_page(
     if body_format == "markdown":
         if is_cloud():
             # Cloud: use editor format (ADF) — value must be a JSON string
-            body_content = json.dumps(markdown_to_adf(body))
+            body_content = json.dumps(markdown_to_adf(body, include_toc=include_toc))
             body_representation = "atlas_doc_format"
             body_key = "editor"
         else:
             # DC/Server: use storage format
-            body_content = markdown_to_storage(body)
+            body_content = markdown_to_storage(body, include_toc=include_toc)
             body_representation = "storage"
             body_key = "storage"
     elif body_format == "storage":
@@ -1633,6 +1728,7 @@ def update_page(
     body: str | None = None,
     body_format: str = "markdown",
     version: int | None = None,
+    include_toc: bool = False,
 ) -> dict[str, Any]:
     """Update an existing page.
 
@@ -1642,6 +1738,7 @@ def update_page(
         body: New content (optional).
         body_format: Format of body content ("markdown", "storage", "editor").
         version: Current version number (will auto-detect if not provided).
+        include_toc: Prepend a table of contents macro.
 
     Returns:
         Updated page dictionary.
@@ -1669,12 +1766,12 @@ def update_page(
         if body_format == "markdown":
             if is_cloud():
                 # Cloud: use editor format (ADF) — value must be a JSON string
-                body_content = json.dumps(markdown_to_adf(body))
+                body_content = json.dumps(markdown_to_adf(body, include_toc=include_toc))
                 body_representation = "atlas_doc_format"
                 body_key = "editor"
             else:
                 # DC/Server: use storage format
-                body_content = markdown_to_storage(body)
+                body_content = markdown_to_storage(body, include_toc=include_toc)
                 body_representation = "storage"
                 body_key = "storage"
         elif body_format == "storage":
@@ -2088,6 +2185,7 @@ def cmd_page(args: argparse.Namespace) -> int:
                 parent_id=parent_id,
                 body_format=args.format,
                 labels=labels,
+                include_toc=args.toc,
             )
 
             if args.json:
@@ -2112,6 +2210,7 @@ def cmd_page(args: argparse.Namespace) -> int:
                 body=body,
                 body_format=args.format,
                 version=args.version,
+                include_toc=args.toc,
             )
 
             if args.json:
@@ -2423,6 +2522,7 @@ def main() -> int:
     )
     create_parser.add_argument("--parent", help="Parent page ID")
     create_parser.add_argument("--labels", help="Comma-separated labels")
+    create_parser.add_argument("--toc", action="store_true", help="Prepend table of contents macro")
     create_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Update subcommand
@@ -2440,6 +2540,7 @@ def main() -> int:
     update_parser.add_argument(
         "--version", type=int, help="Current version (auto-detect if not provided)"
     )
+    update_parser.add_argument("--toc", action="store_true", help="Prepend table of contents macro")
     update_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Move subcommand

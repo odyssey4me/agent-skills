@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "0.6.0"
+  version: "0.7.0"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -206,9 +206,17 @@ Quick examples:
 $SKILL_DIR/scripts/confluence.py page create --space DEMO --title "Documentation" \
   --body-file README.md
 
+# Create page with table of contents
+$SKILL_DIR/scripts/confluence.py page create --space DEMO --title "Guide" \
+  --body-file guide.md --toc
+
 # Update page from file
 $SKILL_DIR/scripts/confluence.py page update 123456 --body-file updated.md
 ```
+
+**Table of contents:** Use `--toc` to prepend a TOC macro that auto-generates from headings.
+
+**Internal link conversion:** Links pointing to pages on the same Confluence instance are automatically converted to native Confluence links during markdown conversion. The linked page is validated before conversion — invalid links are left as-is.
 
 ### page move
 
