@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "0.4.0"
+  version: "0.5.0"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -208,6 +208,18 @@ $SKILL_DIR/scripts/confluence.py page create --space DEMO --title "Documentation
 
 # Update page from file
 $SKILL_DIR/scripts/confluence.py page update 123456 --body-file updated.md
+```
+
+### page move
+
+Move a page under a new parent, or to the space root.
+
+```bash
+# Move under a new parent
+$SKILL_DIR/scripts/confluence.py page move 123456 --parent 789012
+
+# Move to space root (no parent)
+$SKILL_DIR/scripts/confluence.py page move 123456
 ```
 
 ### page delete

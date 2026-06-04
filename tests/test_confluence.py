@@ -589,6 +589,47 @@ class TestAPIFunctions:
         assert page["title"] == "New Title"
         assert page["version"]["number"] == 2
 
+    @patch("skills.confluence.scripts.confluence.put")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    @patch("skills.confluence.scripts.confluence.get_api_base")
+    def test_move_page(self, mock_get_api_base, mock_get_page, mock_put):
+        """Test moving a page under a new parent."""
+        from skills.confluence.scripts.confluence import move_page
+
+        mock_get_api_base.return_value = "https://example.atlassian.net/wiki"
+        mock_get_page.return_value = {
+            "id": "123",
+            "title": "My Page",
+            "version": {"number": 3},
+        }
+        mock_put.return_value = {"id": "123", "title": "My Page", "version": {"number": 4}}
+
+        result = move_page("123", "456")
+        assert result["version"]["number"] == 4
+        payload = mock_put.call_args[0][2]
+        assert payload["ancestors"] == [{"id": "456"}]
+        assert payload["title"] == "My Page"
+        assert payload["version"]["number"] == 4
+
+    @patch("skills.confluence.scripts.confluence.put")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    @patch("skills.confluence.scripts.confluence.get_api_base")
+    def test_move_page_to_root(self, mock_get_api_base, mock_get_page, mock_put):
+        """Test moving a page to space root."""
+        from skills.confluence.scripts.confluence import move_page
+
+        mock_get_api_base.return_value = "https://example.atlassian.net/wiki"
+        mock_get_page.return_value = {
+            "id": "123",
+            "title": "My Page",
+            "version": {"number": 1},
+        }
+        mock_put.return_value = {"id": "123", "version": {"number": 2}}
+
+        move_page("123", None)
+        payload = mock_put.call_args[0][2]
+        assert payload["ancestors"] == []
+
     @patch("skills.confluence.scripts.confluence.delete")
     @patch("skills.confluence.scripts.confluence.get_api_base")
     def test_delete_page(self, mock_get_api_base, mock_delete):
@@ -1057,6 +1098,26 @@ class TestCommandHandlers:
 
         result = cmd_page(args)
         assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.move_page")
+    def test_cmd_page_move(self, mock_move):
+        """Test page move command."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_page
+
+        mock_move.return_value = {"id": "123", "version": {"number": 3}}
+
+        args = argparse.Namespace(
+            page_command="move",
+            page_id="123",
+            parent="456",
+            json=False,
+        )
+
+        result = cmd_page(args)
+        assert result == 0
+        mock_move.assert_called_once_with("123", "456")
 
     @patch("skills.confluence.scripts.confluence.delete_page")
     def test_cmd_page_delete(self, mock_delete):

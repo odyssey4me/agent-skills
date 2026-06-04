@@ -1701,6 +1701,36 @@ def update_page(
     return {}
 
 
+def move_page(page_id: str, parent_id: str | None) -> dict[str, Any]:
+    """Move a page under a new parent (or to the space root).
+
+    Args:
+        page_id: Page ID to move.
+        parent_id: New parent page ID, or None to move to the space root.
+
+    Returns:
+        Updated page dictionary.
+
+    Raises:
+        APIError: If move fails.
+    """
+    current_page = get_page(page_id, expand=["version"])
+    version = current_page.get("version", {}).get("number", 1)
+    title = current_page.get("title", "")
+
+    update_data: dict[str, Any] = {
+        "version": {"number": version + 1},
+        "type": "page",
+        "title": title,
+        "ancestors": [{"id": parent_id}] if parent_id else [],
+    }
+
+    response = put("confluence", api_path(f"content/{page_id}"), update_data)
+    if isinstance(response, dict):
+        return response
+    return {}
+
+
 def delete_page(page_id: str) -> dict[str, Any]:
     """Delete a page (moves to trash on Cloud).
 
@@ -2022,6 +2052,15 @@ def cmd_page(args: argparse.Namespace) -> int:
                 print(f"Updated page: {page.get('id', 'N/A')}")
                 print(f"New version: {page.get('version', {}).get('number', 'N/A')}")
 
+        elif args.page_command == "move":
+            parent_id = args.parent if args.parent else None
+            page = move_page(args.page_id, parent_id)
+            if args.json:
+                print(format_json(page))
+            else:
+                dest = f"under page {parent_id}" if parent_id else "to space root"
+                print(f"Moved page: {page.get('id', 'N/A')} {dest}")
+
         elif args.page_command == "delete":
             delete_page(args.page_id)
             print(f"Deleted page: {args.page_id}")
@@ -2261,6 +2300,12 @@ def main() -> int:
         "--version", type=int, help="Current version (auto-detect if not provided)"
     )
     update_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Move subcommand
+    move_parser = page_subparsers.add_parser("move", help="Move a page under a new parent")
+    move_parser.add_argument("page_id", help="Page ID to move")
+    move_parser.add_argument("--parent", help="New parent page ID (omit to move to space root)")
+    move_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Delete subcommand
     delete_parser = page_subparsers.add_parser("delete", help="Delete a page")
