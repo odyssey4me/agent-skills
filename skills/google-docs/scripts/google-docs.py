@@ -1445,6 +1445,37 @@ def cmd_formatting_apply(args):
 # ============================================================================
 
 
+def extract_frontmatter(text: str) -> tuple[str, dict[str, str]]:
+    """Extract frontmatter metadata from markdown text.
+
+    Supports both ``---`` delimited YAML frontmatter and the Python-Markdown
+    meta extension format (``Key: Value`` lines at the start).
+
+    Args:
+        text: Markdown text, possibly with frontmatter.
+
+    Returns:
+        Tuple of (body without frontmatter, metadata dict).
+    """
+    if MARKDOWN_LIB_AVAILABLE:
+        md = md_lib.Markdown(extensions=["meta"])
+        md.convert(text)
+        meta_raw: dict[str, list[str]] = getattr(md, "Meta", {})
+        meta = {k: ", ".join(v) for k, v in meta_raw.items()}
+        return _strip_frontmatter(text), meta
+
+    return _strip_frontmatter(text), {}
+
+
+def _strip_frontmatter(text: str) -> str:
+    """Remove YAML frontmatter (``---`` delimited) from text."""
+    if text.startswith("---"):
+        end = text.find("---", 3)
+        if end != -1:
+            return text[end + 3 :].lstrip("\n")
+    return text
+
+
 def extract_title_from_markdown(md_content: str) -> str | None:
     """Extract the first H1 heading from markdown content.
 
@@ -1552,23 +1583,26 @@ def cmd_documents_import(args):
 
     md_content = file_path.read_text(encoding="utf-8")
 
-    # Resolve title: --title flag > first H1 > filename stem
-    title = args.title
+    # Extract frontmatter metadata (CLI flags take precedence)
+    body, meta = extract_frontmatter(md_content)
+
+    # Resolve title: --title flag > frontmatter title > first H1 > filename stem
+    title = args.title or meta.get("title")
     if not title:
-        title = extract_title_from_markdown(md_content)
+        title = extract_title_from_markdown(body)
     if not title:
         title = file_path.stem
 
-    html_content = convert_markdown_to_html(md_content)
+    folder_id = args.folder_id or meta.get("folder_id")
+
+    html_content = convert_markdown_to_html(body)
 
     drive_service = build_drive_service(DRIVE_SCOPES_FILE)
 
     if args.document_id:
         result = update_doc_from_html(drive_service, args.document_id, html_content)
     else:
-        result = import_markdown_as_doc(
-            drive_service, html_content, title, folder_id=args.folder_id
-        )
+        result = import_markdown_as_doc(drive_service, html_content, title, folder_id=folder_id)
 
     if args.json:
         print(json.dumps(result, indent=2))

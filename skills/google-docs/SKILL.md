@@ -3,7 +3,7 @@ name: google-docs
 description: Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.
 metadata:
   author: odyssey4me
-  version: "0.3.0"
+  version: "0.4.0"
   category: google-workspace
   tags: "documents, editing"
   complexity: standard

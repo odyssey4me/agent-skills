@@ -48,6 +48,7 @@ cmd_documents_import = google_docs.cmd_documents_import
 cmd_documents_read = google_docs.cmd_documents_read
 cmd_formatting_apply = google_docs.cmd_formatting_apply
 convert_markdown_to_html = google_docs.convert_markdown_to_html
+extract_frontmatter = google_docs.extract_frontmatter
 extract_title_from_markdown = google_docs.extract_title_from_markdown
 import_markdown_as_doc = google_docs.import_markdown_as_doc
 update_doc_from_html = google_docs.update_doc_from_html
@@ -1881,3 +1882,90 @@ class TestArgumentParserImport:
         assert args.document_id == "doc123"
         assert args.folder_id == "folder1"
         assert args.json is True
+
+
+class TestExtractFrontmatter:
+    """Tests for extract_frontmatter."""
+
+    def test_yaml_frontmatter(self):
+        text = "---\ntitle: My Doc\nfolder_id: abc123\n---\n\n# Content"
+        body, meta = extract_frontmatter(text)
+        assert meta["title"] == "My Doc"
+        assert meta["folder_id"] == "abc123"
+        assert "---" not in body
+        assert "Content" in body
+
+    def test_no_frontmatter(self):
+        body, meta = extract_frontmatter("# Just content")
+        assert meta == {}
+        assert "Just content" in body
+
+    def test_empty_frontmatter(self):
+        body, meta = extract_frontmatter("---\n---\n\nBody")
+        assert "Body" in body
+
+
+class TestCmdDocumentsImportFrontmatter:
+    """Tests for frontmatter handling in documents import."""
+
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_import_title_from_frontmatter(self, mock_import, _mock_build, tmp_path):
+        mock_import.return_value = {"id": "doc1", "name": "FM Title", "webViewLink": "url"}
+
+        md_file = tmp_path / "test.md"
+        md_file.write_text("---\ntitle: FM Title\n---\n\nBody content")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            json=False,
+        )
+        result = cmd_documents_import(args)
+        assert result == 0
+        mock_import.assert_called_once()
+        call_args = mock_import.call_args
+        assert call_args[1].get("title") or call_args[0][2] == "FM Title"
+
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_cli_title_overrides_frontmatter(self, mock_import, _mock_build, tmp_path):
+        mock_import.return_value = {"id": "doc1", "name": "CLI Title", "webViewLink": "url"}
+
+        md_file = tmp_path / "test.md"
+        md_file.write_text("---\ntitle: FM Title\n---\n\nBody")
+
+        args = Mock(
+            file_path=str(md_file),
+            title="CLI Title",
+            document_id=None,
+            folder_id=None,
+            json=False,
+        )
+        result = cmd_documents_import(args)
+        assert result == 0
+        call_args = mock_import.call_args
+        assert call_args[0][2] == "CLI Title"
+
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_frontmatter_stripped_from_html(self, mock_import, _mock_build, tmp_path):
+        mock_import.return_value = {"id": "doc1", "name": "T", "webViewLink": "url"}
+
+        md_file = tmp_path / "test.md"
+        md_file.write_text("---\ntitle: My Title\n---\n\n# Heading\n\nBody")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            json=False,
+        )
+        cmd_documents_import(args)
+        html_arg = mock_import.call_args[0][1]
+        assert "title:" not in html_arg
+        assert "---" not in html_arg
+        assert "Heading" in html_arg
