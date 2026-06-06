@@ -3,7 +3,7 @@ name: google-drive
 description: Upload, download, search, and share files on Google Drive. Create folders, manage permissions, and manage comments and replies. Use when asked to share a file, upload to gdrive, search cloud storage, manage a Drive folder, organize Google Drive files, comment on a file, or reply to comments.
 metadata:
   author: odyssey4me
-  version: "0.5.0"
+  version: "0.5.1"
   category: google-workspace
   tags: "files, folders, sharing"
   complexity: standard
@@ -172,6 +172,8 @@ $SKILL_DIR/scripts/google-drive.py files upload ./report.html \
 $SKILL_DIR/scripts/google-drive.py files upload ./data.csv \
   --convert-to "application/vnd.google-apps.spreadsheet"
 ```
+
+**Note:** For importing markdown files as Google Docs with proper formatting (frontmatter support, line spacing, bullet handling, readability checks), use the **google-docs** skill's `documents import` command instead — it provides markdown-specific conversion and post-import formatting that `--convert-to` does not.
 
 ### Permanently delete a file
 

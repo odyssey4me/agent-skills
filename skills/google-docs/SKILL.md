@@ -236,6 +236,8 @@ After formatting, a readability summary is printed showing heading, paragraph, a
 
 **Note:** Requires `markdown`, `mdx-breakless-lists` Python libraries and the `drive.file` + `documents` scopes.
 
+**See also:** For uploading files to Google Drive (non-markdown), sharing, organizing into folders, or exporting documents, use the **google-drive** skill.
+
 ### content append
 
 Append text to the end of a document.
