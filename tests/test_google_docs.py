@@ -49,6 +49,8 @@ cmd_documents_read = google_docs.cmd_documents_read
 cmd_formatting_apply = google_docs.cmd_formatting_apply
 convert_markdown_to_html = google_docs.convert_markdown_to_html
 extract_frontmatter = google_docs.extract_frontmatter
+apply_import_formatting = google_docs.apply_import_formatting
+check_readability = google_docs.check_readability
 extract_title_from_markdown = google_docs.extract_title_from_markdown
 import_markdown_as_doc = google_docs.import_markdown_as_doc
 update_doc_from_html = google_docs.update_doc_from_html
@@ -1969,3 +1971,177 @@ class TestCmdDocumentsImportFrontmatter:
         assert "title:" not in html_arg
         assert "---" not in html_arg
         assert "Heading" in html_arg
+
+
+class TestApplyImportFormatting:
+    """Tests for apply_import_formatting."""
+
+    def test_sends_update_named_style(self):
+        mock_service = Mock()
+        mock_service.documents().batchUpdate().execute.return_value = {"replies": [{}]}
+
+        result = apply_import_formatting(mock_service, "doc123")
+        assert mock_service.documents().batchUpdate.called
+        assert result == {"replies": [{}]}
+
+    def test_custom_spacing(self):
+        mock_service = Mock()
+        mock_service.documents().batchUpdate().execute.return_value = {}
+
+        apply_import_formatting(mock_service, "doc123", line_spacing=130, space_below=12)
+        call_kwargs = mock_service.documents().batchUpdate.call_args[1]
+        requests = call_kwargs["body"]["requests"]
+        style = requests[0]["updateNamedStyle"]["namedStyle"]["paragraphStyle"]
+        assert style["lineSpacing"] == 130
+        assert style["spaceBelow"]["magnitude"] == 12
+
+
+class TestCheckReadability:
+    """Tests for check_readability."""
+
+    def test_counts_elements(self):
+        mock_service = Mock()
+        mock_service.documents().get().execute.return_value = {
+            "body": {
+                "content": [
+                    {
+                        "paragraph": {
+                            "paragraphStyle": {"namedStyleType": "HEADING_1"},
+                            "elements": [{"textRun": {"content": "Title\n"}}],
+                        }
+                    },
+                    {
+                        "paragraph": {
+                            "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+                            "elements": [{"textRun": {"content": "Body text\n"}}],
+                        }
+                    },
+                    {
+                        "paragraph": {
+                            "bullet": {"listId": "list1"},
+                            "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+                            "elements": [{"textRun": {"content": "Item\n"}}],
+                        }
+                    },
+                ]
+            },
+            "namedStyles": {
+                "styles": [
+                    {
+                        "namedStyleType": "NORMAL_TEXT",
+                        "paragraphStyle": {"lineSpacing": 115, "spaceBelow": {"magnitude": 8}},
+                    }
+                ]
+            },
+        }
+
+        result = check_readability(mock_service, "doc123")
+        assert result["headings"] == 1
+        assert result["paragraphs"] == 1
+        assert result["lists"] == 1
+        assert result["spacing_configured"] is True
+
+
+class TestConvertMarkdownBreaklessLists:
+    """Tests for breakless list support in markdown conversion."""
+
+    def test_list_after_paragraph_without_blank_line(self):
+        md = "**Bold text:**\n- Item 1\n- Item 2"
+        html = convert_markdown_to_html(md)
+        assert "<ul>" in html
+        assert "<li>" in html
+
+    def test_list_with_blank_line_still_works(self):
+        md = "Some text\n\n- Item 1\n- Item 2"
+        html = convert_markdown_to_html(md)
+        assert "<ul>" in html
+
+
+class TestCmdDocumentsImportFormatting:
+    """Tests for post-import formatting in cmd_documents_import."""
+
+    @patch("google_docs.check_readability")
+    @patch("google_docs.apply_import_formatting")
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_import_applies_formatting(
+        self, mock_import, _mock_drive, _mock_docs, mock_format, mock_readability, tmp_path
+    ):
+        mock_import.return_value = {"id": "doc1", "name": "T", "webViewLink": "url"}
+        mock_format.return_value = {}
+        mock_readability.return_value = {
+            "paragraphs": 5,
+            "headings": 2,
+            "lists": 3,
+            "empty_paragraphs": 0,
+            "spacing_configured": True,
+        }
+
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Test\n\nBody")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            no_format=False,
+            json=False,
+        )
+        result = cmd_documents_import(args)
+        assert result == 0
+        mock_format.assert_called_once()
+        mock_readability.assert_called_once()
+
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_import_no_format_skips(self, mock_import, _mock_drive, tmp_path):
+        mock_import.return_value = {"id": "doc1", "name": "T", "webViewLink": "url"}
+
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Test\n\nBody")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            no_format=True,
+            json=False,
+        )
+        result = cmd_documents_import(args)
+        assert result == 0
+
+    @patch("google_docs.check_readability")
+    @patch("google_docs.apply_import_formatting")
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_import_frontmatter_style_override(
+        self, mock_import, _mock_drive, _mock_docs, mock_format, mock_readability, tmp_path
+    ):
+        mock_import.return_value = {"id": "doc1", "name": "T", "webViewLink": "url"}
+        mock_format.return_value = {}
+        mock_readability.return_value = {
+            "paragraphs": 1,
+            "headings": 1,
+            "lists": 0,
+            "empty_paragraphs": 0,
+            "spacing_configured": True,
+        }
+
+        md_file = tmp_path / "test.md"
+        md_file.write_text("---\ntitle: Test\nline_spacing: 130\nspace_below: 12\n---\n\n# Test")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            no_format=False,
+            json=False,
+        )
+        cmd_documents_import(args)
+        call_kwargs = mock_format.call_args
+        assert call_kwargs[1].get("line_spacing") or call_kwargs[0][2] == 130

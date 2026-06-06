@@ -3,7 +3,7 @@ name: google-docs
 description: Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.
 metadata:
   author: odyssey4me
-  version: "0.4.0"
+  version: "0.5.0"
   category: google-workspace
   tags: "documents, editing"
   complexity: standard
@@ -204,6 +204,7 @@ $SKILL_DIR/scripts/google-docs.py documents import FILE_PATH [--title TITLE] [--
 - `--title` - Document title (default: first H1 heading, or filename)
 - `--document-id` - Existing document ID to update (replaces content)
 - `--folder-id` - Parent folder ID for new documents
+- `--no-format` - Skip post-import formatting
 - `--json` - Output as JSON
 
 **Examples:**
@@ -216,9 +217,24 @@ $SKILL_DIR/scripts/google-docs.py documents import ./notes.md
 
 # Update an existing document with new markdown content
 $SKILL_DIR/scripts/google-docs.py documents import ./updated.md --document-id 1abc...xyz
+
+# Import without post-import formatting
+$SKILL_DIR/scripts/google-docs.py documents import ./raw.md --no-format
 ```
 
-**Note:** Requires the `markdown` Python library (`pip install --user markdown`) and the `drive.file` scope.
+**Post-import formatting:** By default, the import applies 1.15x line spacing and 8pt space below paragraphs to the Normal text style. These can be overridden via frontmatter:
+
+```yaml
+---
+title: My Document
+line_spacing: 130
+space_below: 10
+---
+```
+
+After formatting, a readability summary is printed showing heading, paragraph, and list item counts.
+
+**Note:** Requires `markdown`, `mdx-breakless-lists` Python libraries and the `drive.file` + `documents` scopes.
 
 ### content append
 

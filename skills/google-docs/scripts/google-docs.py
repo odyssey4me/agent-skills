@@ -71,6 +71,16 @@ try:
 except ImportError:
     MARKDOWN_LIB_AVAILABLE = False
 
+try:
+    import mdx_breakless_lists  # noqa: F401
+except ImportError:
+    print(
+        "Error: 'mdx-breakless-lists' library not found. "
+        "Install with: pip install --user mdx-breakless-lists",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 
 # ============================================================================
 # CONSTANTS
@@ -1500,7 +1510,7 @@ def convert_markdown_to_html(md_content: str) -> str:
     Returns:
         HTML string.
     """
-    return md_lib.markdown(md_content, extensions=["tables", "fenced_code"])
+    return md_lib.markdown(md_content, extensions=["tables", "fenced_code", "mdx_breakless_lists"])
 
 
 def import_markdown_as_doc(
@@ -1567,6 +1577,106 @@ def update_doc_from_html(drive_service, document_id: str, html_content: str) -> 
     )
 
 
+DEFAULT_LINE_SPACING = 115
+DEFAULT_SPACE_BELOW = 8
+
+
+def apply_import_formatting(
+    docs_service,
+    document_id: str,
+    line_spacing: int = DEFAULT_LINE_SPACING,
+    space_below: int = DEFAULT_SPACE_BELOW,
+) -> dict[str, Any]:
+    """Apply readable formatting to a document's Normal text style.
+
+    Args:
+        docs_service: Google Docs API service object.
+        document_id: Document ID to format.
+        line_spacing: Line spacing percentage (e.g. 115 = 1.15x).
+        space_below: Space below paragraphs in points.
+
+    Returns:
+        batchUpdate response.
+    """
+    requests = [
+        {
+            "updateNamedStyle": {
+                "namedStyle": {
+                    "namedStyleType": "NORMAL_TEXT",
+                    "paragraphStyle": {
+                        "lineSpacing": line_spacing,
+                        "spaceBelow": {"magnitude": space_below, "unit": "PT"},
+                    },
+                },
+                "fields": "paragraphStyle(lineSpacing,spaceBelow)",
+            }
+        }
+    ]
+    try:
+        return (
+            docs_service.documents()
+            .batchUpdate(documentId=document_id, body={"requests": requests})
+            .execute()
+        )
+    except HttpError as e:
+        handle_api_error(e)
+        return {}
+
+
+def check_readability(docs_service, document_id: str) -> dict[str, Any]:
+    """Check a document's structure and formatting for readability.
+
+    Args:
+        docs_service: Google Docs API service object.
+        document_id: Document ID to check.
+
+    Returns:
+        Summary dict with paragraph/heading/list counts and style info.
+    """
+    doc = docs_service.documents().get(documentId=document_id).execute()
+
+    paragraphs = 0
+    headings = 0
+    lists = 0
+    empty = 0
+
+    for element in doc.get("body", {}).get("content", []):
+        paragraph = element.get("paragraph")
+        if not paragraph:
+            continue
+
+        style = paragraph.get("paragraphStyle", {})
+        named_type = style.get("namedStyleType", "NORMAL_TEXT")
+
+        if named_type.startswith("HEADING"):
+            headings += 1
+        elif paragraph.get("bullet"):
+            lists += 1
+        else:
+            paragraphs += 1
+            text = "".join(
+                el.get("textRun", {}).get("content", "") for el in paragraph.get("elements", [])
+            )
+            if not text.strip() or text.strip() == "\n":
+                empty += 1
+
+    named_styles = doc.get("namedStyles", {}).get("styles", [])
+    normal_style = next(
+        (s for s in named_styles if s.get("namedStyleType") == "NORMAL_TEXT"),
+        {},
+    )
+    ps = normal_style.get("paragraphStyle", {})
+    spacing_ok = ps.get("lineSpacing") is not None and ps.get("spaceBelow") is not None
+
+    return {
+        "paragraphs": paragraphs,
+        "headings": headings,
+        "lists": lists,
+        "empty_paragraphs": empty,
+        "spacing_configured": spacing_ok,
+    }
+
+
 def cmd_documents_import(args):
     """Handle 'documents import' command."""
     if not MARKDOWN_LIB_AVAILABLE:
@@ -1604,10 +1714,23 @@ def cmd_documents_import(args):
     else:
         result = import_markdown_as_doc(drive_service, html_content, title, folder_id=folder_id)
 
+    doc_id = result.get("id")
+
+    # Post-import formatting (unless --no-format)
+    if not getattr(args, "no_format", False):
+        line_spacing = int(meta.get("line_spacing", DEFAULT_LINE_SPACING))
+        space_below = int(meta.get("space_below", DEFAULT_SPACE_BELOW))
+
+        docs_service = build_docs_service(DOCS_SCOPES)
+        apply_import_formatting(docs_service, doc_id, line_spacing, space_below)
+        readability = check_readability(docs_service, doc_id)
+
     if args.json:
-        print(json.dumps(result, indent=2))
+        output = dict(result)
+        if not getattr(args, "no_format", False):
+            output["readability"] = readability
+        print(json.dumps(output, indent=2))
     else:
-        doc_id = result.get("id")
         link = result.get("webViewLink", f"https://docs.google.com/document/d/{doc_id}/edit")
         if args.document_id:
             print("✓ Document updated from markdown successfully")
@@ -1616,6 +1739,16 @@ def cmd_documents_import(args):
         print(f"  Title: {result.get('name')}")
         print(f"  Document ID: {doc_id}")
         print(f"  URL: {link}")
+
+        if not getattr(args, "no_format", False):
+            print(
+                f"  Formatting: {line_spacing / 100:.2f}x line spacing, {space_below}pt space below"
+            )
+            print(
+                f"  Structure: {readability['headings']} headings, "
+                f"{readability['paragraphs']} paragraphs, "
+                f"{readability['lists']} list items"
+            )
 
     return 0
 
@@ -1684,6 +1817,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--document-id", help="Existing document ID to update (replaces content)"
     )
     import_parser.add_argument("--folder-id", help="Parent folder ID for new documents")
+    import_parser.add_argument(
+        "--no-format",
+        action="store_true",
+        help="Skip post-import formatting (line spacing, paragraph spacing)",
+    )
     import_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # content commands
