@@ -50,6 +50,7 @@ cmd_formatting_apply = google_docs.cmd_formatting_apply
 convert_markdown_to_html = google_docs.convert_markdown_to_html
 extract_frontmatter = google_docs.extract_frontmatter
 apply_import_formatting = google_docs.apply_import_formatting
+apply_table_formatting = google_docs.apply_table_formatting
 check_readability = google_docs.check_readability
 extract_title_from_markdown = google_docs.extract_title_from_markdown
 import_markdown_as_doc = google_docs.import_markdown_as_doc
@@ -1979,21 +1980,118 @@ class TestApplyImportFormatting:
     def test_sends_update_named_style(self):
         mock_service = Mock()
         mock_service.documents().batchUpdate().execute.return_value = {"replies": [{}]}
+        mock_service.documents().get().execute.return_value = {"body": {"content": []}}
 
-        result = apply_import_formatting(mock_service, "doc123")
+        apply_import_formatting(mock_service, "doc123")
         assert mock_service.documents().batchUpdate.called
-        assert result == {"replies": [{}]}
 
     def test_custom_spacing(self):
         mock_service = Mock()
         mock_service.documents().batchUpdate().execute.return_value = {}
+        mock_service.documents().get().execute.return_value = {"body": {"content": []}}
 
         apply_import_formatting(mock_service, "doc123", line_spacing=130, space_below=12)
         call_kwargs = mock_service.documents().batchUpdate.call_args[1]
         requests = call_kwargs["body"]["requests"]
-        style = requests[0]["updateNamedStyle"]["namedStyle"]["paragraphStyle"]
+        named_style_req = next(r for r in requests if "updateNamedStyle" in r)
+        style = named_style_req["updateNamedStyle"]["namedStyle"]["paragraphStyle"]
         assert style["lineSpacing"] == 130
         assert style["spaceBelow"]["magnitude"] == 12
+
+
+class TestApplyTableFormatting:
+    """Tests for apply_table_formatting."""
+
+    def test_applies_padding_and_post_table_spacing(self):
+        mock_service = Mock()
+        mock_service.documents().get().execute.return_value = {
+            "body": {
+                "content": [
+                    {
+                        "paragraph": {"elements": [{"textRun": {"content": "Text\n"}}]},
+                        "startIndex": 0,
+                        "endIndex": 9,
+                    },
+                    {
+                        "table": {
+                            "columns": 2,
+                            "tableRows": [
+                                {
+                                    "tableCells": [
+                                        {
+                                            "content": [
+                                                {"paragraph": {}, "startIndex": 12, "endIndex": 16}
+                                            ]
+                                        },
+                                        {
+                                            "content": [
+                                                {"paragraph": {}, "startIndex": 17, "endIndex": 21}
+                                            ]
+                                        },
+                                    ]
+                                }
+                            ],
+                        },
+                        "startIndex": 10,
+                        "endIndex": 50,
+                    },
+                    {
+                        "paragraph": {"elements": [{"textRun": {"content": "After\n"}}]},
+                        "startIndex": 51,
+                        "endIndex": 60,
+                    },
+                ]
+            }
+        }
+        mock_service.documents().batchUpdate().execute.return_value = {}
+
+        apply_table_formatting(mock_service, "doc123")
+        call_kwargs = mock_service.documents().batchUpdate.call_args[1]
+        requests = call_kwargs["body"]["requests"]
+
+        padding_reqs = [r for r in requests if "updateTableCellStyle" in r]
+        assert any(
+            r["updateTableCellStyle"]["tableCellStyle"].get("paddingTop", {}).get("magnitude")
+            == 5.0
+            for r in padding_reqs
+        )
+        bg_reqs = [
+            r
+            for r in padding_reqs
+            if "backgroundColor" in r["updateTableCellStyle"].get("tableCellStyle", {})
+        ]
+        assert len(bg_reqs) == 1
+
+        bold_reqs = [r for r in requests if "updateTextStyle" in r]
+        assert all(r["updateTextStyle"]["textStyle"]["bold"] for r in bold_reqs)
+
+        row_reqs = [r for r in requests if "updateTableRowStyle" in r]
+        assert len(row_reqs) == 1
+
+        post_table = [
+            r
+            for r in requests
+            if "updateParagraphStyle" in r
+            and r["updateParagraphStyle"]["range"]["startIndex"] == 51
+        ]
+        assert (
+            post_table[0]["updateParagraphStyle"]["paragraphStyle"]["spaceAbove"]["magnitude"]
+            == 16.0
+        )
+
+    def test_skips_when_no_tables(self):
+        mock_service = Mock()
+        mock_service.documents().get().execute.return_value = {
+            "body": {"content": [{"paragraph": {}}]}
+        }
+
+        apply_table_formatting(mock_service, "doc123")
+        for call in mock_service.documents().batchUpdate.call_args_list:
+            kwargs = call[1] if call[1] else {}
+            body = kwargs.get("body", {})
+            requests = body.get("requests", [])
+            has_table_style = any("updateTableCellStyle" in r for r in requests)
+            assert not has_table_style
 
 
 class TestCheckReadability:

@@ -1586,6 +1586,7 @@ def apply_import_formatting(
     document_id: str,
     line_spacing: int = DEFAULT_LINE_SPACING,
     space_below: int = DEFAULT_SPACE_BELOW,
+    pageless: bool = True,
 ) -> dict[str, Any]:
     """Apply readable formatting to a document's Normal text style.
 
@@ -1594,11 +1595,26 @@ def apply_import_formatting(
         document_id: Document ID to format.
         line_spacing: Line spacing percentage (e.g. 115 = 1.15x).
         space_below: Space below paragraphs in points.
+        pageless: Set document to pageless mode.
 
     Returns:
         batchUpdate response.
     """
-    requests = [
+    requests: list[dict[str, Any]] = []
+
+    if pageless:
+        requests.append(
+            {
+                "updateDocumentStyle": {
+                    "documentStyle": {
+                        "documentFormat": {"documentMode": "PAGELESS"},
+                    },
+                    "fields": "documentFormat",
+                }
+            }
+        )
+
+    requests.append(
         {
             "updateNamedStyle": {
                 "namedStyle": {
@@ -1611,16 +1627,155 @@ def apply_import_formatting(
                 "fields": "namedStyleType,paragraphStyle(lineSpacing,spaceBelow)",
             }
         }
-    ]
+    )
     try:
-        return (
-            docs_service.documents()
-            .batchUpdate(documentId=document_id, body={"requests": requests})
-            .execute()
-        )
+        docs_service.documents().batchUpdate(
+            documentId=document_id, body={"requests": requests}
+        ).execute()
     except HttpError as e:
         handle_api_error(e)
-        return {}
+
+    apply_table_formatting(docs_service, document_id)
+    return {}
+
+
+def apply_table_formatting(
+    docs_service,
+    document_id: str,
+    cell_padding_pt: float = 5.0,
+    post_table_space_pt: float = 16.0,
+) -> None:
+    """Apply readable formatting to all tables.
+
+    Applies cell padding, header row styling (grey background, bold,
+    centered), compact row heights, and post-table spacing.
+    """
+    doc = docs_service.documents().get(documentId=document_id).execute()
+    padding = {"magnitude": cell_padding_pt, "unit": "PT"}
+    header_bg = {"color": {"rgbColor": {"red": 0.9, "green": 0.9, "blue": 0.9}}}
+    requests: list[dict[str, Any]] = []
+    content = doc.get("body", {}).get("content", [])
+
+    for idx, element in enumerate(content):
+        table = element.get("table")
+        if not table:
+            continue
+        table_start = element.get("startIndex")
+        if table_start is None:
+            continue
+
+        num_cols = table.get("columns", 1)
+        table_loc = {"index": table_start}
+
+        requests.append(
+            {
+                "updateTableCellStyle": {
+                    "tableStartLocation": table_loc,
+                    "tableCellStyle": {
+                        "paddingTop": padding,
+                        "paddingBottom": padding,
+                        "paddingLeft": padding,
+                        "paddingRight": padding,
+                    },
+                    "fields": "paddingTop,paddingBottom,paddingLeft,paddingRight",
+                }
+            }
+        )
+
+        requests.append(
+            {
+                "updateTableCellStyle": {
+                    "tableRange": {
+                        "tableCellLocation": {
+                            "tableStartLocation": table_loc,
+                            "rowIndex": 0,
+                            "columnIndex": 0,
+                        },
+                        "rowSpan": 1,
+                        "columnSpan": num_cols,
+                    },
+                    "tableCellStyle": {"backgroundColor": header_bg},
+                    "fields": "backgroundColor",
+                }
+            }
+        )
+
+        header_row = table.get("tableRows", [{}])[0]
+        for cell in header_row.get("tableCells", []):
+            for para in cell.get("content", []):
+                p_start = para.get("startIndex")
+                p_end = para.get("endIndex")
+                if p_start is not None and p_end is not None and p_end > p_start:
+                    requests.append(
+                        {
+                            "updateTextStyle": {
+                                "range": {
+                                    "startIndex": p_start,
+                                    "endIndex": p_end - 1,
+                                },
+                                "textStyle": {"bold": True},
+                                "fields": "bold",
+                            }
+                        }
+                    )
+                    requests.append(
+                        {
+                            "updateParagraphStyle": {
+                                "range": {
+                                    "startIndex": p_start,
+                                    "endIndex": p_end,
+                                },
+                                "paragraphStyle": {
+                                    "alignment": "CENTER",
+                                    "spaceAbove": {"magnitude": 0, "unit": "PT"},
+                                    "spaceBelow": {"magnitude": 0, "unit": "PT"},
+                                },
+                                "fields": "alignment,spaceAbove,spaceBelow",
+                            }
+                        }
+                    )
+
+        requests.append(
+            {
+                "updateTableRowStyle": {
+                    "tableStartLocation": table_loc,
+                    "tableRowStyle": {
+                        "minRowHeight": {"magnitude": 0, "unit": "PT"},
+                    },
+                    "fields": "minRowHeight",
+                }
+            }
+        )
+
+        if idx + 1 < len(content) and content[idx + 1].get("paragraph"):
+            next_start = content[idx + 1].get("startIndex")
+            next_end = content[idx + 1].get("endIndex")
+            if next_start is not None and next_end is not None:
+                requests.append(
+                    {
+                        "updateParagraphStyle": {
+                            "range": {
+                                "startIndex": next_start,
+                                "endIndex": next_end,
+                            },
+                            "paragraphStyle": {
+                                "spaceAbove": {
+                                    "magnitude": post_table_space_pt,
+                                    "unit": "PT",
+                                }
+                            },
+                            "fields": "spaceAbove",
+                        }
+                    }
+                )
+
+    if requests:
+        try:
+            docs_service.documents().batchUpdate(
+                documentId=document_id, body={"requests": requests}
+            ).execute()
+        except HttpError as e:
+            handle_api_error(e)
 
 
 def check_readability(docs_service, document_id: str) -> dict[str, Any]:
@@ -1720,9 +1875,10 @@ def cmd_documents_import(args):
     if not getattr(args, "no_format", False):
         line_spacing = int(meta.get("line_spacing", DEFAULT_LINE_SPACING))
         space_below = int(meta.get("space_below", DEFAULT_SPACE_BELOW))
+        pageless = meta.get("pageless", "true").lower() not in ("false", "no", "0")
 
         docs_service = build_docs_service(DOCS_SCOPES)
-        apply_import_formatting(docs_service, doc_id, line_spacing, space_below)
+        apply_import_formatting(docs_service, doc_id, line_spacing, space_below, pageless=pageless)
         readability = check_readability(docs_service, doc_id)
 
     if args.json:
