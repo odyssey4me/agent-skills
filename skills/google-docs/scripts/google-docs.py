@@ -1608,7 +1608,7 @@ def apply_import_formatting(
                         "spaceBelow": {"magnitude": space_below, "unit": "PT"},
                     },
                 },
-                "fields": "paragraphStyle(lineSpacing,spaceBelow)",
+                "fields": "namedStyleType,paragraphStyle(lineSpacing,spaceBelow)",
             }
         }
     ]
