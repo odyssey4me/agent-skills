@@ -46,6 +46,7 @@ printf "%-22s %-10s %-10s %s\n" "-----" "--------" "-------" "------"
 
 for skill in skills/*/; do
   skill_name=$(basename "$skill")
+  [ -f "${skill}SKILL.md" ] || continue
   current=$(extract_version "${skill}SKILL.md")
   released=$(git show "${TAG}:${skill}SKILL.md" 2>/dev/null \
     | sed -n 's/^  version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' | head -1)
