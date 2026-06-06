@@ -45,6 +45,7 @@ from skills.gmail.scripts.gmail import (
     get_google_credentials,
     get_message,
     get_oauth_client_config,
+    get_reply_headers,
     get_thread,
     handle_api_error,
     list_drafts,
@@ -2201,11 +2202,13 @@ class TestFromFile:
         assert call_kwargs["to"] == "a@b.com"
         assert call_kwargs["body_html"] is not None
 
+    @patch("skills.gmail.scripts.gmail.build_gmail_service")
     @patch("builtins.print")
-    def test_cmd_send_missing_required_fields(self, _mock_print):
+    def test_cmd_send_missing_required_fields(self, _mock_print, _mock_service):
         """Test error when required fields are missing."""
         args = Mock()
         args.from_file = None
+        args.reply_to = None
         args.to = "a@b.com"
         args.subject = None
         args.body = None
@@ -2216,3 +2219,118 @@ class TestFromFile:
         exit_code = cmd_send(args)
 
         assert exit_code == 1
+
+
+class TestReplyThreading:
+    """Tests for in-thread reply support."""
+
+    def test_get_reply_headers(self):
+        mock_service = Mock()
+        mock_service.users().messages().get().execute.return_value = {
+            "threadId": "thread456",
+            "payload": {
+                "headers": [
+                    {"name": "Message-ID", "value": "<abc@example.com>"},
+                    {"name": "Subject", "value": "Original Subject"},
+                    {"name": "From", "value": "sender@example.com"},
+                    {"name": "References", "value": "<prev@example.com>"},
+                ],
+            },
+        }
+
+        result = get_reply_headers(mock_service, "msg123")
+        assert result["in_reply_to"] == "<abc@example.com>"
+        assert "<prev@example.com>" in result["references"]
+        assert "<abc@example.com>" in result["references"]
+        assert result["subject"] == "Re: Original Subject"
+        assert result["to"] == "sender@example.com"
+        assert result["thread_id"] == "thread456"
+
+    def test_get_reply_headers_already_re(self):
+        mock_service = Mock()
+        mock_service.users().messages().get().execute.return_value = {
+            "threadId": "t1",
+            "payload": {
+                "headers": [
+                    {"name": "Message-ID", "value": "<x@e.com>"},
+                    {"name": "Subject", "value": "Re: Already replied"},
+                    {"name": "From", "value": "a@b.com"},
+                ],
+            },
+        }
+
+        result = get_reply_headers(mock_service, "m1")
+        assert result["subject"] == "Re: Already replied"
+
+    def test_get_reply_headers_uses_reply_to(self):
+        mock_service = Mock()
+        mock_service.users().messages().get().execute.return_value = {
+            "threadId": "t1",
+            "payload": {
+                "headers": [
+                    {"name": "Message-ID", "value": "<x@e.com>"},
+                    {"name": "Subject", "value": "Test"},
+                    {"name": "From", "value": "sender@e.com"},
+                    {"name": "Reply-To", "value": "replyto@e.com"},
+                ],
+            },
+        }
+
+        result = get_reply_headers(mock_service, "m1")
+        assert result["to"] == "replyto@e.com"
+
+    def test_build_mime_message_with_threading(self):
+        import base64
+        from email import message_from_bytes
+
+        raw = build_mime_message(
+            to="to@e.com",
+            subject="Re: Test",
+            body_plain="Reply body",
+            in_reply_to="<orig@e.com>",
+            references="<prev@e.com> <orig@e.com>",
+        )
+        decoded = base64.urlsafe_b64decode(raw)
+        msg = message_from_bytes(decoded)
+        assert msg["In-Reply-To"] == "<orig@e.com>"
+        assert msg["References"] == "<prev@e.com> <orig@e.com>"
+
+    def test_send_message_with_thread_id(self):
+        mock_service = Mock()
+        mock_service.users().messages().send().execute.return_value = {
+            "id": "sent1",
+            "threadId": "t1",
+        }
+
+        send_message(
+            mock_service,
+            to="to@e.com",
+            subject="Re: Test",
+            body="Reply",
+            thread_id="t1",
+            in_reply_to="<orig@e.com>",
+            references="<orig@e.com>",
+        )
+
+        call_args = mock_service.users().messages().send.call_args
+        body = call_args[1].get("body") or call_args[0][0] if call_args[0] else call_args[1]["body"]
+        assert body.get("threadId") == "t1"
+
+    def test_create_draft_with_thread_id(self):
+        mock_service = Mock()
+        mock_service.users().drafts().create().execute.return_value = {
+            "id": "draft1",
+            "message": {"id": "msg1"},
+        }
+
+        create_draft(
+            mock_service,
+            to="to@e.com",
+            subject="Re: Test",
+            body="Reply draft",
+            thread_id="t1",
+            in_reply_to="<orig@e.com>",
+            references="<orig@e.com>",
+        )
+
+        assert mock_service.users().drafts().create.called

@@ -542,6 +542,8 @@ def build_mime_message(
     body_html: str | None = None,
     cc: str | None = None,
     bcc: str | None = None,
+    in_reply_to: str | None = None,
+    references: str | None = None,
 ) -> str:
     """Build a MIME message and return the base64url-encoded raw string.
 
@@ -562,8 +564,44 @@ def build_mime_message(
         message["Cc"] = cc
     if bcc:
         message["Bcc"] = bcc
+    if in_reply_to:
+        message["In-Reply-To"] = in_reply_to
+    if references:
+        message["References"] = references
 
     return base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+
+
+def get_reply_headers(service, message_id: str) -> dict[str, str]:
+    """Extract threading headers from a message for composing a reply.
+
+    Args:
+        service: Gmail API service object.
+        message_id: ID of the message to reply to.
+
+    Returns:
+        Dict with keys: in_reply_to, references, subject, to, thread_id.
+    """
+    msg = get_message(service, message_id, format="metadata")
+    headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+
+    msg_id_header = headers.get("Message-ID", headers.get("Message-Id", ""))
+    existing_refs = headers.get("References", "")
+    references = f"{existing_refs} {msg_id_header}".strip() if msg_id_header else existing_refs
+
+    subject = headers.get("Subject", "")
+    if subject and not subject.lower().startswith("re:"):
+        subject = f"Re: {subject}"
+
+    reply_to = headers.get("Reply-To", headers.get("From", ""))
+
+    return {
+        "in_reply_to": msg_id_header,
+        "references": references,
+        "subject": subject,
+        "to": reply_to,
+        "thread_id": msg.get("threadId", ""),
+    }
 
 
 def send_message(
@@ -574,6 +612,9 @@ def send_message(
     cc: str | None = None,
     bcc: str | None = None,
     body_html: str | None = None,
+    thread_id: str | None = None,
+    in_reply_to: str | None = None,
+    references: str | None = None,
 ) -> dict[str, Any]:
     """Send an email message.
 
@@ -585,6 +626,9 @@ def send_message(
         cc: CC recipients (comma-separated).
         bcc: BCC recipients (comma-separated).
         body_html: Optional HTML body for multipart/alternative.
+        thread_id: Thread ID for in-thread replies.
+        in_reply_to: Message-ID header for threading.
+        references: References header for threading.
 
     Returns:
         Sent message dictionary.
@@ -593,8 +637,13 @@ def send_message(
         GmailAPIError: If the API call fails.
     """
     try:
-        raw_message = build_mime_message(to, subject, body, body_html, cc, bcc)
-        result = service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
+        raw_message = build_mime_message(
+            to, subject, body, body_html, cc, bcc, in_reply_to, references
+        )
+        api_body: dict[str, Any] = {"raw": raw_message}
+        if thread_id:
+            api_body["threadId"] = thread_id
+        result = service.users().messages().send(userId="me", body=api_body).execute()
         return result
     except HttpError as e:
         handle_api_error(e)
@@ -614,6 +663,9 @@ def create_draft(
     cc: str | None = None,
     bcc: str | None = None,
     body_html: str | None = None,
+    thread_id: str | None = None,
+    in_reply_to: str | None = None,
+    references: str | None = None,
 ) -> dict[str, Any]:
     """Create a draft email.
 
@@ -625,6 +677,9 @@ def create_draft(
         cc: CC recipients (comma-separated).
         bcc: BCC recipients (comma-separated).
         body_html: Optional HTML body for multipart/alternative.
+        thread_id: Thread ID for in-thread replies.
+        in_reply_to: Message-ID header for threading.
+        references: References header for threading.
 
     Returns:
         Draft dictionary.
@@ -633,13 +688,13 @@ def create_draft(
         GmailAPIError: If the API call fails.
     """
     try:
-        raw_message = build_mime_message(to, subject, body, body_html, cc, bcc)
-        draft = (
-            service.users()
-            .drafts()
-            .create(userId="me", body={"message": {"raw": raw_message}})
-            .execute()
+        raw_message = build_mime_message(
+            to, subject, body, body_html, cc, bcc, in_reply_to, references
         )
+        msg_body: dict[str, Any] = {"raw": raw_message}
+        if thread_id:
+            msg_body["threadId"] = thread_id
+        draft = service.users().drafts().create(userId="me", body={"message": msg_body}).execute()
         return draft
     except HttpError as e:
         handle_api_error(e)
@@ -1328,11 +1383,21 @@ def _resolve_email_args(args) -> tuple[dict[str, Any], int]:
 
 def cmd_send(args):
     """Handle 'send' command."""
+    service = build_gmail_service(GMAIL_SCOPES_READONLY + GMAIL_SCOPES_SEND)
+
+    reply_headers: dict[str, str] = {}
+    reply_to_id = getattr(args, "reply_to", None)
+    if reply_to_id:
+        reply_headers = get_reply_headers(service, reply_to_id)
+
     fields, exit_code = _resolve_email_args(args)
     if exit_code:
         return exit_code
 
-    service = build_gmail_service(GMAIL_SCOPES_READONLY + GMAIL_SCOPES_SEND)
+    if reply_headers:
+        fields.setdefault("to", reply_headers.get("to", ""))
+        fields.setdefault("subject", reply_headers.get("subject", ""))
+
     result = send_message(
         service,
         to=fields["to"],
@@ -1341,6 +1406,9 @@ def cmd_send(args):
         cc=fields.get("cc"),
         bcc=fields.get("bcc"),
         body_html=fields.get("body_html"),
+        thread_id=reply_headers.get("thread_id"),
+        in_reply_to=reply_headers.get("in_reply_to"),
+        references=reply_headers.get("references"),
     )
 
     if args.json:
@@ -1375,11 +1443,21 @@ def cmd_drafts_list(args):
 
 def cmd_drafts_create(args):
     """Handle 'drafts create' command."""
+    service = build_gmail_service(GMAIL_SCOPES_READONLY + GMAIL_SCOPES_MODIFY)
+
+    reply_headers: dict[str, str] = {}
+    reply_to_id = getattr(args, "reply_to", None)
+    if reply_to_id:
+        reply_headers = get_reply_headers(service, reply_to_id)
+
     fields, exit_code = _resolve_email_args(args)
     if exit_code:
         return exit_code
 
-    service = build_gmail_service(GMAIL_SCOPES_READONLY + GMAIL_SCOPES_MODIFY)
+    if reply_headers:
+        fields.setdefault("to", reply_headers.get("to", ""))
+        fields.setdefault("subject", reply_headers.get("subject", ""))
+
     result = create_draft(
         service,
         to=fields["to"],
@@ -1388,6 +1466,9 @@ def cmd_drafts_create(args):
         cc=fields.get("cc"),
         bcc=fields.get("bcc"),
         body_html=fields.get("body_html"),
+        thread_id=reply_headers.get("thread_id"),
+        in_reply_to=reply_headers.get("in_reply_to"),
+        references=reply_headers.get("references"),
     )
 
     if args.json:
@@ -1516,6 +1597,7 @@ def build_parser() -> argparse.ArgumentParser:
     send_parser.add_argument("--from-file", help="Markdown file with YAML frontmatter")
     send_parser.add_argument("--cc", help="CC recipients (comma-separated)")
     send_parser.add_argument("--bcc", help="BCC recipients (comma-separated)")
+    send_parser.add_argument("--reply-to", help="Message ID to reply to (sends in-thread)")
     send_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # drafts commands
@@ -1533,6 +1615,9 @@ def build_parser() -> argparse.ArgumentParser:
     drafts_create_parser.add_argument("--from-file", help="Markdown file with YAML frontmatter")
     drafts_create_parser.add_argument("--cc", help="CC recipients (comma-separated)")
     drafts_create_parser.add_argument("--bcc", help="BCC recipients (comma-separated)")
+    drafts_create_parser.add_argument(
+        "--reply-to", help="Message ID to reply to (creates reply draft in-thread)"
+    )
     drafts_create_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     drafts_send_parser = drafts_subparsers.add_parser("send", help="Send a draft")

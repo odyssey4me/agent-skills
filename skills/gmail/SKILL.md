@@ -3,7 +3,7 @@ name: gmail
 description: Send, search, and organize Gmail messages, drafts, and labels. Read full threads and get shareable Google Groups permalinks. Use when asked to compose an email, reply to mail, forward a message, search inbox, manage attachments, organize Gmail, read a thread, or find a Google Groups discussion link.
 metadata:
   author: odyssey4me
-  version: "0.4.0"
+  version: "0.5.0"
   category: communication
   tags: "email, drafts, labels"
   complexity: standard
@@ -212,15 +212,19 @@ $SKILL_DIR/scripts/gmail.py send --from-file update.md
 
 # Send from file with CLI overrides
 $SKILL_DIR/scripts/gmail.py send --from-file update.md --to override@example.com
+
+# Reply to a message in-thread
+$SKILL_DIR/scripts/gmail.py send --reply-to MESSAGE_ID --body "Thanks, got it."
 ```
 
 **Arguments:**
-- `--to`: Recipient email address (required unless in `--from-file`)
-- `--subject`: Email subject (required unless in `--from-file`)
+- `--to`: Recipient email address (required unless in `--from-file` or `--reply-to`)
+- `--subject`: Email subject (required unless in `--from-file` or `--reply-to`)
 - `--body`: Email body text (required unless in `--from-file`)
 - `--from-file`: Markdown file with YAML frontmatter (see format below)
 - `--cc`: CC recipients (comma-separated)
 - `--bcc`: BCC recipients (comma-separated)
+- `--reply-to`: Message ID to reply to (sends in-thread, auto-fills to/subject)
 
 CLI flags override frontmatter values. When using `--from-file`, the markdown
 body is converted to HTML and sent as multipart/alternative (HTML + plain text
@@ -280,6 +284,9 @@ $SKILL_DIR/scripts/gmail.py drafts create \
   --subject "Meeting Notes" \
   --body "Notes from today's meeting..." \
   --cc team@example.com
+
+# Create a reply draft in-thread
+$SKILL_DIR/scripts/gmail.py drafts create --reply-to MESSAGE_ID --body "I'll look into this."
 ```
 
 ```bash
