@@ -524,6 +524,27 @@ def api_path(endpoint: str) -> str:
     return f"rest/api/{version}/{endpoint.lstrip('/')}"
 
 
+def automation_path(endpoint: str) -> str:
+    """Construct the gateway path for the Automation Rule Management API.
+
+    Uses the gateway path (``{site}/gateway/api/automation/...``) so
+    existing Jira Cloud credentials (email + API token) work without a
+    separate auth flow.  Cloud-only.
+
+    Args:
+        endpoint: Automation API endpoint (e.g., ``rule/summary``).
+
+    Returns:
+        Full gateway path string.
+
+    Raises:
+        APIError: If the instance is not Cloud or the Cloud ID cannot
+            be determined.
+    """
+    cloud_id = get_cloud_id()
+    return f"gateway/api/automation/public/jira/{cloud_id}/rest/v1/{endpoint.lstrip('/')}"
+
+
 _INLINE_RE = re.compile(r"(\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\))")
 
 
@@ -728,6 +749,46 @@ def clear_cache() -> None:
     Useful for testing or when switching between Jira instances.
     """
     _deployment_cache.clear()
+
+
+def get_cloud_id() -> str:
+    """Get the Atlassian Cloud ID for the current Jira instance.
+
+    Fetches from ``{base_url}/_edge/tenant_info`` and caches the result
+    in ``_deployment_cache``.
+
+    Returns:
+        The Cloud ID string.
+
+    Raises:
+        APIError: If the instance is not Cloud or the request fails.
+    """
+    if not is_cloud():
+        raise APIError("Automation rules are only available on Jira Cloud")
+
+    creds = get_credentials("jira")
+    if not creds.url:
+        raise APIError("No Jira URL configured")
+
+    cached = _deployment_cache.get(creds.url, {})
+    if "cloud_id" in cached:
+        return cached["cloud_id"]
+
+    url = f"{creds.url.rstrip('/')}/_edge/tenant_info"
+    response = requests.get(url, timeout=10)
+    if not response.ok:
+        raise APIError(
+            f"Failed to fetch Cloud ID: {response.status_code} {response.reason}",
+            status_code=response.status_code,
+            response=response.text,
+        )
+
+    cloud_id = response.json().get("cloudId")
+    if not cloud_id:
+        raise APIError("Could not determine Cloud ID from tenant info")
+
+    _deployment_cache.setdefault(creds.url, {})["cloud_id"] = cloud_id
+    return cloud_id
 
 
 def detect_scriptrunner_support(force_refresh: bool = False) -> dict[str, Any]:
@@ -1457,6 +1518,431 @@ def format_issues_list(
         parts.append(entry)
 
     return "\n\n".join(parts)
+
+
+# ============================================================================
+# AUTOMATION RULES (Cloud-only)
+# ============================================================================
+
+
+def list_automation_rules(
+    *,
+    project_key: str | None = None,
+    state: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """List automation rule summaries with optional filtering.
+
+    Args:
+        project_key: Filter to rules scoped to this project.
+        state: Filter by state (``ENABLED`` or ``DISABLED``).
+        limit: Maximum rules to return (paginates automatically).
+
+    Returns:
+        List of rule summary dicts.
+    """
+    endpoint = automation_path("rule/summary")
+    results: list[dict[str, Any]] = []
+    cursor: str | None = None
+
+    while True:
+        params: dict[str, Any] = {"limit": min(limit - len(results), 100)}
+        if cursor:
+            params["cursor"] = cursor
+
+        response = get("jira", endpoint, params=params)
+        data = response.get("data", [])
+        results.extend(data)
+
+        links = response.get("links", {})
+        next_link = links.get("next")
+        if not next_link or len(results) >= limit:
+            break
+        # The next link contains query params; extract cursor value
+        import urllib.parse
+
+        parsed = urllib.parse.parse_qs(urllib.parse.urlparse(next_link).query)
+        cursor = parsed.get("cursor", [None])[0]
+        if not cursor:
+            break
+
+    # Filter by project scope if requested
+    if project_key:
+        filtered = []
+        project_key_upper = project_key.upper()
+        for rule in results:
+            scope_aris = rule.get("ruleScopeARIs", [])
+            if _rule_matches_project(scope_aris, project_key_upper):
+                filtered.append(rule)
+        results = filtered
+
+    # Filter by state if requested
+    if state:
+        state_upper = state.upper()
+        results = [r for r in results if r.get("state", "").upper() == state_upper]
+
+    return results
+
+
+def _rule_matches_project(scope_aris: list[str], project_key: str) -> bool:
+    """Check whether any scope ARI matches the given project key.
+
+    Scope ARIs look like ``ari:cloud:jira:{siteId}:project/{projectId}``
+    but can also be global.  We also resolve the project key to its ID
+    when possible.
+    """
+    if not scope_aris:
+        return True  # global rules match all projects
+
+    for ari in scope_aris:
+        if "project/" in ari:
+            # Try to resolve project key to id for matching
+            try:
+                project = get("jira", api_path(f"project/{project_key}"))
+                project_id = str(project.get("id", ""))
+                if project_id and f"project/{project_id}" in ari:
+                    return True
+            except APIError:
+                pass
+    return False
+
+
+# Cache for project key → id lookups used by automation scope matching
+_project_id_cache: dict[str, str] = {}
+
+
+def _resolve_project_id(project_key: str) -> str | None:
+    """Resolve a project key to its numeric ID, with caching."""
+    if project_key in _project_id_cache:
+        return _project_id_cache[project_key]
+    try:
+        project = get("jira", api_path(f"project/{project_key}"))
+        pid = str(project.get("id", ""))
+        if pid:
+            _project_id_cache[project_key] = pid
+        return pid or None
+    except APIError:
+        return None
+
+
+def get_automation_rule(rule_uuid: str) -> dict[str, Any]:
+    """Fetch the full definition of an automation rule.
+
+    Args:
+        rule_uuid: The rule UUID.
+
+    Returns:
+        The ``RuleConfigResponse`` dict with ``rule`` and ``connections`` keys.
+    """
+    endpoint = automation_path(f"rule/{rule_uuid}")
+    return get("jira", endpoint)
+
+
+def format_automation_summary(rule: dict[str, Any]) -> str:
+    """Format a rule summary for list output.
+
+    Args:
+        rule: A rule summary dict from the list endpoint.
+
+    Returns:
+        Markdown string.
+    """
+    name = rule.get("name", "Untitled")
+    state = rule.get("state", "UNKNOWN")
+    author = rule.get("authorAccountId", "unknown")
+    labels = rule.get("labels", [])
+    uuid = rule.get("uuid", "")
+    scope_aris = rule.get("ruleScopeARIs", [])
+
+    state_icon = "ON" if state == "ENABLED" else "OFF"
+
+    parts = [f"### {name}"]
+    parts.append(f"- **State:** {state_icon} ({state})")
+    parts.append(f"- **Author:** {author}")
+    if labels:
+        parts.append(f"- **Labels:** {', '.join(labels)}")
+    if scope_aris:
+        scopes = [_format_scope_ari(ari) for ari in scope_aris]
+        parts.append(f"- **Scope:** {', '.join(scopes)}")
+    parts.append(f"- **UUID:** `{uuid}`")
+
+    return "\n".join(parts)
+
+
+def _format_scope_ari(ari: str) -> str:
+    """Extract a human-readable scope from an ARI string."""
+    if "project/" in ari:
+        project_id = ari.rsplit("project/", 1)[-1]
+        return f"Project #{project_id}"
+    if ari.endswith(":site"):
+        return "Global (site)"
+    return ari
+
+
+def format_automation_detail(rule_config: dict[str, Any]) -> str:
+    """Format a full rule definition as a readable markdown document.
+
+    Args:
+        rule_config: The ``RuleConfigResponse`` from the get endpoint.
+
+    Returns:
+        Markdown string describing the rule step by step.
+    """
+    rule = rule_config.get("rule", {})
+    name = rule.get("name", "Untitled")
+    description = rule.get("description", "")
+    state = rule.get("state", "UNKNOWN")
+    author = rule.get("authorAccountId", "unknown")
+    labels = rule.get("labels", [])
+    scope_aris = rule.get("ruleScopeARIs", [])
+    created = rule.get("created")
+    updated = rule.get("updated")
+    notify = rule.get("notifyOnError", "")
+    write_access = rule.get("writeAccessType", "")
+    collaborators = rule.get("collaborators", [])
+    can_other_trigger = rule.get("canOtherRuleTrigger", False)
+
+    parts = [f"## {name}"]
+
+    # Metadata
+    state_icon = "ON" if state == "ENABLED" else "OFF"
+    parts.append(f"\n- **State:** {state_icon} ({state})")
+    parts.append(f"- **Author:** {author}")
+    if collaborators:
+        parts.append(f"- **Collaborators:** {', '.join(collaborators)}")
+    if labels:
+        parts.append(f"- **Labels:** {', '.join(labels)}")
+    if scope_aris:
+        scopes = [_format_scope_ari(ari) for ari in scope_aris]
+        parts.append(f"- **Scope:** {', '.join(scopes)}")
+    if created:
+        parts.append(f"- **Created:** {_format_timestamp(created)}")
+    if updated:
+        parts.append(f"- **Updated:** {_format_timestamp(updated)}")
+    if notify:
+        parts.append(f"- **Notify on error:** {notify}")
+    if write_access:
+        parts.append(f"- **Write access:** {write_access}")
+    if can_other_trigger:
+        parts.append("- **Can be triggered by other rules:** yes")
+    if description:
+        parts.append(f"\n{description}")
+
+    # Trigger
+    trigger = rule.get("trigger")
+    if trigger:
+        parts.append("\n### Trigger")
+        parts.append(_format_component(trigger, prefix="**When:**"))
+        trigger_conditions = trigger.get("conditions", [])
+        if trigger_conditions:
+            for cond in trigger_conditions:
+                parts.append(_format_component(cond, prefix="  - **If:**"))
+
+    # Components (conditions, actions, branches)
+    components = rule.get("components", [])
+    if components:
+        conditions = [c for c in components if c.get("component") == "CONDITION"]
+        actions = [c for c in components if c.get("component") == "ACTION"]
+        branches = [c for c in components if c.get("component") == "BRANCH"]
+        other = [
+            c for c in components if c.get("component") not in ("CONDITION", "ACTION", "BRANCH")
+        ]
+
+        if conditions:
+            parts.append("\n### Conditions")
+            for i, cond in enumerate(conditions, 1):
+                parts.append(f"{i}. {_format_component(cond, prefix='**If:**')}")
+                for sub in cond.get("conditions", []):
+                    parts.append(f"   - {_format_component(sub, prefix='**And:**')}")
+
+        if actions:
+            parts.append("\n### Actions")
+            for i, action in enumerate(actions, 1):
+                parts.append(f"{i}. {_format_component(action, prefix='**Then:**')}")
+                for sub_cond in action.get("conditions", []):
+                    parts.append(f"   - {_format_component(sub_cond, prefix='**If:**')}")
+                for child in action.get("children", []):
+                    parts.append(f"   - {_format_component(child, prefix='**→**')}")
+
+        if branches:
+            parts.append("\n### Branches")
+            for i, branch in enumerate(branches, 1):
+                parts.append(f"{i}. {_format_component(branch, prefix='**Branch:**')}")
+                for child in branch.get("children", []):
+                    parts.append(f"   - {_format_component(child, prefix='**→**')}")
+                for sub_cond in branch.get("conditions", []):
+                    parts.append(f"   - {_format_component(sub_cond, prefix='**If:**')}")
+
+        if other:
+            parts.append("\n### Other Components")
+            for i, comp in enumerate(other, 1):
+                component_type = comp.get("component", "UNKNOWN")
+                parts.append(f"{i}. {_format_component(comp, prefix=f'**{component_type}:**')}")
+
+    # Connections
+    connections = rule_config.get("connections", [])
+    if connections:
+        parts.append("\n### Connections")
+        for conn in connections:
+            target = conn.get("connectionTargetKey", "unknown")
+            auth_type = conn.get("authType", "unknown")
+            parts.append(f"- **{target}** (auth: {auth_type})")
+
+    return "\n".join(parts)
+
+
+def _format_timestamp(ts: float | int) -> str:
+    """Format a Unix timestamp (seconds or milliseconds) as ISO date."""
+    from datetime import datetime, timezone
+
+    if ts > 1e12:
+        ts = ts / 1000.0
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    return dt.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _format_component(component: dict[str, Any], *, prefix: str = "") -> str:
+    """Format a single automation component (trigger, condition, or action).
+
+    Parses the ``type`` and ``value`` fields to produce a human-readable
+    description.
+    """
+    comp_type = component.get("type", "unknown")
+    value_raw = component.get("value")
+
+    # Make the type key human-readable
+    readable_type = _humanise_component_type(comp_type)
+
+    # Parse value JSON if present
+    value_detail = ""
+    if value_raw:
+        try:
+            value_obj = json.loads(value_raw) if isinstance(value_raw, str) else value_raw
+            value_detail = _summarise_value(value_obj)
+        except (json.JSONDecodeError, TypeError):
+            value_detail = str(value_raw)
+
+    line = f"{prefix} {readable_type}" if prefix else readable_type
+    if value_detail:
+        line += f" — {value_detail}"
+    return line.strip()
+
+
+# Common automation component type keys → human-readable names
+_COMPONENT_TYPE_NAMES: dict[str, str] = {
+    "jira.issue.event.trigger:created": "Issue created",
+    "jira.issue.event.trigger:updated": "Issue updated",
+    "jira.issue.event.trigger:transitioned": "Issue transitioned",
+    "jira.issue.event.trigger:commented": "Comment added",
+    "jira.issue.event.trigger:assigned": "Issue assigned",
+    "jira.issue.event.trigger:deleted": "Issue deleted",
+    "jira.issue.event.trigger:moved": "Issue moved",
+    "jira.sprint.event.trigger:started": "Sprint started",
+    "jira.sprint.event.trigger:completed": "Sprint completed",
+    "jira.version.event.trigger:created": "Version created",
+    "jira.version.event.trigger:released": "Version released",
+    "jira.scheduled.trigger": "Scheduled",
+    "jira.manual.trigger": "Manual trigger",
+    "jira.incoming.webhook.trigger": "Incoming webhook",
+    "jira.issue.field.changed.trigger": "Field value changed",
+    "jira.worklog.event.trigger:created": "Work logged",
+    "jira.issue.link.event.trigger:created": "Issue linked",
+    "jira.issue.create.action": "Create issue",
+    "jira.issue.edit.action": "Edit issue",
+    "jira.issue.transition.action": "Transition issue",
+    "jira.issue.assign.action": "Assign issue",
+    "jira.issue.comment.action": "Add comment",
+    "jira.issue.link.action": "Link issues",
+    "jira.issue.delete.action": "Delete issue",
+    "jira.issue.clone.action": "Clone issue",
+    "jira.email.send.action": "Send email",
+    "jira.webhook.action": "Send web request",
+    "jira.lookup.issues.action": "Lookup issues (JQL)",
+    "jira.create.variable.action": "Create variable",
+    "jira.log.action": "Log action",
+    "jira.branch.action": "Branch / related issues",
+    "jira.condition.if.block": "If/else block",
+    "jira.condition.jql": "JQL condition",
+    "jira.condition.field": "Field condition",
+    "jira.condition.user": "User condition",
+    "jira.condition.issue.of.type": "Issue type condition",
+    "jira.condition.issue.in.status": "Status condition",
+    "jira.condition.issue.has.subtasks": "Has subtasks",
+    "jira.condition.related.issues": "Related issues condition",
+    "jira.condition.advanced": "Advanced condition",
+}
+
+
+def _humanise_component_type(type_key: str) -> str:
+    """Convert a component type key to a human-readable label."""
+    if type_key in _COMPONENT_TYPE_NAMES:
+        return _COMPONENT_TYPE_NAMES[type_key]
+    # Fallback: extract meaningful parts from the key
+    parts = type_key.replace("jira.", "").replace(".", " ").replace(":", " — ")
+    return parts.replace("_", " ").title()
+
+
+def _summarise_value(value_obj: dict[str, Any] | list | str) -> str:
+    """Produce a compact human-readable summary of a component's value config."""
+    if isinstance(value_obj, str):
+        return value_obj
+    if isinstance(value_obj, list):
+        return ", ".join(_summarise_value(v) for v in value_obj[:5])
+    if not isinstance(value_obj, dict):
+        return str(value_obj)
+
+    # Pick the most informative fields from the value object
+    interesting_keys = [
+        "jql",
+        "fieldId",
+        "fieldValue",
+        "value",
+        "message",
+        "body",
+        "text",
+        "name",
+        "summary",
+        "url",
+        "to",
+        "statusId",
+        "issueType",
+        "projectId",
+        "accountId",
+        "group",
+        "schedule",
+        "cron",
+        "selectedFieldType",
+        "compareFieldValue",
+        "compareValue",
+        "condition",
+    ]
+
+    snippets = []
+    for key in interesting_keys:
+        if key in value_obj:
+            val = value_obj[key]
+            if isinstance(val, dict):
+                # Try to get a display value from nested objects
+                display = val.get("displayName") or val.get("name") or val.get("value")
+                if display:
+                    snippets.append(f"{key}: {display}")
+                else:
+                    snippets.append(f"{key}: {json.dumps(val, ensure_ascii=False)}")
+            elif isinstance(val, list):
+                items = [
+                    str(v.get("displayName", v.get("name", v)) if isinstance(v, dict) else v)
+                    for v in val[:3]
+                ]
+                snippets.append(f"{key}: [{', '.join(items)}]")
+            else:
+                snippets.append(f"{key}: {val}")
+
+    if snippets:
+        return "; ".join(snippets)
+
+    # Last resort: show compact JSON of first few keys
+    short = {k: value_obj[k] for k in list(value_obj)[:3]}
+    return json.dumps(short, ensure_ascii=False, default=str)
 
 
 # ============================================================================
@@ -2450,10 +2936,44 @@ def cmd_check() -> int:
     except Exception as e:
         print(f"   WARNING: Could not check ScriptRunner: {e}")
 
-    # 5. Validate custom field mappings
+    # 5. Check Automation API access (Cloud-only)
+    if is_cloud():
+        print("\n5. Checking Automation API access...")
+        try:
+            # Check user permissions
+            perms_response = get(
+                "jira",
+                api_path("mypermissions"),
+                params={"permissions": "ADMINISTER"},
+            )
+            perms = perms_response.get("permissions", {})
+            administer = perms.get("ADMINISTER", {})
+            has_admin = administer.get("havePermission", False)
+            if has_admin:
+                print("   Jira admin permission: YES")
+            else:
+                print("   Jira admin permission: NO")
+                print("   (Automation rules may require admin access)")
+
+            # Try the automation endpoint
+            cloud_id = get_cloud_id()
+            print(f"   Cloud ID: {cloud_id}")
+            endpoint = automation_path("rule/summary")
+            auto_response = get("jira", endpoint, params={"limit": 1})
+            rule_count = len(auto_response.get("data", []))
+            print(f"   Automation API: OK (test returned {rule_count} rule(s))")
+        except APIError as e:
+            print(f"   Automation API: FAILED — {e}")
+            print("   (Your token may lack automation access or admin permissions)")
+        except Exception as e:
+            print(f"   WARNING: Could not check Automation API: {e}")
+    else:
+        print("\n5. Automation API: Skipped (Cloud-only feature)")
+
+    # 6. Validate custom field mappings
     defaults = get_jira_defaults()
     if defaults.custom_fields:
-        print("\n5. Validating custom field mappings...")
+        print("\n6. Validating custom field mappings...")
         errors = validate_custom_fields(defaults.custom_fields)
         if errors:
             print("   WARNING: Some custom field mappings are invalid:")
@@ -3129,6 +3649,47 @@ def cmd_collaboration(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_automations(args: argparse.Namespace) -> int:
+    """Handle automations command (Cloud-only)."""
+    try:
+        if args.automations_command == "list":
+            rules = list_automation_rules(
+                project_key=getattr(args, "project", None),
+                state=getattr(args, "state", None),
+                limit=getattr(args, "limit", 100) or 100,
+            )
+
+            if not rules:
+                print("No automation rules found.")
+                return 0
+
+            if args.json:
+                print(format_json(rules))
+            else:
+                parts = [format_automation_summary(r) for r in rules]
+                print(f"Found {len(rules)} automation rule(s).\n")
+                print("\n\n".join(parts))
+
+        elif args.automations_command == "get":
+            rule_config = get_automation_rule(args.uuid)
+
+            if args.json:
+                print(format_json(rule_config))
+            else:
+                print(format_automation_detail(rule_config))
+
+        return 0
+
+    except APIError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        if hasattr(e, "response") and e.response:
+            print(f"Response: {e.response}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
 # ============================================================================
 # MAIN CLI
 # ============================================================================
@@ -3421,6 +3982,42 @@ def main() -> int:
     )
     epics_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    # ========================================================================
+    # AUTOMATIONS COMMAND (Cloud-only)
+    # ========================================================================
+    automations_parser = subparsers.add_parser(
+        "automations",
+        help="List and inspect automation rules (Cloud-only)",
+    )
+    automations_subparsers = automations_parser.add_subparsers(
+        dest="automations_command", required=True
+    )
+
+    # automations list
+    auto_list_parser = automations_subparsers.add_parser(
+        "list", help="List automation rule summaries"
+    )
+    auto_list_parser.add_argument("--project", help="Filter to rules scoped to this project key")
+    auto_list_parser.add_argument(
+        "--state",
+        choices=["ENABLED", "DISABLED"],
+        help="Filter by rule state",
+    )
+    auto_list_parser.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Maximum rules to return (default: 100)",
+    )
+    auto_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # automations get
+    auto_get_parser = automations_subparsers.add_parser(
+        "get", help="Get full details of an automation rule"
+    )
+    auto_get_parser.add_argument("uuid", help="Automation rule UUID")
+    auto_get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # Parse and dispatch
     args = parser.parse_args()
 
@@ -3442,6 +4039,8 @@ def main() -> int:
         return cmd_user(args)
     elif args.command == "collaboration":
         return cmd_collaboration(args)
+    elif args.command == "automations":
+        return cmd_automations(args)
 
     return 1
 

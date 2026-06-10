@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.8.1"
+  version: "0.9.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -414,6 +414,36 @@ $SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
 - `--max-results`: Maximum epics to check (default: 50)
 
 **Note:** This makes N+1 API calls (1 for epics + 1 per epic for children). Use `--max-results` to control cost.
+
+### automations
+
+List and inspect Jira automation rules. Uses the Automation Rule Management API via the gateway path, reusing existing Jira Cloud credentials. **Cloud-only** — Data Center and Server instances will receive a clear error.
+
+```bash
+# List all automation rules
+$SKILL_DIR/scripts/jira.py automations list
+
+# List rules scoped to a specific project
+$SKILL_DIR/scripts/jira.py automations list --project OSPRH
+
+# List only enabled rules
+$SKILL_DIR/scripts/jira.py automations list --state ENABLED
+
+# Get full details of a rule (triggers, conditions, actions)
+$SKILL_DIR/scripts/jira.py automations get <rule-uuid>
+```
+
+**Arguments for `automations list`:**
+- `--project`: Filter to rules scoped to this project key
+- `--state`: Filter by state (`ENABLED` or `DISABLED`)
+- `--limit`: Maximum rules to return (default: 100)
+
+**Arguments for `automations get`:**
+- `uuid` (positional): Automation rule UUID (shown in list output)
+
+The `get` command renders a markdown document describing the rule step by step: metadata, trigger, conditions, actions, branches, and external connections. Component types are translated to human-readable labels (e.g., `jira.issue.event.trigger:created` → "Issue created") and value configurations are summarised inline.
+
+**Note:** The automation API requires the Atlassian Cloud ID, which is fetched automatically from `_edge/tenant_info` and cached for the session.
 
 ## Examples
 

@@ -17,14 +17,21 @@ from skills.jira.scripts.jira import (
     _build_epic_children_jql,
     _deployment_cache,
     _extract_text_from_adf,
+    _format_component,
+    _format_scope_ari,
+    _format_timestamp,
+    _humanise_component_type,
     _make_detection_request,
     _parse_inline,
     _parse_link_args,
     _parse_markdown_to_adf,
+    _summarise_value,
     _truncate,
     add_comment,
     api_path,
+    automation_path,
     clear_cache,
+    cmd_automations,
     cmd_check,
     cmd_collaboration,
     cmd_config,
@@ -44,6 +51,8 @@ from skills.jira.scripts.jira import (
     ensure_field_included,
     extract_contributors,
     find_collaborative_epics,
+    format_automation_detail,
+    format_automation_summary,
     format_collaborative_epics,
     format_comments,
     format_issue,
@@ -52,6 +61,8 @@ from skills.jira.scripts.jira import (
     format_rich_text,
     format_table,
     get_api_version,
+    get_automation_rule,
+    get_cloud_id,
     get_comments,
     get_credential,
     get_credentials,
@@ -62,6 +73,7 @@ from skills.jira.scripts.jira import (
     get_project_defaults,
     get_transitions,
     is_cloud,
+    list_automation_rules,
     list_fields,
     list_status_categories,
     list_statuses,
@@ -1436,8 +1448,22 @@ class TestCommandHandlers:
     @patch("skills.jira.scripts.jira.get_api_version")
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
+    @patch("skills.jira.scripts.jira.get_cloud_id")
+    @patch("skills.jira.scripts.jira.automation_path")
     def test_cmd_check_success(
-        self, mock_post, mock_is_cloud, mock_api_version, mock_detect, mock_creds, capsys
+        self,
+        mock_auto_path,
+        mock_cloud_id,
+        mock_scriptrunner,
+        mock_get,
+        mock_post,
+        mock_is_cloud,
+        mock_api_version,
+        mock_detect,
+        mock_creds,
+        capsys,
     ):
         """Test check command success."""
         mock_creds.return_value = Credentials(
@@ -1449,6 +1475,23 @@ class TestCommandHandlers:
         mock_api_version.return_value = "3"
         mock_is_cloud.return_value = True
         mock_post.return_value = {"issues": []}
+        mock_scriptrunner.return_value = {
+            "available": False,
+            "version": None,
+            "type": "cloud",
+            "enhanced_search": False,
+        }
+        mock_cloud_id.return_value = "cloud-123"
+        mock_auto_path.return_value = "gateway/path"
+
+        def get_side_effect(_service, endpoint, **_kwargs):
+            if "mypermissions" in endpoint:
+                return {"permissions": {"ADMINISTER": {"havePermission": True}}}
+            if "gateway" in endpoint:
+                return {"data": [{"name": "Rule 1"}]}
+            return {}
+
+        mock_get.side_effect = get_side_effect
 
         result = cmd_check()
 
@@ -1456,6 +1499,7 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "All checks passed" in captured.out
         assert "search/jql" in captured.out
+        assert "Automation API: OK" in captured.out
 
     @patch("skills.jira.scripts.jira.get_credentials")
     @patch("skills.jira.scripts.jira.detect_deployment_type")
@@ -4420,3 +4464,703 @@ class TestCmdIssueLinkIntegration:
         assert mock_link.call_count == 2
         mock_link.assert_any_call("DEMO-400", "blocks", "DEMO-1")
         mock_link.assert_any_call("DEMO-400", "Relates", "DEMO-2")
+
+
+# ============================================================================
+# AUTOMATION RULES
+# ============================================================================
+
+
+class TestGetCloudId:
+    """Tests for get_cloud_id function."""
+
+    @patch("skills.jira.scripts.jira.requests.get")
+    @patch("skills.jira.scripts.jira.is_cloud", return_value=True)
+    @patch("skills.jira.scripts.jira.get_credentials")
+    def test_fetches_and_caches_cloud_id(self, mock_creds, _mock_is_cloud, mock_get):
+        """Test successful Cloud ID fetch and caching."""
+        mock_creds.return_value = Credentials(
+            url="https://test.atlassian.net", token="tok", email="a@b.com"
+        )
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_response.json.return_value = {"cloudId": "abc-123"}
+        mock_get.return_value = mock_response
+
+        clear_cache()
+        result = get_cloud_id()
+
+        assert result == "abc-123"
+        mock_get.assert_called_once_with("https://test.atlassian.net/_edge/tenant_info", timeout=10)
+
+        # Second call should use cache
+        mock_get.reset_mock()
+        result2 = get_cloud_id()
+        assert result2 == "abc-123"
+        mock_get.assert_not_called()
+        clear_cache()
+
+    @patch("skills.jira.scripts.jira.is_cloud", return_value=False)
+    def test_raises_on_dc(self, _mock_is_cloud):
+        """Test that DC/Server raises APIError."""
+        with pytest.raises(APIError, match="only available on Jira Cloud"):
+            get_cloud_id()
+
+    @patch("skills.jira.scripts.jira.requests.get")
+    @patch("skills.jira.scripts.jira.is_cloud", return_value=True)
+    @patch("skills.jira.scripts.jira.get_credentials")
+    def test_raises_on_http_error(self, mock_creds, _mock_is_cloud, mock_get):
+        """Test HTTP error raises APIError."""
+        mock_creds.return_value = Credentials(
+            url="https://test.atlassian.net", token="tok", email="a@b.com"
+        )
+        mock_response = Mock()
+        mock_response.ok = False
+        mock_response.status_code = 403
+        mock_response.reason = "Forbidden"
+        mock_response.text = "access denied"
+        mock_get.return_value = mock_response
+
+        clear_cache()
+        with pytest.raises(APIError, match="Failed to fetch Cloud ID"):
+            get_cloud_id()
+        clear_cache()
+
+
+class TestAutomationPath:
+    """Tests for automation_path function."""
+
+    @patch("skills.jira.scripts.jira.get_cloud_id", return_value="cloud-xyz")
+    def test_constructs_gateway_path(self, _mock_cloud_id):
+        """Test correct gateway path construction."""
+        result = automation_path("rule/summary")
+        assert result == "gateway/api/automation/public/jira/cloud-xyz/rest/v1/rule/summary"
+
+    @patch("skills.jira.scripts.jira.get_cloud_id", return_value="cloud-xyz")
+    def test_strips_leading_slash(self, _mock_cloud_id):
+        """Test leading slash is stripped from endpoint."""
+        result = automation_path("/rule/summary")
+        assert result == "gateway/api/automation/public/jira/cloud-xyz/rest/v1/rule/summary"
+
+
+class TestListAutomationRules:
+    """Tests for list_automation_rules function."""
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.automation_path")
+    def test_list_all_rules(self, mock_path, mock_get):
+        """Test listing all rules."""
+        mock_path.return_value = "gateway/api/automation/public/jira/cid/rest/v1/rule/summary"
+        mock_get.return_value = {
+            "data": [
+                {"name": "Rule 1", "state": "ENABLED", "uuid": "u1", "ruleScopeARIs": []},
+                {"name": "Rule 2", "state": "DISABLED", "uuid": "u2", "ruleScopeARIs": []},
+            ],
+            "links": {},
+        }
+
+        rules = list_automation_rules()
+        assert len(rules) == 2
+        assert rules[0]["name"] == "Rule 1"
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.automation_path")
+    def test_filter_by_state(self, mock_path, mock_get):
+        """Test filtering by state."""
+        mock_path.return_value = "gateway/path"
+        mock_get.return_value = {
+            "data": [
+                {"name": "Rule 1", "state": "ENABLED", "uuid": "u1", "ruleScopeARIs": []},
+                {"name": "Rule 2", "state": "DISABLED", "uuid": "u2", "ruleScopeARIs": []},
+            ],
+            "links": {},
+        }
+
+        rules = list_automation_rules(state="ENABLED")
+        assert len(rules) == 1
+        assert rules[0]["name"] == "Rule 1"
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.automation_path")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_filter_by_project(self, mock_api_path, mock_auto_path, mock_get):
+        """Test filtering by project key."""
+        mock_auto_path.return_value = "gateway/path"
+        mock_api_path.return_value = "rest/api/3/project/DEMO"
+
+        def side_effect(_service, endpoint, **_kwargs):
+            if "project/DEMO" in endpoint:
+                return {"id": "10001"}
+            return {
+                "data": [
+                    {
+                        "name": "Rule 1",
+                        "state": "ENABLED",
+                        "uuid": "u1",
+                        "ruleScopeARIs": ["ari:cloud:jira:site:project/10001"],
+                    },
+                    {
+                        "name": "Rule 2",
+                        "state": "ENABLED",
+                        "uuid": "u2",
+                        "ruleScopeARIs": ["ari:cloud:jira:site:project/99999"],
+                    },
+                ],
+                "links": {},
+            }
+
+        mock_get.side_effect = side_effect
+
+        rules = list_automation_rules(project_key="DEMO")
+        assert len(rules) == 1
+        assert rules[0]["name"] == "Rule 1"
+
+
+class TestGetAutomationRule:
+    """Tests for get_automation_rule function."""
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.automation_path")
+    def test_fetches_rule_by_uuid(self, mock_path, mock_get):
+        """Test fetching a single rule by UUID."""
+        mock_path.return_value = "gateway/path/rule/test-uuid"
+        mock_get.return_value = {
+            "rule": {"uuid": "test-uuid", "name": "My Rule"},
+            "connections": [],
+        }
+
+        result = get_automation_rule("test-uuid")
+        assert result["rule"]["name"] == "My Rule"
+        mock_path.assert_called_once_with("rule/test-uuid")
+
+
+class TestFormatAutomationSummary:
+    """Tests for format_automation_summary function."""
+
+    def test_basic_summary(self):
+        """Test basic summary formatting."""
+        rule = {
+            "name": "Auto-assign bugs",
+            "state": "ENABLED",
+            "authorAccountId": "user-123",
+            "labels": ["bugs", "triage"],
+            "uuid": "abc-def",
+            "ruleScopeARIs": ["ari:cloud:jira:site:project/10001"],
+        }
+
+        result = format_automation_summary(rule)
+        assert "### Auto-assign bugs" in result
+        assert "ON (ENABLED)" in result
+        assert "user-123" in result
+        assert "bugs, triage" in result
+        assert "`abc-def`" in result
+
+    def test_disabled_state(self):
+        """Test disabled state shows OFF."""
+        rule = {
+            "name": "Old rule",
+            "state": "DISABLED",
+            "authorAccountId": "user-1",
+            "uuid": "xyz",
+            "ruleScopeARIs": [],
+        }
+
+        result = format_automation_summary(rule)
+        assert "OFF (DISABLED)" in result
+
+
+class TestFormatAutomationDetail:
+    """Tests for format_automation_detail function."""
+
+    def test_full_rule_formatting(self):
+        """Test formatting a complete rule definition."""
+        rule_config = {
+            "rule": {
+                "name": "Assign critical bugs",
+                "description": "Auto-assigns critical bugs to the on-call engineer.",
+                "state": "ENABLED",
+                "authorAccountId": "user-123",
+                "labels": ["triage"],
+                "ruleScopeARIs": ["ari:cloud:jira:site:project/10001"],
+                "created": 1705305600.0,
+                "updated": 1717977600.0,
+                "notifyOnError": "FIRSTERROR",
+                "writeAccessType": "OWNER_ONLY",
+                "canOtherRuleTrigger": True,
+                "collaborators": [],
+                "trigger": {
+                    "type": "jira.issue.event.trigger:created",
+                    "value": '{"issueType": "Bug"}',
+                    "component": "TRIGGER",
+                    "conditions": [
+                        {
+                            "type": "jira.condition.field",
+                            "value": '{"fieldId": "priority", "compareValue": "Critical"}',
+                            "component": "CONDITION",
+                        }
+                    ],
+                },
+                "components": [
+                    {
+                        "type": "jira.issue.assign.action",
+                        "value": '{"accountId": "oncall-user"}',
+                        "component": "ACTION",
+                        "conditions": [],
+                        "children": [],
+                    },
+                    {
+                        "type": "jira.issue.comment.action",
+                        "value": '{"body": "Auto-triaged as critical"}',
+                        "component": "ACTION",
+                        "conditions": [],
+                        "children": [],
+                    },
+                ],
+            },
+            "connections": [],
+        }
+
+        result = format_automation_detail(rule_config)
+        assert "## Assign critical bugs" in result
+        assert "ON (ENABLED)" in result
+        assert "user-123" in result
+        assert "### Trigger" in result
+        assert "Issue created" in result
+        assert "### Actions" in result
+        assert "Assign issue" in result
+        assert "Add comment" in result
+        assert "Auto-triaged as critical" in result
+
+    def test_empty_rule(self):
+        """Test formatting a minimal rule."""
+        rule_config = {"rule": {"name": "Empty", "state": "DISABLED"}, "connections": []}
+
+        result = format_automation_detail(rule_config)
+        assert "## Empty" in result
+        assert "OFF (DISABLED)" in result
+
+
+class TestFormatTimestamp:
+    """Tests for _format_timestamp helper."""
+
+    def test_seconds_timestamp(self):
+        """Test Unix timestamp in seconds."""
+        result = _format_timestamp(1705305600.0)
+        assert "2024-01-15" in result
+
+    def test_milliseconds_timestamp(self):
+        """Test Unix timestamp in milliseconds."""
+        result = _format_timestamp(1705305600000.0)
+        assert "2024-01-15" in result
+
+
+class TestFormatComponent:
+    """Tests for _format_component helper."""
+
+    def test_known_type(self):
+        """Test component with a known type key."""
+        comp = {"type": "jira.issue.event.trigger:created", "value": None}
+        result = _format_component(comp, prefix="**When:**")
+        assert "**When:** Issue created" in result
+
+    def test_value_parsing(self):
+        """Test JSON value is parsed and summarised."""
+        comp = {
+            "type": "jira.condition.jql",
+            "value": '{"jql": "priority = Critical"}',
+        }
+        result = _format_component(comp)
+        assert "JQL condition" in result
+        assert "priority = Critical" in result
+
+    def test_unknown_type_fallback(self):
+        """Test unknown type gets human-readable fallback."""
+        comp = {"type": "com.example.custom.action", "value": None}
+        result = _format_component(comp)
+        assert result  # should not crash
+
+
+class TestHumaniseComponentType:
+    """Tests for _humanise_component_type function."""
+
+    def test_known_types(self):
+        """Test known type mappings."""
+        assert _humanise_component_type("jira.issue.event.trigger:created") == "Issue created"
+        assert _humanise_component_type("jira.issue.create.action") == "Create issue"
+        assert _humanise_component_type("jira.condition.jql") == "JQL condition"
+
+    def test_unknown_type_fallback(self):
+        """Test fallback formatting for unknown types."""
+        result = _humanise_component_type("jira.custom.thing.action:fired")
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+
+class TestSummariseValue:
+    """Tests for _summarise_value function."""
+
+    def test_string_value(self):
+        """Test string passthrough."""
+        assert _summarise_value("hello") == "hello"
+
+    def test_dict_with_jql(self):
+        """Test dict with JQL field."""
+        result = _summarise_value({"jql": "project = DEMO"})
+        assert "project = DEMO" in result
+
+    def test_dict_with_nested_display(self):
+        """Test dict with nested displayName."""
+        result = _summarise_value({"fieldValue": {"displayName": "Critical"}})
+        assert "Critical" in result
+
+    def test_empty_dict_fallback(self):
+        """Test empty dict gets JSON fallback."""
+        result = _summarise_value({"unknownKey": 42})
+        assert "42" in result
+
+
+class TestFormatScopeAri:
+    """Tests for _format_scope_ari function."""
+
+    def test_project_scope(self):
+        """Test project ARI formatting."""
+        result = _format_scope_ari("ari:cloud:jira:site-id:project/10001")
+        assert "Project #10001" in result
+
+    def test_global_scope(self):
+        """Test global scope ARI."""
+        result = _format_scope_ari("ari:cloud:jira:site-id:site")
+        assert "Global (site)" in result
+
+    def test_unknown_scope(self):
+        """Test unknown ARI returns as-is."""
+        result = _format_scope_ari("ari:cloud:jira:site-id:other/thing")
+        assert result == "ari:cloud:jira:site-id:other/thing"
+
+
+class TestCmdAutomations:
+    """Tests for cmd_automations handler."""
+
+    @patch("skills.jira.scripts.jira.list_automation_rules")
+    def test_list_rules(self, mock_list, capsys):
+        """Test automations list command."""
+        mock_list.return_value = [
+            {
+                "name": "Rule 1",
+                "state": "ENABLED",
+                "authorAccountId": "user-1",
+                "uuid": "u1",
+                "ruleScopeARIs": [],
+            }
+        ]
+
+        args = argparse.Namespace(
+            automations_command="list",
+            project=None,
+            state=None,
+            limit=100,
+            json=False,
+        )
+
+        result = cmd_automations(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Rule 1" in captured.out
+        assert "1 automation rule(s)" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_automation_rules")
+    def test_list_empty(self, mock_list, capsys):
+        """Test automations list with no results."""
+        mock_list.return_value = []
+
+        args = argparse.Namespace(
+            automations_command="list",
+            project=None,
+            state=None,
+            limit=100,
+            json=False,
+        )
+
+        result = cmd_automations(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "No automation rules found" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_automation_rule")
+    def test_get_rule(self, mock_get, capsys):
+        """Test automations get command."""
+        mock_get.return_value = {
+            "rule": {
+                "name": "Test Rule",
+                "state": "ENABLED",
+                "authorAccountId": "user-1",
+                "trigger": {
+                    "type": "jira.issue.event.trigger:created",
+                    "component": "TRIGGER",
+                    "conditions": [],
+                },
+                "components": [],
+            },
+            "connections": [],
+        }
+
+        args = argparse.Namespace(
+            automations_command="get",
+            uuid="test-uuid",
+            json=False,
+        )
+
+        result = cmd_automations(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Test Rule" in captured.out
+        assert "Issue created" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_automation_rules")
+    def test_list_error(self, mock_list, capsys):
+        """Test automations list with API error."""
+        mock_list.side_effect = APIError("Automation rules are only available on Jira Cloud")
+
+        args = argparse.Namespace(
+            automations_command="list",
+            project=None,
+            state=None,
+            limit=100,
+            json=False,
+        )
+
+        result = cmd_automations(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "only available on Jira Cloud" in captured.err
+
+
+class TestListAutomationRulesPagination:
+    """Tests for list_automation_rules pagination."""
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.automation_path")
+    def test_pagination(self, mock_path, mock_get):
+        """Test automatic pagination through results."""
+        mock_path.return_value = "gateway/path"
+        mock_get.side_effect = [
+            {
+                "data": [{"name": "Rule 1", "state": "ENABLED", "uuid": "u1", "ruleScopeARIs": []}],
+                "links": {"next": "?cursor=abc123&limit=100"},
+            },
+            {
+                "data": [{"name": "Rule 2", "state": "ENABLED", "uuid": "u2", "ruleScopeARIs": []}],
+                "links": {},
+            },
+        ]
+
+        rules = list_automation_rules()
+        assert len(rules) == 2
+        assert rules[0]["name"] == "Rule 1"
+        assert rules[1]["name"] == "Rule 2"
+
+
+class TestFormatAutomationDetailComplex:
+    """Tests for format_automation_detail with complex rule structures."""
+
+    def test_branches_and_connections(self):
+        """Test formatting rules with branches and connections."""
+        rule_config = {
+            "rule": {
+                "name": "Complex Rule",
+                "state": "ENABLED",
+                "authorAccountId": "user-1",
+                "trigger": {
+                    "type": "jira.issue.event.trigger:updated",
+                    "component": "TRIGGER",
+                    "conditions": [],
+                },
+                "components": [
+                    {
+                        "type": "jira.condition.jql",
+                        "value": '{"jql": "priority = High"}',
+                        "component": "CONDITION",
+                        "conditions": [
+                            {
+                                "type": "jira.condition.field",
+                                "value": '{"fieldId": "status"}',
+                                "component": "CONDITION",
+                            }
+                        ],
+                    },
+                    {
+                        "type": "jira.branch.action",
+                        "value": None,
+                        "component": "BRANCH",
+                        "children": [
+                            {
+                                "type": "jira.issue.assign.action",
+                                "value": '{"accountId": "user-2"}',
+                                "component": "ACTION",
+                            }
+                        ],
+                        "conditions": [
+                            {
+                                "type": "jira.condition.field",
+                                "value": '{"fieldId": "issuetype"}',
+                                "component": "CONDITION",
+                            }
+                        ],
+                    },
+                    {
+                        "type": "custom.unknown.component",
+                        "value": None,
+                        "component": "CUSTOM",
+                    },
+                ],
+            },
+            "connections": [
+                {
+                    "connectionTargetKey": "com.atlassian.confluence.native",
+                    "authType": "OAUTH_3LO",
+                }
+            ],
+        }
+
+        result = format_automation_detail(rule_config)
+        assert "### Conditions" in result
+        assert "### Branches" in result
+        assert "### Connections" in result
+        assert "### Other Components" in result
+        assert "confluence.native" in result
+        assert "OAUTH_3LO" in result
+        assert "**And:**" in result
+
+    def test_actions_with_conditions_and_children(self):
+        """Test actions that have nested conditions and children."""
+        rule_config = {
+            "rule": {
+                "name": "Nested Actions",
+                "state": "ENABLED",
+                "authorAccountId": "user-1",
+                "components": [
+                    {
+                        "type": "jira.issue.edit.action",
+                        "value": '{"summary": "Updated"}',
+                        "component": "ACTION",
+                        "conditions": [
+                            {
+                                "type": "jira.condition.field",
+                                "value": '{"fieldId": "priority"}',
+                                "component": "CONDITION",
+                            }
+                        ],
+                        "children": [
+                            {
+                                "type": "jira.issue.comment.action",
+                                "value": '{"body": "Sub-action"}',
+                                "component": "ACTION",
+                            }
+                        ],
+                    },
+                ],
+            },
+            "connections": [],
+        }
+
+        result = format_automation_detail(rule_config)
+        assert "### Actions" in result
+        assert "Edit issue" in result
+        assert "**If:**" in result
+        assert "**→**" in result
+
+
+class TestSummariseValueEdgeCases:
+    """Tests for _summarise_value edge cases."""
+
+    def test_list_value(self):
+        """Test list input."""
+        result = _summarise_value(["a", "b", "c"])
+        assert "a" in result
+        assert "b" in result
+
+    def test_non_dict_non_string(self):
+        """Test numeric input."""
+        result = _summarise_value(42)
+        assert "42" in result
+
+    def test_dict_with_nested_no_display(self):
+        """Test dict with nested object lacking displayName."""
+        result = _summarise_value({"value": {"custom": "data"}})
+        assert "custom" in result
+
+    def test_dict_with_list_field(self):
+        """Test dict with list-typed value field."""
+        result = _summarise_value({"value": [{"displayName": "A"}, {"name": "B"}]})
+        assert "A" in result
+
+
+class TestGetCloudIdNoUrl:
+    """Test get_cloud_id when no URL is configured."""
+
+    @patch("skills.jira.scripts.jira.is_cloud", return_value=True)
+    @patch("skills.jira.scripts.jira.get_credentials")
+    def test_raises_no_url(self, mock_creds, _mock_is_cloud):
+        """Test error when no URL is configured."""
+        mock_creds.return_value = Credentials()
+
+        clear_cache()
+        with pytest.raises(APIError, match="No Jira URL configured"):
+            get_cloud_id()
+
+    @patch("skills.jira.scripts.jira.requests.get")
+    @patch("skills.jira.scripts.jira.is_cloud", return_value=True)
+    @patch("skills.jira.scripts.jira.get_credentials")
+    def test_raises_no_cloud_id_in_response(self, mock_creds, _mock_is_cloud, mock_get):
+        """Test error when tenant_info returns no cloudId."""
+        mock_creds.return_value = Credentials(
+            url="https://test.atlassian.net", token="tok", email="a@b.com"
+        )
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_response.json.return_value = {}
+        mock_get.return_value = mock_response
+
+        clear_cache()
+        with pytest.raises(APIError, match="Could not determine Cloud ID"):
+            get_cloud_id()
+        clear_cache()
+
+
+class TestCmdAutomationsGet:
+    """Tests for cmd_automations get with JSON output."""
+
+    @patch("skills.jira.scripts.jira.get_automation_rule")
+    @patch("skills.jira.scripts.jira.format_json")
+    def test_get_json_output(self, mock_format_json, mock_get, capsys):
+        """Test automations get with JSON output."""
+        mock_get.return_value = {"rule": {"name": "R"}, "connections": []}
+        mock_format_json.return_value = '{"rule": {"name": "R"}}'
+
+        args = argparse.Namespace(
+            automations_command="get",
+            uuid="test-uuid",
+            json=True,
+        )
+
+        result = cmd_automations(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "R" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_automation_rule")
+    def test_get_error(self, mock_get, capsys):
+        """Test automations get with error and response body."""
+        err = APIError("Not found", status_code=404, response="rule not found")
+        mock_get.side_effect = err
+
+        args = argparse.Namespace(
+            automations_command="get",
+            uuid="bad-uuid",
+            json=False,
+        )
+
+        result = cmd_automations(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Not found" in captured.err
