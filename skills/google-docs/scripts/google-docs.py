@@ -1456,7 +1456,10 @@ def cmd_formatting_apply(args):
 
 
 def extract_frontmatter(text: str) -> tuple[str, dict[str, str]]:
-    """Extract frontmatter metadata from markdown text.
+    """Extract and strip frontmatter metadata from markdown text.
+
+    Frontmatter is removed from the returned body so it does not appear
+    in the imported Google Doc content.
 
     Supports both ``---`` delimited YAML frontmatter and the Python-Markdown
     meta extension format (``Key: Value`` lines at the start).

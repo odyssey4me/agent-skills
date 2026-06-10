@@ -3,7 +3,7 @@ name: google-docs
 description: Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.
 metadata:
   author: odyssey4me
-  version: "0.5.0"
+  version: "0.5.1"
   category: google-workspace
   tags: "documents, editing"
   complexity: standard
@@ -222,7 +222,13 @@ $SKILL_DIR/scripts/google-docs.py documents import ./updated.md --document-id 1a
 $SKILL_DIR/scripts/google-docs.py documents import ./raw.md --no-format
 ```
 
-**Post-import formatting:** By default, the import applies 1.15x line spacing and 8pt space below paragraphs to the Normal text style. These can be overridden via frontmatter:
+**Frontmatter:** YAML frontmatter (`---` delimited) is stripped from the markdown before import — it is not included in the Google Doc content. Supported frontmatter fields:
+
+- `title` — Document title (overridden by `--title` flag)
+- `folder_id` — Parent folder ID (overridden by `--folder-id` flag)
+- `line_spacing` — Line spacing percentage (default: 115)
+- `space_below` — Space below paragraphs in pt (default: 8)
+- `pageless` — Set to `true` for pageless mode
 
 ```yaml
 ---
