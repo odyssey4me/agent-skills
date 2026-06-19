@@ -19,11 +19,9 @@ from skills.confluence.scripts.confluence import (
     get_credential,
     load_config,
     markdown_to_adf,
-    markdown_to_storage,
     merge_cql_with_scope,
     save_config,
     set_credential,
-    storage_to_markdown,
 )
 
 
@@ -163,22 +161,6 @@ class TestDefaults:
 class TestMarkdownConversion:
     """Tests for markdown/storage/ADF conversion."""
 
-    def test_markdown_to_storage_basic(self):
-        """Test basic markdown to storage format conversion."""
-        markdown = "# Heading\n\nSome **bold** text."
-        storage = markdown_to_storage(markdown)
-
-        assert "<h1>Heading</h1>" in storage
-        assert "<strong>bold</strong>" in storage
-
-    def test_storage_to_markdown_basic(self):
-        """Test basic storage format to markdown conversion."""
-        storage = "<h1>Heading</h1><p>Some <strong>bold</strong> text.</p>"
-        markdown = storage_to_markdown(storage)
-
-        assert "# Heading" in markdown
-        assert "**bold**" in markdown
-
     def test_markdown_to_adf_heading(self):
         """Test markdown to ADF format conversion."""
         markdown = "# Heading 1\n\n## Heading 2"
@@ -207,12 +189,6 @@ class TestMarkdownConversion:
         }
         markdown = adf_to_markdown(adf)
         assert "# Heading 1" in markdown
-
-    def test_markdown_to_storage_list(self):
-        """Test markdown list to storage conversion."""
-        markdown = "- Item 1\n- Item 2\n- Item 3"
-        storage = markdown_to_storage(markdown)
-        assert "<ul>" in storage or "<li>" in storage
 
     def test_markdown_to_adf_paragraph(self):
         """Test markdown paragraph to ADF conversion."""
@@ -319,16 +295,6 @@ class TestFormatting:
 class TestUtilityFunctions:
     """Tests for utility functions."""
 
-    def test_markdown_conversion_roundtrip(self):
-        """Test markdown -> storage -> markdown conversion."""
-        original = "# Heading\n\nSome **bold** text with a [link](https://example.com)."
-        storage = markdown_to_storage(original)
-        converted = storage_to_markdown(storage)
-
-        # Check key elements are preserved
-        assert "Heading" in converted
-        assert "bold" in converted or "<strong>bold</strong>" in storage
-
     def test_adf_conversion_roundtrip(self):
         """Test markdown -> ADF -> markdown conversion."""
         original = "# Heading\n\nParagraph text."
@@ -401,59 +367,6 @@ class TestCredentialRetrieval:
         assert creds.token == "config-token"
 
 
-class TestDeploymentDetection:
-    """Tests for deployment type detection."""
-
-    @patch("skills.confluence.scripts.confluence._make_detection_request")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_detect_cloud_deployment(self, mock_creds, mock_request):
-        """Test detecting Confluence Cloud."""
-        from skills.confluence.scripts.confluence import clear_cache, detect_deployment_type
-
-        mock_creds.return_value = Credentials(url="https://example.atlassian.net", token="test")
-        mock_request.return_value = {
-            "baseUrl": "https://example.atlassian.net",
-            "deploymentType": "Cloud",
-        }
-        clear_cache()
-
-        deployment = detect_deployment_type(force_refresh=True)
-        assert deployment.lower() == "cloud"
-
-    @patch("skills.confluence.scripts.confluence._make_detection_request")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_detect_server_deployment(self, mock_creds, mock_request):
-        """Test detecting Confluence Server."""
-        from skills.confluence.scripts.confluence import clear_cache, detect_deployment_type
-
-        mock_creds.return_value = Credentials(url="https://example.com/confluence", token="test")
-        mock_request.return_value = {
-            "baseUrl": "https://example.com/confluence",
-            "deploymentType": "Server",
-        }
-        clear_cache()
-
-        deployment = detect_deployment_type(force_refresh=True)
-        assert deployment.lower() == "server"
-
-    @patch("skills.confluence.scripts.confluence._make_detection_request")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_detect_datacenter_deployment(self, mock_creds, mock_request):
-        """Test detecting Confluence Data Center."""
-        from skills.confluence.scripts.confluence import clear_cache, detect_deployment_type
-
-        mock_creds.return_value = Credentials(url="https://example.com/confluence", token="test")
-        mock_request.return_value = {
-            "baseUrl": "https://example.com/confluence",
-            "deploymentType": "Data Center",
-        }
-        clear_cache()
-
-        deployment = detect_deployment_type(force_refresh=True)
-        # Confluence treats Data Center same as Server
-        assert deployment.lower() in ["datacenter", "data center", "server"]
-
-
 class TestAPIFunctions:
     """Tests for API wrapper functions."""
 
@@ -513,14 +426,12 @@ class TestAPIFunctions:
         assert page["title"] == "Test Page"
 
     @patch("skills.confluence.scripts.confluence.post")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
     @patch("skills.confluence.scripts.confluence.get_api_base")
-    def test_create_page_cloud(self, mock_get_api_base, mock_is_cloud, mock_post):
+    def test_create_page_cloud(self, mock_get_api_base, mock_post):
         """Test creating page on Cloud."""
         from skills.confluence.scripts.confluence import create_page
 
         mock_get_api_base.return_value = "https://example.atlassian.net/wiki"
-        mock_is_cloud.return_value = True
         mock_post.return_value = {
             "id": "789",
             "title": "New Page",
@@ -533,14 +444,12 @@ class TestAPIFunctions:
 
     @patch("skills.confluence.scripts.confluence.put")
     @patch("skills.confluence.scripts.confluence.get_page")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
     @patch("skills.confluence.scripts.confluence.get_api_base")
-    def test_update_page(self, mock_get_api_base, mock_is_cloud, mock_get_page, mock_put):
+    def test_update_page(self, mock_get_api_base, mock_get_page, mock_put):
         """Test updating a page."""
         from skills.confluence.scripts.confluence import update_page
 
         mock_get_api_base.return_value = "https://example.atlassian.net/wiki"
-        mock_is_cloud.return_value = True
         mock_get_page.return_value = {
             "id": "123",
             "title": "Old Title",
@@ -660,18 +569,11 @@ class TestFormatFunctions:
         assert "- **Page ID:** 1" in result
         assert "- **Page ID:** 2" in result
 
-    def test_format_content_markdown_to_storage(self):
-        """Test format_content conversion."""
+    def test_format_content_markdown_to_adf(self):
+        """Test format_content converts markdown to ADF."""
         from skills.confluence.scripts.confluence import format_content
 
-        result = format_content("# Heading", input_format="markdown", output_format="storage")
-        assert "Heading" in str(result)
-
-    def test_format_content_markdown_to_editor(self):
-        """Test format_content conversion to editor format."""
-        from skills.confluence.scripts.confluence import format_content
-
-        result = format_content("# Heading", input_format="markdown", output_format="editor")
+        result = format_content("# Heading", input_format="markdown")
         assert isinstance(result, dict)
         assert result.get("type") == "doc"
 
@@ -717,86 +619,27 @@ class TestGetConfluenceDefaults:
 class TestAPIPathAndBase:
     """Tests for API path generation."""
 
-    @patch("skills.confluence.scripts.confluence._make_detection_request")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_get_api_base_cloud(self, mock_creds, mock_request):
-        """Test API base for Cloud."""
-        from skills.confluence.scripts.confluence import clear_cache, get_api_base
-
-        mock_creds.return_value = Credentials(url="https://example.atlassian.net", token="test")
-        mock_request.return_value = {
-            "baseUrl": "https://example.atlassian.net",
-            "deploymentType": "Cloud",
-        }
-        clear_cache()
+    def test_get_api_base(self):
+        """Test API base always returns Cloud path."""
+        from skills.confluence.scripts.confluence import get_api_base
 
         base = get_api_base()
         assert base == "/wiki/rest/api"
 
-    @patch("skills.confluence.scripts.confluence._make_detection_request")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_get_api_base_server(self, mock_creds, mock_request):
-        """Test API base for Server."""
-        from skills.confluence.scripts.confluence import clear_cache, get_api_base
-
-        mock_creds.return_value = Credentials(url="https://example.com/confluence", token="test")
-        mock_request.return_value = {
-            "baseUrl": "https://example.com/confluence",
-            "deploymentType": "Server",
-        }
-        clear_cache()
-
-        base = get_api_base()
-        assert base == "/rest/api"
-
-    @patch("skills.confluence.scripts.confluence.get_api_base")
-    def test_api_path(self, mock_get_api_base):
+    def test_api_path(self):
         """Test API path generation."""
         from skills.confluence.scripts.confluence import api_path
 
-        mock_get_api_base.return_value = "https://example.atlassian.net/wiki"
-
-        path = api_path("/rest/api/content")
-        assert path == "https://example.atlassian.net/wiki/rest/api/content"
-
-    @patch("skills.confluence.scripts.confluence._make_detection_request")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_is_cloud_true(self, mock_creds, mock_request):
-        """Test is_cloud returns True for Cloud."""
-        from skills.confluence.scripts.confluence import clear_cache, is_cloud
-
-        mock_creds.return_value = Credentials(url="https://example.atlassian.net", token="test")
-        mock_request.return_value = {
-            "baseUrl": "https://example.atlassian.net",
-            "deploymentType": "Cloud",
-        }
-        clear_cache()
-
-        assert is_cloud() is True
-
-    @patch("skills.confluence.scripts.confluence._make_detection_request")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_is_cloud_false(self, mock_creds, mock_request):
-        """Test is_cloud returns False for Server."""
-        from skills.confluence.scripts.confluence import clear_cache, is_cloud
-
-        mock_creds.return_value = Credentials(url="https://example.com/confluence", token="test")
-        mock_request.return_value = {
-            "baseUrl": "https://example.com/confluence",
-            "deploymentType": "Server",
-        }
-        clear_cache()
-
-        assert is_cloud() is False
+        path = api_path("content")
+        assert path == "/wiki/rest/api/content"
 
 
 class TestCommandHandlers:
     """Tests for CLI command handlers."""
 
     @patch("skills.confluence.scripts.confluence.get_credentials")
-    @patch("skills.confluence.scripts.confluence.detect_deployment_type")
     @patch("skills.confluence.scripts.confluence.get")
-    def test_cmd_check_success(self, mock_get, mock_detect, mock_creds):
+    def test_cmd_check_success(self, mock_get, mock_creds):
         """Test successful check command."""
 
         from skills.confluence.scripts.confluence import cmd_check
@@ -804,7 +647,6 @@ class TestCommandHandlers:
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net", token="test123", email="test@example.com"
         )
-        mock_detect.return_value = "Cloud"
         mock_get.return_value = {"results": []}
 
         result = cmd_check()
@@ -1455,69 +1297,6 @@ class TestCommandHandlers:
 class TestMarkdownEdgeCases:
     """Tests for markdown conversion edge cases."""
 
-    def test_markdown_to_storage_ordered_list(self):
-        """Test ordered list conversion."""
-        from skills.confluence.scripts.confluence import markdown_to_storage
-
-        markdown = "1. First\n2. Second\n3. Third"
-        storage = markdown_to_storage(markdown)
-        assert "<ol>" in storage
-        assert "<li>First</li>" in storage
-        assert "<li>Second</li>" in storage
-
-    def test_markdown_to_storage_mixed_lists(self):
-        """Test mixed ordered and unordered lists."""
-        from skills.confluence.scripts.confluence import markdown_to_storage
-
-        markdown = "- Bullet\n\nSome text\n\n1. Number"
-        storage = markdown_to_storage(markdown)
-        assert "<ul>" in storage
-        assert "<ol>" in storage
-
-    def test_markdown_to_storage_code_with_language(self):
-        """Test code block with language."""
-        from skills.confluence.scripts.confluence import markdown_to_storage
-
-        markdown = "```python\nprint('hello')\n```"
-        storage = markdown_to_storage(markdown)
-        assert "python" in storage
-        assert "print" in storage
-
-    def test_markdown_to_storage_code_no_language(self):
-        """Test code block without language."""
-        from skills.confluence.scripts.confluence import markdown_to_storage
-
-        markdown = "```\ncode here\n```"
-        storage = markdown_to_storage(markdown)
-        assert "<pre>" in storage or "<code>" in storage
-
-    def test_markdown_to_storage_nested_formatting(self):
-        """Test nested formatting."""
-        from skills.confluence.scripts.confluence import markdown_to_storage
-
-        markdown = "**bold with *italic* inside**"
-        storage = markdown_to_storage(markdown)
-        assert "<strong>" in storage
-        assert "<em>" in storage
-
-    def test_storage_to_markdown_ordered_list(self):
-        """Test ordered list from storage."""
-        from skills.confluence.scripts.confluence import storage_to_markdown
-
-        storage = "<ol><li>First</li><li>Second</li></ol>"
-        markdown = storage_to_markdown(storage)
-        assert "1. First" in markdown
-        assert "2. Second" in markdown
-
-    def test_storage_to_markdown_code_macro_with_language(self):
-        """Test code macro with language."""
-        from skills.confluence.scripts.confluence import storage_to_markdown
-
-        storage = '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">python</ac:parameter><ac:plain-text-body><![CDATA[print("hi")]]></ac:plain-text-body></ac:structured-macro>'
-        markdown = storage_to_markdown(storage)
-        assert "```python" in markdown
-        assert 'print("hi")' in markdown
-
     def test_adf_to_markdown_ordered_list(self):
         """Test ordered list from ADF."""
         from skills.confluence.scripts.confluence import adf_to_markdown
@@ -1590,15 +1369,6 @@ class TestMarkdownEdgeCases:
         markdown = adf_to_markdown(adf)
         assert markdown == ""
 
-    def test_format_content_storage_to_editor(self):
-        """Test storage to editor conversion."""
-        from skills.confluence.scripts.confluence import format_content
-
-        storage = "<p>Test content</p>"
-        result = format_content(storage, input_format="storage", output_format="editor")
-        assert isinstance(result, dict)
-        assert result.get("type") == "doc"
-
     def test_markdown_to_adf_bullet_list(self):
         """Test bullet list to ADF."""
         from skills.confluence.scripts.confluence import markdown_to_adf
@@ -1642,15 +1412,13 @@ class TestHTTPWrappers:
 
     @patch("skills.confluence.scripts.confluence.get_credentials")
     @patch("skills.confluence.scripts.confluence.requests.request")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
-    def test_make_request_success(self, mock_is_cloud, mock_request, mock_creds):
+    def test_make_request_success(self, mock_request, mock_creds):
         """Test successful HTTP request."""
         from skills.confluence.scripts.confluence import make_request
 
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net", token="test123", email="test@example.com"
         )
-        mock_is_cloud.return_value = True
         mock_response = Mock()
         mock_response.ok = True
         mock_response.status_code = 200
@@ -1672,15 +1440,13 @@ class TestHTTPWrappers:
 
     @patch("skills.confluence.scripts.confluence.get_credentials")
     @patch("skills.confluence.scripts.confluence.requests.request")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
-    def test_make_request_404_error(self, mock_is_cloud, mock_request, mock_creds):
+    def test_make_request_404_error(self, mock_request, mock_creds):
         """Test request with 404 error."""
         from skills.confluence.scripts.confluence import APIError, make_request
 
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net", token="test123", email="test@example.com"
         )
-        mock_is_cloud.return_value = True
         mock_response = Mock()
         mock_response.ok = False
         mock_response.status_code = 404
@@ -1694,15 +1460,13 @@ class TestHTTPWrappers:
 
     @patch("skills.confluence.scripts.confluence.get_credentials")
     @patch("skills.confluence.scripts.confluence.requests.request")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
-    def test_make_request_204_no_content(self, mock_is_cloud, mock_request, mock_creds):
+    def test_make_request_204_no_content(self, mock_request, mock_creds):
         """Test request with 204 No Content."""
         from skills.confluence.scripts.confluence import make_request
 
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net", token="test123", email="test@example.com"
         )
-        mock_is_cloud.return_value = True
         mock_response = Mock()
         mock_response.ok = True
         mock_response.status_code = 204
@@ -1710,51 +1474,6 @@ class TestHTTPWrappers:
 
         result = make_request("confluence", "DELETE", "/rest/api/content/123")
         assert result == {}
-
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    @patch("skills.confluence.scripts.confluence.requests.request")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
-    def test_make_request_bearer_token_server(self, mock_is_cloud, mock_request, mock_creds):
-        """Test request with bearer token for server."""
-        from skills.confluence.scripts.confluence import make_request
-
-        mock_creds.return_value = Credentials(url="https://example.com/confluence", token="test123")
-        mock_is_cloud.return_value = False
-        mock_response = Mock()
-        mock_response.ok = True
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"result": "success"}
-        mock_request.return_value = mock_response
-
-        result = make_request("confluence", "GET", "/rest/api/space")
-        assert result == {"result": "success"}
-        # Verify Bearer token was used
-        call_kwargs = mock_request.call_args[1]
-        assert "Authorization" in call_kwargs["headers"]
-        assert call_kwargs["headers"]["Authorization"] == "Bearer test123"
-
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    @patch("skills.confluence.scripts.confluence.requests.request")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
-    def test_make_request_basic_auth_server(self, mock_is_cloud, mock_request, mock_creds):
-        """Test request with username/password for server."""
-        from skills.confluence.scripts.confluence import make_request
-
-        mock_creds.return_value = Credentials(
-            url="https://example.com/confluence", username="user", password="pass"
-        )
-        mock_is_cloud.return_value = False
-        mock_response = Mock()
-        mock_response.ok = True
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"result": "success"}
-        mock_request.return_value = mock_response
-
-        result = make_request("confluence", "GET", "/rest/api/space")
-        assert result == {"result": "success"}
-        # Verify basic auth was used
-        call_kwargs = mock_request.call_args[1]
-        assert call_kwargs["auth"] == ("user", "pass")
 
 
 class TestFormatPageVariations:
@@ -1858,150 +1577,6 @@ class TestFormatPageVariations:
         assert '"storage"' in result
 
 
-class TestDeploymentDetectionDetails:
-    """Tests for deployment detection internals."""
-
-    @patch("skills.confluence.scripts.confluence.requests.get")
-    def test_make_detection_request_unauthenticated_success(self, mock_get):
-        """Test detection request succeeds without auth."""
-        from skills.confluence.scripts.confluence import _make_detection_request
-
-        mock_response = Mock()
-        mock_response.ok = True
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"deploymentType": "Cloud"}
-        mock_get.return_value = mock_response
-
-        result = _make_detection_request("https://example.atlassian.net", "/rest/api/space")
-        assert result == {"deploymentType": "Cloud"}
-
-    @patch("skills.confluence.scripts.confluence.requests.get")
-    def test_make_detection_request_requires_auth(self, mock_get):
-        """Test detection request falls back to auth."""
-        from skills.confluence.scripts.confluence import _make_detection_request
-
-        # First call returns 401, second call with auth succeeds
-        unauth_response = Mock()
-        unauth_response.ok = False
-        unauth_response.status_code = 401
-
-        auth_response = Mock()
-        auth_response.ok = True
-        auth_response.status_code = 200
-        auth_response.json.return_value = {"deploymentType": "Server"}
-
-        mock_get.side_effect = [unauth_response, auth_response]
-
-        result = _make_detection_request(
-            "https://example.com/confluence",
-            "/rest/api/space",
-            username="user",
-            password="pass",
-        )
-        assert result == {"deploymentType": "Server"}
-
-    @patch("skills.confluence.scripts.confluence.requests.get")
-    @patch("skills.confluence.scripts.confluence.time.sleep")
-    def test_make_detection_request_rate_limit_with_retry_after(self, mock_sleep, mock_get):
-        """Test detection request handles rate limit with Retry-After header."""
-        from skills.confluence.scripts.confluence import _make_detection_request
-
-        # First call returns 429 with Retry-After, second succeeds
-        rate_limit_response = Mock()
-        rate_limit_response.ok = False
-        rate_limit_response.status_code = 429
-        rate_limit_response.headers = {"Retry-After": "2"}
-
-        success_response = Mock()
-        success_response.ok = True
-        success_response.status_code = 200
-        success_response.json.return_value = {"deploymentType": "Cloud"}
-
-        mock_get.side_effect = [rate_limit_response, success_response]
-
-        result = _make_detection_request("https://example.atlassian.net", "/rest/api/space")
-        assert result == {"deploymentType": "Cloud"}
-        mock_sleep.assert_called_once_with(2.0)
-
-    @patch("skills.confluence.scripts.confluence.requests.get")
-    @patch("skills.confluence.scripts.confluence.time.sleep")
-    def test_make_detection_request_rate_limit_max_retries(self, _mock_sleep, mock_get):
-        """Test detection request fails after max retries."""
-        from skills.confluence.scripts.confluence import (
-            ConfluenceDetectionError,
-            _make_detection_request,
-        )
-
-        rate_limit_response = Mock()
-        rate_limit_response.ok = False
-        rate_limit_response.status_code = 429
-        rate_limit_response.headers = {}
-
-        mock_get.return_value = rate_limit_response
-
-        with pytest.raises(ConfluenceDetectionError):
-            _make_detection_request("https://example.atlassian.net", "/rest/api/space")
-
-    @patch("skills.confluence.scripts.confluence.requests.get")
-    def test_make_detection_request_network_error(self, mock_get):
-        """Test detection request handles network error."""
-        import requests
-
-        from skills.confluence.scripts.confluence import (
-            ConfluenceDetectionError,
-            _make_detection_request,
-        )
-
-        mock_get.side_effect = requests.RequestException("Network error")
-
-        with pytest.raises(ConfluenceDetectionError):
-            _make_detection_request("https://example.atlassian.net", "/rest/api/space")
-
-    @patch("skills.confluence.scripts.confluence._make_detection_request")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_detect_deployment_type_cloud_url_fails_tries_server(self, mock_creds, mock_request):
-        """Test detection tries server API if cloud fails."""
-        from skills.confluence.scripts.confluence import (
-            ConfluenceDetectionError,
-            clear_cache,
-            detect_deployment_type,
-        )
-
-        mock_creds.return_value = Credentials(url="https://example.atlassian.net", token="test")
-
-        # First request (cloud API) fails, second request (server API) succeeds
-        mock_request.side_effect = [
-            ConfluenceDetectionError("Failed"),
-            {"deploymentType": "Server"},
-        ]
-
-        clear_cache()
-        result = detect_deployment_type()
-        assert result == "Server"
-
-    @patch("skills.confluence.scripts.confluence._make_detection_request")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_detect_deployment_type_server_url_fails_tries_cloud(self, mock_creds, mock_request):
-        """Test detection tries cloud API if server fails."""
-        from skills.confluence.scripts.confluence import (
-            ConfluenceDetectionError,
-            clear_cache,
-            detect_deployment_type,
-        )
-
-        mock_creds.return_value = Credentials(url="https://example.com/confluence", token="test")
-
-        # First request (server API) fails, second request (cloud API) succeeds
-        mock_request.side_effect = [
-            ConfluenceDetectionError("Failed"),
-            {"deploymentType": "Cloud"},
-        ]
-
-        clear_cache()
-        result = detect_deployment_type()
-        assert result == "Cloud"
-
-
 class TestAdditionalCoverage:
     """Additional tests to push coverage over 80%."""
 
@@ -2011,49 +1586,6 @@ class TestAdditionalCoverage:
 
         result = format_table([], ["col1", "col2"])
         assert result == "No data"
-
-    def test_storage_to_markdown_simple_code_block(self):
-        """Test simple code block without CDATA."""
-        from skills.confluence.scripts.confluence import storage_to_markdown
-
-        storage = "<pre><code>test code</code></pre>"
-        markdown = storage_to_markdown(storage)
-        assert "```" in markdown
-        assert "test code" in markdown
-
-    def test_storage_to_markdown_code_macro_no_language(self):
-        """Test code macro without language parameter."""
-        from skills.confluence.scripts.confluence import storage_to_markdown
-
-        storage = (
-            '<ac:structured-macro ac:name="code">'
-            "<ac:plain-text-body><![CDATA[hello()]]></ac:plain-text-body>"
-            "</ac:structured-macro>"
-        )
-        markdown = storage_to_markdown(storage)
-        assert "```" in markdown
-        assert "hello()" in markdown
-
-    def test_storage_to_markdown_ac_link(self):
-        """Test ac:link elements converted to markdown links."""
-        from skills.confluence.scripts.confluence import storage_to_markdown
-
-        storage = (
-            '<ac:link><ri:content-page ri:content-id="456" />'
-            "<ac:plain-text-link-body><![CDATA[My Page]]>"
-            "</ac:plain-text-link-body></ac:link>"
-        )
-        markdown = storage_to_markdown(storage)
-        assert "My Page" in markdown
-        assert "page:456" in markdown
-
-    def test_storage_to_markdown_ac_link_no_text(self):
-        """Test ac:link without link text body."""
-        from skills.confluence.scripts.confluence import storage_to_markdown
-
-        storage = '<ac:link><ri:content-page ri:content-id="789" /></ac:link>'
-        markdown = storage_to_markdown(storage)
-        assert "789" in markdown
 
     def test_adf_content_to_text_with_all_marks(self):
         """Test ADF content with all mark types."""
@@ -2079,14 +1611,11 @@ class TestAdditionalCoverage:
         assert "`code`" in result
         assert "[link](https://example.com)" in result
 
-    @patch("skills.confluence.scripts.confluence.is_cloud")
-    def test_format_content_editor_as_string(self, mock_is_cloud):
+    def test_format_content_editor_as_string(self):
         """Test format_content with editor format as string."""
         import json
 
         from skills.confluence.scripts.confluence import format_content
-
-        mock_is_cloud.return_value = True
 
         adf_str = json.dumps(
             {
@@ -2101,18 +1630,16 @@ class TestAdditionalCoverage:
             }
         )
 
-        result = format_content(adf_str, input_format="editor", output_format="storage")
-        assert isinstance(result, str)
+        result = format_content(adf_str, input_format="editor")
+        assert isinstance(result, dict)
+        assert result["type"] == "doc"
 
-    @patch("skills.confluence.scripts.confluence.is_cloud")
-    def test_format_content_passthrough(self, mock_is_cloud):
-        """Test format_content with same input/output format."""
+    def test_format_content_passthrough(self):
+        """Test format_content with unrecognized input format passes through."""
         from skills.confluence.scripts.confluence import format_content
 
-        mock_is_cloud.return_value = True
-
         content = "test content"
-        result = format_content(content, input_format="markdown", output_format="markdown")
+        result = format_content(content, input_format="other")
         assert result == content
 
 
@@ -2153,14 +1680,12 @@ class TestUpdatePageTitleFallback:
 
     @patch("skills.confluence.scripts.confluence.put")
     @patch("skills.confluence.scripts.confluence.get_page")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
     @patch("skills.confluence.scripts.confluence.get_api_base")
-    def test_update_page_without_title(self, mock_base, mock_cloud, mock_get, mock_put):
+    def test_update_page_without_title(self, mock_base, mock_get, mock_put):
         """update_page includes current title when --title not provided."""
         from skills.confluence.scripts.confluence import update_page
 
         mock_base.return_value = "https://example.atlassian.net/wiki"
-        mock_cloud.return_value = True
         mock_get.return_value = {
             "id": "123",
             "title": "Existing Title",
@@ -2176,16 +1701,14 @@ class TestUpdatePageTitleFallback:
 
     @patch("skills.confluence.scripts.confluence.put")
     @patch("skills.confluence.scripts.confluence.get_page")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
     @patch("skills.confluence.scripts.confluence.get_api_base")
-    def test_update_page_with_body_cloud(self, mock_base, mock_cloud, mock_get, mock_put):
+    def test_update_page_with_body_cloud(self, mock_base, mock_get, mock_put):
         """update_page sends ADF as JSON string on Cloud."""
         import json
 
         from skills.confluence.scripts.confluence import update_page
 
         mock_base.return_value = "https://example.atlassian.net/wiki"
-        mock_cloud.return_value = True
         mock_get.return_value = {
             "id": "456",
             "title": "Page",
@@ -2199,27 +1722,6 @@ class TestUpdatePageTitleFallback:
         assert isinstance(value, str)
         parsed = json.loads(value)
         assert parsed["type"] == "doc"
-
-    @patch("skills.confluence.scripts.confluence.put")
-    @patch("skills.confluence.scripts.confluence.get_page")
-    @patch("skills.confluence.scripts.confluence.is_cloud")
-    @patch("skills.confluence.scripts.confluence.get_api_base")
-    def test_update_page_with_body_dc(self, mock_base, mock_cloud, mock_get, mock_put):
-        """update_page sends storage format on DC/Server."""
-        from skills.confluence.scripts.confluence import update_page
-
-        mock_base.return_value = "https://confluence.example.com"
-        mock_cloud.return_value = False
-        mock_get.return_value = {
-            "id": "789",
-            "title": "Page",
-            "version": {"number": 1},
-        }
-        mock_put.return_value = {"id": "789", "version": {"number": 2}}
-
-        update_page("789", body="Hello")
-        payload = mock_put.call_args[0][2]
-        assert "storage" in payload["body"]
 
 
 class TestSpacePermissions:
@@ -2486,12 +1988,6 @@ class TestInternalLinksAndToc:
         url = "https://example.atlassian.net/wiki/spaces/DEMO/pages/789"
         assert _extract_page_id_from_url(url, "https://example.atlassian.net") == "789"
 
-    def test_extract_page_id_dc_url(self):
-        from skills.confluence.scripts.confluence import _extract_page_id_from_url
-
-        url = "https://confluence.internal.com/pages/viewpage.action?pageId=42"
-        assert _extract_page_id_from_url(url, "https://confluence.internal.com") == "42"
-
     def test_extract_page_id_different_instance(self):
         from skills.confluence.scripts.confluence import _extract_page_id_from_url
 
@@ -2505,43 +2001,6 @@ class TestInternalLinksAndToc:
             _extract_page_id_from_url("https://google.com", "https://example.atlassian.net") is None
         )
 
-    @patch("skills.confluence.scripts.confluence._validate_page_exists")
-    def test_convert_internal_links_storage_valid(self, mock_validate):
-        from skills.confluence.scripts.confluence import _convert_internal_links_storage
-
-        mock_validate.return_value = {"id": "123", "title": "My Page"}
-        html = '<a href="https://ex.atlassian.net/wiki/spaces/DEMO/pages/123">My Page</a>'
-        result = _convert_internal_links_storage(html, "https://ex.atlassian.net")
-        assert "<ac:link>" in result
-        assert 'ri:content-id="123"' in result
-        assert "My Page" in result
-
-    @patch("skills.confluence.scripts.confluence._validate_page_exists")
-    def test_convert_internal_links_storage_invalid(self, mock_validate):
-        from skills.confluence.scripts.confluence import _convert_internal_links_storage
-
-        mock_validate.return_value = None
-        html = '<a href="https://ex.atlassian.net/wiki/spaces/DEMO/pages/999">Missing</a>'
-        result = _convert_internal_links_storage(html, "https://ex.atlassian.net")
-        assert "<ac:link>" not in result
-        assert "<a href=" in result
-
-    @patch("skills.confluence.scripts.confluence._validate_page_exists")
-    def test_convert_internal_links_external_unchanged(self, mock_validate):
-        from skills.confluence.scripts.confluence import _convert_internal_links_storage
-
-        html = '<a href="https://google.com">Google</a>'
-        result = _convert_internal_links_storage(html, "https://ex.atlassian.net")
-        assert result == html
-        mock_validate.assert_not_called()
-
-    def test_prepend_toc_storage(self):
-        from skills.confluence.scripts.confluence import _prepend_toc_storage
-
-        result = _prepend_toc_storage("<p>Hello</p>")
-        assert result.startswith('<ac:structured-macro ac:name="toc">')
-        assert "<p>Hello</p>" in result
-
     def test_prepend_toc_adf(self):
         from skills.confluence.scripts.confluence import _prepend_toc_adf
 
@@ -2551,23 +2010,10 @@ class TestInternalLinksAndToc:
         assert result["content"][0]["attrs"]["extensionKey"] == "toc"
         assert result["content"][1]["type"] == "paragraph"
 
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_markdown_to_storage_with_toc(self, mock_creds):
-        mock_creds.return_value = Credentials(url="https://example.atlassian.net")
-        result = markdown_to_storage("# Hello", include_toc=True)
-        assert '<ac:structured-macro ac:name="toc">' in result
-        assert "Hello" in result
-
     def test_markdown_to_adf_with_toc(self):
         result = markdown_to_adf("# Hello", include_toc=True)
         assert result["content"][0]["type"] == "extension"
         assert result["content"][0]["attrs"]["extensionKey"] == "toc"
-
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_markdown_to_storage_without_toc(self, mock_creds):
-        mock_creds.return_value = Credentials(url="https://example.atlassian.net")
-        result = markdown_to_storage("# Hello")
-        assert "toc" not in result
 
 
 class TestFrontmatter:
@@ -2606,6 +2052,8 @@ class TestFrontmatter:
         assert _strip_frontmatter(text) == text
 
     def test_format_page_with_frontmatter(self):
+        import json
+
         from skills.confluence.scripts.confluence import format_page_with_frontmatter
 
         page = {
@@ -2620,7 +2068,20 @@ class TestFrontmatter:
                 }
             },
             "body": {
-                "storage": {"value": "<p>Hello world</p>"},
+                "editor": {
+                    "value": json.dumps(
+                        {
+                            "version": 1,
+                            "type": "doc",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Hello world"}],
+                                }
+                            ],
+                        }
+                    )
+                },
             },
         }
 
@@ -2644,7 +2105,7 @@ class TestFrontmatter:
             "version": {"number": 1},
             "ancestors": [],
             "metadata": {"labels": {"results": []}},
-            "body": {"storage": {"value": "<p>Content</p>"}},
+            "body": {},
         }
 
         result = format_page_with_frontmatter(page)

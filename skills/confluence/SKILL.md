@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "1.0.0"
+  version: "2.0.0"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -33,7 +33,6 @@ This will check:
 - Python dependencies (requests, keyring, pyyaml)
 - Authentication configuration
 - Connectivity to Confluence
-- Deployment type detection (Cloud vs Data Center/Server)
 
 If anything is missing, the check command will provide setup instructions.
 
@@ -63,11 +62,9 @@ token: your-token
 
 ### Required Credentials
 
-- **URL**: Your Confluence instance URL
-  - Cloud: `https://yourcompany.atlassian.net/wiki`
-  - DC/Server: `https://confluence.yourcompany.com`
-- **Email**: Your account email (required for Cloud)
-- **API Token**: Create at https://id.atlassian.com/manage-profile/security/api-tokens (Cloud) or from your Confluence profile (DC/Server)
+- **URL**: Your Confluence Cloud URL (e.g. `https://yourcompany.atlassian.net/wiki`)
+- **Email**: Your Atlassian account email
+- **API Token**: Create at https://id.atlassian.com/manage-profile/security/api-tokens
 
 ## Configuration Defaults
 
@@ -118,7 +115,7 @@ This validates:
 - Python dependencies are installed
 - Authentication is configured
 - Can connect to Confluence
-- Deployment type (Cloud vs DC/Server) is detected correctly
+- API connectivity is working
 
 ### search
 
@@ -424,8 +421,6 @@ Run `$SKILL_DIR/scripts/confluence.py check` to diagnose issues. It will provide
 1. Verify your API token is correct
 2. Ensure you're using your email (not username) for Cloud instances
 3. For Cloud, use your Atlassian account email
-4. For Data Center/Server, you may need username/password or Bearer token
-
 ### Permission denied
 
 You may not have access to the requested space or page. Contact your Confluence administrator.
@@ -447,11 +442,4 @@ Ensure dependencies are installed:
 pip install --user requests keyring pyyaml
 ```
 
-## Cloud vs Data Center/Server
-
-The skill automatically detects your Confluence deployment type and adapts:
-
-- **Cloud** (atlassian.net): Uses `/wiki/rest/api` and editor format (ADF)
-- **Data Center/Server**: Uses `/rest/api` and storage format (XHTML)
-
-When reading pages, content is automatically converted to Markdown for display regardless of deployment type.
+**Note:** This skill supports Atlassian Cloud only. Data Center/Server instances are not supported.

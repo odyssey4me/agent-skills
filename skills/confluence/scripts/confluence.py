@@ -19,12 +19,10 @@ from __future__ import annotations
 # Standard library imports
 import argparse
 import contextlib
-import html
 import json
 import os
 import re
 import sys
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -56,15 +54,6 @@ try:
 except ImportError:
     print(
         "Error: 'pyyaml' library not found. Install with: pip install --user pyyaml",
-        file=sys.stderr,
-    )
-    sys.exit(1)
-
-try:
-    from markdownify import markdownify as _markdownify_html
-except ImportError:
-    print(
-        "Error: 'markdownify' library not found. Install with: pip install --user markdownify",
         file=sys.stderr,
     )
     sys.exit(1)
@@ -345,248 +334,31 @@ def merge_cql_with_scope(user_cql: str, scope: str | None) -> str:
 # CONFLUENCE API HELPERS
 # ============================================================================
 
-# Module-level cache for deployment type detection
-# Key: Confluence URL, Value: {"deployment_type": str, "api_version": str}
-_deployment_cache: dict[str, dict[str, str]] = {}
-
-# Rate limit retry configuration
-MAX_RETRIES = 3
-INITIAL_RETRY_DELAY = 1.0  # seconds
-RETRY_BACKOFF_MULTIPLIER = 2.0
-
-
-class ConfluenceDetectionError(Exception):
-    """Exception raised when Confluence deployment type detection fails."""
-
-    pass
-
-
-def _make_detection_request(
-    url: str,
-    endpoint: str,
-    email: str | None = None,
-    token: str | None = None,
-    username: str | None = None,
-    password: str | None = None,
-    timeout: int = 10,
-) -> dict[str, Any]:
-    """Make a request to Confluence for deployment detection with rate limit handling.
-
-    Tries unauthenticated first, then falls back to authenticated if needed.
-
-    Args:
-        url: Base Confluence URL.
-        endpoint: API endpoint.
-        email: User email for Cloud auth.
-        token: API token.
-        username: Username for basic auth.
-        password: Password for basic auth.
-        timeout: Request timeout.
-
-    Returns:
-        Parsed JSON response.
-
-    Raises:
-        ConfluenceDetectionError: If request fails after retries.
-    """
-    full_url = f"{url.rstrip('/')}/{endpoint.lstrip('/')}"
-    headers = {"Accept": "application/json"}
-
-    # Build auth tuple for fallback
-    auth = None
-    if token and email:
-        auth = (email, token)
-    elif username and password:
-        auth = (username, password)
-
-    retry_delay = INITIAL_RETRY_DELAY
-
-    # Try unauthenticated first (some endpoints are public)
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = requests.get(
-                full_url,
-                headers=headers,
-                timeout=timeout,
-            )
-
-            # If unauthenticated fails with 401/403, try with auth
-            if response.status_code in (401, 403) and auth:
-                response = requests.get(
-                    full_url,
-                    headers=headers,
-                    auth=auth,
-                    timeout=timeout,
-                )
-
-            # Handle rate limiting (429 Too Many Requests)
-            if response.status_code == 429:
-                retry_after = response.headers.get("Retry-After")
-                if retry_after:
-                    wait_time = float(retry_after)
-                else:
-                    wait_time = retry_delay
-                    retry_delay *= RETRY_BACKOFF_MULTIPLIER
-
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    raise ConfluenceDetectionError(f"Rate limited after {MAX_RETRIES} attempts")
-
-            if not response.ok:
-                raise ConfluenceDetectionError(
-                    f"Request failed: {response.status_code} {response.reason}"
-                )
-
-            return response.json()
-
-        except requests.RequestException as e:
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(retry_delay)
-                retry_delay *= RETRY_BACKOFF_MULTIPLIER
-                continue
-            raise ConfluenceDetectionError(f"Request failed: {e}") from e
-
-    raise ConfluenceDetectionError("Request failed after all retries")
-
-
-def detect_deployment_type(force_refresh: bool = False) -> str:
-    """Detect the Confluence deployment type (Cloud or DataCenter/Server).
-
-    Uses URL pattern detection and API responses to determine deployment type.
-    Results are cached per-session to avoid repeated API calls.
-
-    Args:
-        force_refresh: If True, bypass the cache and make a new request.
-
-    Returns:
-        Deployment type string: "Cloud" or "Server".
-
-    Raises:
-        ConfluenceDetectionError: If detection fails.
-    """
-    creds = get_credentials("confluence")
-    if not creds.url:
-        raise ConfluenceDetectionError("No Confluence URL configured")
-
-    # Check cache unless force refresh requested
-    if not force_refresh and creds.url in _deployment_cache:
-        return _deployment_cache[creds.url]["deployment_type"]
-
-    try:
-        # First, check URL pattern - Cloud instances typically have atlassian.net domain
-        if "atlassian.net" in creds.url:
-            deployment_type = "Cloud"
-            api_base = "/wiki/rest/api"
-        else:
-            # For self-hosted, try to verify by checking API endpoints
-            deployment_type = "Server"
-            api_base = "/rest/api"
-
-        # Try to verify by making a simple API call
-        try:
-            _make_detection_request(
-                url=creds.url,
-                endpoint=f"{api_base}/space",
-                email=creds.email,
-                token=creds.token,
-                username=creds.username,
-                password=creds.password,
-            )
-        except ConfluenceDetectionError:
-            # If the first attempt fails, try the alternate API base
-            if deployment_type == "Cloud":
-                api_base = "/rest/api"
-                deployment_type = "Server"
-            else:
-                api_base = "/wiki/rest/api"
-                deployment_type = "Cloud"
-
-            # Verify with alternate base
-            _make_detection_request(
-                url=creds.url,
-                endpoint=f"{api_base}/space",
-                email=creds.email,
-                token=creds.token,
-                username=creds.username,
-                password=creds.password,
-            )
-
-        # Cache the result
-        _deployment_cache[creds.url] = {
-            "deployment_type": deployment_type,
-            "api_base": api_base,
-        }
-
-        return deployment_type
-
-    except Exception as e:
-        raise ConfluenceDetectionError(f"Failed to detect deployment type: {e}") from e
-
 
 def get_api_base() -> str:
-    """Get the appropriate API base path for the current Confluence instance.
+    """Get the API base path for Confluence Cloud.
 
     Returns:
-        "/wiki/rest/api" for Cloud, "/rest/api" for Server/DataCenter.
+        "/wiki/rest/api" for Confluence Cloud.
     """
-    creds = get_credentials("confluence")
-    if creds.url and creds.url in _deployment_cache:
-        return _deployment_cache[creds.url]["api_base"]
-
-    # Trigger detection to populate cache
-    detect_deployment_type()
-
-    if creds.url and creds.url in _deployment_cache:
-        return _deployment_cache[creds.url]["api_base"]
-
-    # Default to server path if detection fails (more compatible)
-    return "/rest/api"
+    return "/wiki/rest/api"
 
 
 def api_path(endpoint: str) -> str:
-    """Construct the full API path with the correct base.
+    """Construct the full API path.
 
     Args:
         endpoint: API endpoint without base prefix (e.g., "content/search", "space").
 
     Returns:
-        Full path (e.g., "/wiki/rest/api/content/search" or "/rest/api/content/search").
+        Full path (e.g., "/wiki/rest/api/content/search").
     """
-    base = get_api_base()
-    return f"{base}/{endpoint.lstrip('/')}"
-
-
-def is_cloud() -> bool:
-    """Check if the current Confluence instance is Cloud.
-
-    Returns:
-        True if Cloud, False otherwise.
-    """
-    try:
-        return detect_deployment_type() == "Cloud"
-    except ConfluenceDetectionError:
-        return False
-
-
-def clear_cache() -> None:
-    """Clear the deployment type cache.
-
-    Useful for testing or when switching between Confluence instances.
-    """
-    _deployment_cache.clear()
+    return f"/wiki/rest/api/{endpoint.lstrip('/')}"
 
 
 # ============================================================================
 # MARKDOWN CONVERSION UTILITIES
 # ============================================================================
-
-_TOC_STORAGE = (
-    '<ac:structured-macro ac:name="toc">'
-    '<ac:parameter ac:name="maxLevel">3</ac:parameter>'
-    "</ac:structured-macro>"
-)
 
 _TOC_ADF_NODE: dict[str, Any] = {
     "type": "extension",
@@ -598,7 +370,6 @@ _TOC_ADF_NODE: dict[str, Any] = {
 }
 
 _CLOUD_PAGE_URL_RE = re.compile(r"/wiki/spaces/[^/]+/pages/(\d+)")
-_DC_PAGE_ID_URL_RE = re.compile(r"[?&]pageId=(\d+)")
 
 
 def _extract_page_id_from_url(url: str, confluence_url: str) -> str | None:
@@ -611,10 +382,6 @@ def _extract_page_id_from_url(url: str, confluence_url: str) -> str | None:
     if match:
         return match.group(1)
 
-    match = _DC_PAGE_ID_URL_RE.search(url)
-    if match:
-        return match.group(1)
-
     return None
 
 
@@ -624,32 +391,6 @@ def _validate_page_exists(page_id: str) -> dict[str, Any] | None:
         return get_page(page_id)
     except APIError:
         return None
-
-
-def _convert_internal_links_storage(html_content: str, confluence_url: str) -> str:
-    """Convert internal Confluence links in HTML to native ac:link elements."""
-
-    def _replace_link(match: re.Match) -> str:
-        url = match.group(1)
-        link_text = match.group(2)
-        page_id = _extract_page_id_from_url(url, confluence_url)
-        if page_id and _validate_page_exists(page_id):
-            return (
-                f"<ac:link>"
-                f'<ri:content-page ri:content-id="{page_id}" />'
-                f"<ac:plain-text-link-body>"
-                f"<![CDATA[{link_text}]]>"
-                f"</ac:plain-text-link-body>"
-                f"</ac:link>"
-            )
-        return match.group(0)
-
-    return re.sub(r'<a href="([^"]+)">([^<]+)</a>', _replace_link, html_content)
-
-
-def _prepend_toc_storage(html_content: str) -> str:
-    """Prepend a table of contents macro to storage format HTML."""
-    return _TOC_STORAGE + "\n" + html_content
 
 
 def _prepend_toc_adf(adf: dict[str, Any]) -> dict[str, Any]:
@@ -686,125 +427,6 @@ def _strip_frontmatter(text: str) -> str:
         if end != -1:
             return text[end + 3 :].lstrip("\n")
     return text
-
-
-def markdown_to_storage(markdown: str, *, include_toc: bool = False) -> str:
-    """Convert Markdown to Confluence storage format (XHTML).
-
-    Supports:
-    - Headers (# → <h1>, ## → <h2>, etc.)
-    - Paragraphs
-    - Bold (**text** or __text__ → <strong>)
-    - Italic (*text* or _text_ → <em>)
-    - Lists (- or * → <ul><li>)
-    - Numbered lists (1. → <ol><li>)
-    - Code blocks (``` → <ac:structured-macro>)
-    - Inline code (`code` → <code>)
-    - Links ([text](url) → <a>)
-
-    Args:
-        markdown: Markdown string.
-
-    Returns:
-        XHTML string for storage format.
-    """
-    result = md_lib.markdown(markdown, extensions=["tables", "fenced_code"])
-    return _finalize_storage(result, include_toc=include_toc)
-
-
-def _finalize_storage(html_content: str, *, include_toc: bool = False) -> str:
-    """Apply internal link conversion and optional TOC to storage HTML."""
-    creds = get_credentials("confluence")
-    if creds.url:
-        html_content = _convert_internal_links_storage(html_content, creds.url)
-    if include_toc:
-        html_content = _prepend_toc_storage(html_content)
-    return html_content
-
-
-def storage_to_markdown(storage: str) -> str:
-    """Convert Confluence storage format (XHTML) to Markdown.
-
-    Uses markdownify for HTML-to-Markdown conversion, with pre-processing
-    for Confluence-specific macros (code blocks).
-
-    Args:
-        storage: XHTML storage format string.
-
-    Returns:
-        Markdown string.
-    """
-    text = storage
-    code_blocks: list[str] = []
-
-    def _extract_code_macro(match: re.Match) -> str:
-        lang = match.group(1) if match.group(1) else ""
-        code = match.group(2).replace("<![CDATA[", "").replace("]]>", "")
-        code = html.unescape(code)
-        block = f"```{lang}\n{code}\n```"
-        idx = len(code_blocks)
-        code_blocks.append(block)
-        return f"\n\nCODEBLOCKPH{idx}END\n\n"
-
-    text = re.sub(
-        r'<ac:structured-macro ac:name="code">'
-        r'.*?<ac:parameter ac:name="language">([^<]*)</ac:parameter>'
-        r".*?<ac:plain-text-body>(.*?)</ac:plain-text-body>"
-        r".*?</ac:structured-macro>",
-        _extract_code_macro,
-        text,
-        flags=re.DOTALL,
-    )
-
-    def _extract_code_macro_no_lang(match: re.Match) -> str:
-        code = match.group(1).replace("<![CDATA[", "").replace("]]>", "")
-        code = html.unescape(code)
-        block = f"```\n{code}\n```"
-        idx = len(code_blocks)
-        code_blocks.append(block)
-        return f"\n\nCODEBLOCKPH{idx}END\n\n"
-
-    text = re.sub(
-        r'<ac:structured-macro ac:name="code">'
-        r".*?<ac:plain-text-body>(.*?)</ac:plain-text-body>"
-        r".*?</ac:structured-macro>",
-        _extract_code_macro_no_lang,
-        text,
-        flags=re.DOTALL,
-    )
-
-    # Remove other Confluence macros (TOC, etc.) — they have no markdown equivalent
-    text = re.sub(
-        r"<ac:structured-macro[^>]*>.*?</ac:structured-macro>",
-        "",
-        text,
-        flags=re.DOTALL,
-    )
-
-    # Convert ac:link elements back to markdown links
-    def replace_ac_link(match):
-        content_id = match.group(1)
-        link_text = match.group(2) if match.group(2) else f"Page {content_id}"
-        return f'<a href="page:{content_id}">{link_text}</a>'
-
-    text = re.sub(
-        r"<ac:link>"
-        r'<ri:content-page ri:content-id="(\d+)"[^/]*/>'
-        r"(?:<ac:plain-text-link-body>"
-        r"<!\[CDATA\[(.*?)\]\]>"
-        r"</ac:plain-text-link-body>)?"
-        r"</ac:link>",
-        replace_ac_link,
-        text,
-        flags=re.DOTALL,
-    )
-
-    result = _markdownify_html(text, heading_style="ATX", strip=["img"])
-
-    for idx, block in enumerate(code_blocks):
-        result = result.replace(f"CODEBLOCKPH{idx}END", block)
-
-    return re.sub(r"\n{3,}", "\n\n", result).strip()
 
 
 def markdown_to_adf(markdown: str, *, include_toc: bool = False) -> dict[str, Any]:
@@ -904,47 +526,24 @@ def _adf_content_to_text(content: list[dict[str, Any]]) -> str:
 
 
 def format_content(
-    content: str, input_format: str = "markdown", output_format: str = "auto"
+    content: str, input_format: str = "markdown", *, include_toc: bool = False
 ) -> dict[str, Any] | str:
     """Main content formatting function.
 
     Args:
         content: Content string.
-        input_format: "markdown", "storage", "editor".
-        output_format: "auto", "storage", "editor".
+        input_format: "markdown" or "editor".
+        include_toc: Prepend a table of contents macro.
 
     Returns:
         Formatted content for API.
     """
-    # Determine output format
-    if output_format == "auto":
-        output_format = "editor" if is_cloud() else "storage"
-
-    # Convert input to output format
     if input_format == "markdown":
-        if output_format == "storage":
-            return markdown_to_storage(content)
-        elif output_format == "editor":
-            return markdown_to_adf(content)
-        else:
-            return content
-    elif input_format == "storage":
-        if output_format == "editor":
-            # Convert storage → markdown → ADF
-            md = storage_to_markdown(content)
-            return markdown_to_adf(md)
-        else:
-            return content
+        return markdown_to_adf(content, include_toc=include_toc)
     elif input_format == "editor":
-        # Assume content is already ADF dict
         if isinstance(content, str):
             content = json.loads(content)
-        if output_format == "storage":
-            # Convert ADF → markdown → storage
-            md = adf_to_markdown(content)
-            return markdown_to_storage(md)
-        else:
-            return content
+        return content
 
     return content
 
@@ -987,37 +586,6 @@ class APIError(Exception):
         return "\n".join(parts)
 
 
-def _get_confluence_auth_method(
-    creds: Credentials,
-) -> tuple[tuple[str, str] | None, dict[str, str]]:
-    """Determine the appropriate Confluence authentication method.
-
-    Cloud uses email + API token as basic auth.
-    Data Center/Server typically uses Bearer token or username/password.
-
-    Args:
-        creds: Credentials object with token and email.
-
-    Returns:
-        Tuple of (auth, headers_dict) for requests.
-    """
-    headers: dict[str, str] = {}
-    auth = None
-
-    if is_cloud():
-        # Cloud: email + API token as basic auth
-        if creds.email and creds.token:
-            auth = (creds.email, creds.token)
-    else:
-        # DC/Server: Can use Bearer token or username/password
-        if creds.token:
-            headers["Authorization"] = f"Bearer {creds.token}"
-        elif creds.username and creds.password:
-            auth = (creds.username, creds.password)
-
-    return auth, headers
-
-
 def make_request(
     service: str,
     method: str,
@@ -1056,19 +624,12 @@ def make_request(
     request_headers.setdefault("Content-Type", "application/json")
     request_headers.setdefault("Accept", "application/json")
 
-    # Add authentication based on service type
+    # Add authentication
     auth = None
-    if service == "confluence" and creds.token:
-        # Use Confluence-specific auth detection
-        auth, auth_headers = _get_confluence_auth_method(creds)
-        request_headers.update(auth_headers)
+    if creds.email and creds.token:
+        auth = (creds.email, creds.token)
     elif creds.token:
-        if creds.email:
-            # Generic: email + API token as basic auth
-            auth = (creds.email, creds.token)
-        else:
-            # Bearer token style
-            request_headers["Authorization"] = f"Bearer {creds.token}"
+        request_headers["Authorization"] = f"Bearer {creds.token}"
     elif creds.username and creds.password:
         auth = (creds.username, creds.password)
 
@@ -1233,11 +794,7 @@ def format_page(
     if include_body:
         body = page.get("body", {})
         if as_markdown:
-            # Try to get storage format first, then editor format
-            if "storage" in body:
-                storage_value = body["storage"].get("value", "")
-                markdown_body = storage_to_markdown(storage_value)
-            elif "editor" in body:
+            if "editor" in body:
                 editor_value = body["editor"].get("value", {})
                 if isinstance(editor_value, str):
                     editor_value = json.loads(editor_value)
@@ -1287,9 +844,7 @@ def format_page_with_frontmatter(page: dict[str, Any]) -> str:
 
     # Extract body as markdown
     body = page.get("body", {})
-    if "storage" in body:
-        md_body = storage_to_markdown(body["storage"].get("value", ""))
-    elif "editor" in body:
+    if "editor" in body:
         editor_value = body["editor"].get("value", {})
         if isinstance(editor_value, str):
             editor_value = json.loads(editor_value)
@@ -1457,7 +1012,7 @@ def create_page(
         title: Page title.
         body: Page content.
         parent_id: Parent page ID for hierarchy.
-        body_format: Format of body content ("markdown", "storage", "editor").
+        body_format: Format of body content ("markdown" or "editor").
         labels: List of labels to add.
         include_toc: Prepend a table of contents macro.
 
@@ -1469,20 +1024,9 @@ def create_page(
     """
     # Convert body to appropriate format
     if body_format == "markdown":
-        if is_cloud():
-            # Cloud: use editor format (ADF) — value must be a JSON string
-            body_content = json.dumps(markdown_to_adf(body, include_toc=include_toc))
-            body_representation = "atlas_doc_format"
-            body_key = "editor"
-        else:
-            # DC/Server: use storage format
-            body_content = markdown_to_storage(body, include_toc=include_toc)
-            body_representation = "storage"
-            body_key = "storage"
-    elif body_format == "storage":
-        body_content = body
-        body_representation = "storage"
-        body_key = "storage"
+        body_content = json.dumps(markdown_to_adf(body, include_toc=include_toc))
+        body_representation = "atlas_doc_format"
+        body_key = "editor"
     elif body_format == "editor":
         body_content = body if isinstance(body, str) else json.dumps(body)
         body_representation = "atlas_doc_format"
@@ -1530,7 +1074,7 @@ def update_page(
         page_id: Page ID to update.
         title: New title (optional).
         body: New content (optional).
-        body_format: Format of body content ("markdown", "storage", "editor").
+        body_format: Format of body content ("markdown" or "editor").
         version: Current version number (will auto-detect if not provided).
         include_toc: Prepend a table of contents macro.
 
@@ -1558,20 +1102,9 @@ def update_page(
     if body:
         # Convert body to appropriate format
         if body_format == "markdown":
-            if is_cloud():
-                # Cloud: use editor format (ADF) — value must be a JSON string
-                body_content = json.dumps(markdown_to_adf(body, include_toc=include_toc))
-                body_representation = "atlas_doc_format"
-                body_key = "editor"
-            else:
-                # DC/Server: use storage format
-                body_content = markdown_to_storage(body, include_toc=include_toc)
-                body_representation = "storage"
-                body_key = "storage"
-        elif body_format == "storage":
-            body_content = body
-            body_representation = "storage"
-            body_key = "storage"
+            body_content = json.dumps(markdown_to_adf(body, include_toc=include_toc))
+            body_representation = "atlas_doc_format"
+            body_key = "editor"
         elif body_format == "editor":
             body_content = body if isinstance(body, str) else json.dumps(body)
             body_representation = "atlas_doc_format"
@@ -1854,19 +1387,8 @@ def cmd_check() -> int:
 
     print("   Credentials: OK\n")
 
-    # 2. Test connectivity and detect deployment type
-    print("2. Testing connectivity...")
-    try:
-        deployment_type = detect_deployment_type(force_refresh=True)
-        print(f"   Deployment: {deployment_type}")
-        print(f"   API Base: {get_api_base()}")
-        print("   Connection: OK\n")
-    except ConfluenceDetectionError as e:
-        print(f"   ERROR: {e}")
-        return 1
-
-    # 3. Test a simple API call
-    print("3. Testing API access...")
+    # 2. Test API access
+    print("2. Testing API access...")
     try:
         # Try to list spaces
         response = get(
@@ -1937,13 +1459,12 @@ def cmd_page(args: argparse.Namespace) -> int:
     try:
         if args.page_command == "get":
             # Determine what to expand
-            expand = ["body.storage", "body.editor", "version", "space"]
+            expand = ["body.editor", "version", "space"]
             if args.expand:
                 expand = args.expand.split(",")
 
             if args.frontmatter:
                 expand = [
-                    "body.storage",
                     "body.editor",
                     "version",
                     "space",
@@ -2351,7 +1872,7 @@ def main() -> int:
     create_parser.add_argument(
         "--format",
         default="markdown",
-        choices=["markdown", "storage", "editor"],
+        choices=["markdown", "editor"],
         help="Input format (default: markdown)",
     )
     create_parser.add_argument("--parent", help="Parent page ID")
@@ -2368,7 +1889,7 @@ def main() -> int:
     update_parser.add_argument(
         "--format",
         default="markdown",
-        choices=["markdown", "storage", "editor"],
+        choices=["markdown", "editor"],
         help="Input format (default: markdown)",
     )
     update_parser.add_argument(

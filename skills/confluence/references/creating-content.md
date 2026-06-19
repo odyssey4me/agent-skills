@@ -20,18 +20,10 @@ The Confluence skill uses Markdown as the default format for page content, makin
 
 ### Format Conversion
 
-The skill automatically converts between formats:
-- **Cloud instances**: Markdown → ADF (Atlassian Document Format)
-- **DC/Server instances**: Markdown → Storage format (XHTML)
-- **Reading**: Storage/ADF → Markdown (for display)
+The skill automatically converts Markdown to ADF (Atlassian Document Format) for Confluence Cloud. When reading pages, ADF is converted back to Markdown for display.
 
-You can override the automatic format with `--format`:
+You can pass ADF directly with `--format editor`:
 ```bash
-# Use storage format directly
-python confluence.py page create --space DEMO --title "Page" \
-  --body "<p>HTML content</p>" --format storage
-
-# Use editor format (ADF) directly
 python confluence.py page create --space DEMO --title "Page" \
   --body '{"type":"doc","content":[...]}' --format editor
 ```
@@ -63,7 +55,7 @@ python confluence.py page create --space DEMO --title "Tagged Page" \
 - `--title`: Page title (required)
 - `--body`: Page content (Markdown by default)
 - `--body-file`: Read content from file (Markdown)
-- `--format`: Input format - `markdown` (default), `storage`, `editor`
+- `--format`: Input format - `markdown` (default), `editor`
 - `--parent`: Parent page ID for hierarchy
 - `--labels`: Comma-separated labels
 - `--json`: Output as JSON
@@ -119,8 +111,6 @@ python confluence.py page update 123456 --title "New Title"
 # Update with specific version (prevents conflicts)
 python confluence.py page update 123456 --body "Content" --version 5
 
-# Update using storage format
-python confluence.py page update 123456 --body "<p>HTML</p>" --format storage
 ```
 
 **Arguments:**
@@ -128,7 +118,7 @@ python confluence.py page update 123456 --body "<p>HTML</p>" --format storage
 - `--title`: New title
 - `--body`: New content (Markdown by default)
 - `--body-file`: Read content from file (Markdown)
-- `--format`: Input format - `markdown` (default), `storage`, `editor`
+- `--format`: Input format - `markdown` (default), `editor`
 - `--version`: Current version number (auto-detected if not provided)
 - `--json`: Output as JSON
 
@@ -244,15 +234,3 @@ python confluence.py page create --space DEMO --title "New Page" --body "Content
 # Automatically uses default_parent and default_labels from DEMO space defaults
 ```
 
-## Cloud vs Data Center/Server
-
-The skill automatically detects your Confluence deployment type and adapts:
-
-- **Cloud** (atlassian.net): Uses `/wiki/rest/api` and editor format (ADF)
-- **Data Center/Server**: Uses `/rest/api` and storage format (XHTML)
-
-Markdown conversion works seamlessly on both:
-- Your Markdown input → Appropriate format for your deployment
-- API responses → Converted to Markdown for display
-
-You don't need to worry about the internal formats unless you want to use `--format storage` or `--format editor` explicitly.
