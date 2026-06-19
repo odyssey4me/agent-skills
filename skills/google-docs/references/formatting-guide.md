@@ -169,7 +169,7 @@ The Google Docs skill currently supports basic text formatting. The following ar
 - Alignment (left, center, right, justify)
 - Lists (bullet points, numbered lists)
 - Links (hyperlinks)
-- Images
+- Images (supported during import via `documents import`; not yet supported via `formatting apply`)
 - Tables
 - Headers and footers
 - Page breaks

@@ -76,6 +76,9 @@ parse_markdown = google_docs.parse_markdown
 read_document_content = google_docs.read_document_content
 save_config = google_docs.save_config
 set_credential = google_docs.set_credential
+embed_local_images = google_docs.embed_local_images
+_get_image_width = google_docs._get_image_width
+_MAX_IMAGE_WIDTH_PX = google_docs._MAX_IMAGE_WIDTH_PX
 
 # ============================================================================
 # KEYRING CREDENTIAL TESTS
@@ -2243,3 +2246,267 @@ class TestCmdDocumentsImportFormatting:
         cmd_documents_import(args)
         call_kwargs = mock_format.call_args
         assert call_kwargs[1].get("line_spacing") or call_kwargs[0][2] == 130
+
+
+# Minimal valid 1x1 PNG for test fixtures
+MINIMAL_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+    b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00"
+    b"\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00"
+    b"\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+class TestGetImageWidth:
+    """Tests for _get_image_width."""
+
+    def test_reads_png_width(self):
+        assert _get_image_width(MINIMAL_PNG) == 1
+
+    def test_reads_wide_png(self):
+        import struct
+
+        # Construct a PNG header with width=2000
+        header = b"\x89PNG\r\n\x1a\n"
+        ihdr_data = struct.pack(">II", 2000, 500) + b"\x08\x02\x00\x00\x00"
+        ihdr_chunk = b"\x00\x00\x00\rIHDR" + ihdr_data
+        png = header + ihdr_chunk + b"\x00" * 20
+        assert _get_image_width(png) == 2000
+
+    def test_reads_jpeg_width(self):
+        import struct
+
+        # Construct a minimal JPEG with SOI + SOF0 marker
+        soi = b"\xff\xd8"
+        # APP0 marker (skip over it)
+        app0 = b"\xff\xe0" + struct.pack(">H", 16) + b"\x00" * 14
+        # SOF0 marker: length=8, precision=8, height=300, width=800
+        sof0 = b"\xff\xc0" + struct.pack(">H", 8) + b"\x08" + struct.pack(">HH", 300, 800)
+        jpeg = soi + app0 + sof0 + b"\x00" * 20
+        assert _get_image_width(jpeg) == 800
+
+    def test_jpeg_truncated_sof(self):
+        # SOI + SOF0 but not enough data
+        jpeg = b"\xff\xd8\xff\xc0\x00\x08\x08"
+        assert _get_image_width(jpeg) is None
+
+    def test_jpeg_broken_marker(self):
+        # SOI then non-FF byte
+        jpeg = b"\xff\xd8\x00\x00\x00\x00\x00\x00"
+        assert _get_image_width(jpeg) is None
+
+    def test_returns_none_for_unknown_format(self):
+        assert _get_image_width(b"not an image") is None
+
+    def test_returns_none_for_truncated_data(self):
+        assert _get_image_width(b"\x89PNG\r\n\x1a\n") is None
+
+
+class TestEmbedLocalImages:
+    """Tests for embed_local_images."""
+
+    def test_embeds_single_image(self, tmp_path):
+        img = tmp_path / "photo.png"
+        img.write_bytes(MINIMAL_PNG)
+
+        body = "Text before\n\n![Alt text](photo.png)\n\nText after"
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert count == 1
+        assert "![Alt text](photo.png)" not in modified
+        assert '<img src="data:image/png;base64,' in modified
+        assert 'alt="Alt text"' in modified
+
+    def test_embeds_multiple_images(self, tmp_path):
+        for name in ["a.png", "b.png", "c.png"]:
+            (tmp_path / name).write_bytes(MINIMAL_PNG)
+
+        body = "![A](a.png)\n![B](b.png)\n![C](c.png)"
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert count == 3
+        assert modified.count('<img src="data:image/png;base64,') == 3
+
+    def test_skips_url_images(self, tmp_path):
+        body = "![Logo](https://example.com/logo.png)"
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert count == 0
+        assert "https://example.com/logo.png" in modified
+
+    def test_skips_http_url_images(self, tmp_path):
+        body = "![Logo](http://example.com/logo.png)"
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert count == 0
+
+    def test_missing_file_warns(self, tmp_path, capsys):
+        body = "![Missing](nonexistent.png)"
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert count == 0
+        assert "![Missing](nonexistent.png)" in modified
+        assert "not found" in capsys.readouterr().err
+
+    def test_relative_path_resolution(self, tmp_path):
+        subdir = tmp_path / "images"
+        subdir.mkdir()
+        img = subdir / "diagram.png"
+        img.write_bytes(MINIMAL_PNG)
+
+        body = "![Diagram](images/diagram.png)"
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert count == 1
+        assert '<img src="data:image/png;base64,' in modified
+
+    def test_mixed_local_and_url(self, tmp_path):
+        (tmp_path / "local.png").write_bytes(MINIMAL_PNG)
+
+        body = "![Local](local.png)\n![Remote](https://example.com/img.png)"
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert count == 1
+        assert "https://example.com/img.png" in modified
+        assert '<img src="data:image/png;base64,' in modified
+
+    def test_no_images_returns_unchanged(self, tmp_path):
+        body = "# Heading\n\nJust text."
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert modified == body
+        assert count == 0
+
+    def test_small_image_no_width_attr(self, tmp_path):
+        img = tmp_path / "small.png"
+        img.write_bytes(MINIMAL_PNG)  # 1x1 pixel
+
+        body = "![Small](small.png)"
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert count == 1
+        assert "width=" not in modified
+
+    def test_large_image_gets_width_capped(self, tmp_path):
+        import struct
+
+        header = b"\x89PNG\r\n\x1a\n"
+        ihdr_data = struct.pack(">II", 2000, 500) + b"\x08\x02\x00\x00\x00"
+        ihdr_crc = b"\x00\x00\x00\x00"
+        ihdr_chunk = b"\x00\x00\x00\rIHDR" + ihdr_data + ihdr_crc
+        iend_chunk = b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        png = header + ihdr_chunk + iend_chunk
+
+        img = tmp_path / "wide.png"
+        img.write_bytes(png)
+
+        body = "![Wide](wide.png)"
+        modified, count = embed_local_images(body, tmp_path)
+
+        assert count == 1
+        assert f'width="{_MAX_IMAGE_WIDTH_PX}"' in modified
+
+
+class TestCmdDocumentsImportWithImages:
+    """Tests for cmd_documents_import with image embedding."""
+
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_import_embeds_images(self, mock_import, _mock_build, tmp_path, capsys):
+        mock_import.return_value = {
+            "id": "doc1",
+            "name": "Test",
+            "webViewLink": "https://docs.google.com/document/d/doc1/edit",
+        }
+
+        img = tmp_path / "photo.png"
+        img.write_bytes(MINIMAL_PNG)
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Test\n\n![Photo](photo.png)\n\nText")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            no_images=False,
+            json=False,
+        )
+        result = cmd_documents_import(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Images: 1 embedded" in captured.out
+
+    @patch("google_docs.build_docs_service")
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_import_images_json_output(
+        self, mock_import, _mock_drive, _mock_docs, tmp_path, capsys
+    ):
+        mock_import.return_value = {
+            "id": "doc1",
+            "name": "Test",
+            "webViewLink": "https://docs.google.com/document/d/doc1/edit",
+        }
+
+        img = tmp_path / "photo.png"
+        img.write_bytes(MINIMAL_PNG)
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Test\n\n![Photo](photo.png)")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            no_images=False,
+            no_format=True,
+            json=True,
+        )
+        cmd_documents_import(args)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["images"] == 1
+
+    @patch("google_docs.build_drive_service")
+    @patch("google_docs.import_markdown_as_doc")
+    def test_import_no_images_flag_skips(self, mock_import, _mock_build, tmp_path, capsys):
+        mock_import.return_value = {
+            "id": "doc1",
+            "name": "Test",
+            "webViewLink": "https://docs.google.com/document/d/doc1/edit",
+        }
+
+        img = tmp_path / "photo.png"
+        img.write_bytes(MINIMAL_PNG)
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Test\n\n![Photo](photo.png)")
+
+        args = Mock(
+            file_path=str(md_file),
+            title=None,
+            document_id=None,
+            folder_id=None,
+            no_images=True,
+            json=False,
+        )
+        cmd_documents_import(args)
+
+        captured = capsys.readouterr()
+        assert "Images:" not in captured.out
+
+
+class TestArgumentParserImportNoImages:
+    """Tests for --no-images argument parser flag."""
+
+    def test_parser_accepts_no_images(self):
+        parser = build_parser()
+        args = parser.parse_args(["documents", "import", "/tmp/test.md", "--no-images"])
+        assert args.no_images is True
+
+    def test_parser_no_images_default_false(self):
+        parser = build_parser()
+        args = parser.parse_args(["documents", "import", "/tmp/test.md"])
+        assert args.no_images is False

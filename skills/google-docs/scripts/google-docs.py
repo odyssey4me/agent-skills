@@ -23,7 +23,9 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import mimetypes
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -817,8 +819,6 @@ def parse_markdown(text: str) -> list[dict]:
     Returns:
         List of element dicts with type-specific fields.
     """
-    import re
-
     elements: list[dict] = []
 
     for line in text.split("\n"):
@@ -1498,8 +1498,6 @@ def extract_title_from_markdown(md_content: str) -> str | None:
     Returns:
         The heading text, or None if no H1 found.
     """
-    import re
-
     match = re.search(r"^#\s+(.+)$", md_content, re.MULTILINE)
     return match.group(1).strip() if match else None
 
@@ -1514,6 +1512,92 @@ def convert_markdown_to_html(md_content: str) -> str:
         HTML string.
     """
     return md_lib.markdown(md_content, extensions=["tables", "fenced_code", "mdx_breakless_lists"])
+
+
+_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+
+# Max image width in pixels — matches Google Docs Letter page content area
+# (8.5in - 2*1in margins = 6.5in = 468pt = 624px at 96 DPI)
+_MAX_IMAGE_WIDTH_PX = 624
+
+
+def _get_image_width(data: bytes) -> int | None:
+    """Read the pixel width from a PNG or JPEG file header."""
+    import struct
+
+    if data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) >= 24:
+        return struct.unpack(">I", data[16:20])[0]
+
+    if data[:2] in (b"\xff\xd8",):
+        offset = 2
+        while offset < len(data) - 4:
+            if data[offset] != 0xFF:
+                break
+            marker = data[offset + 1]
+            if marker in (0xC0, 0xC1, 0xC2):
+                if offset + 9 <= len(data):
+                    return struct.unpack(">H", data[offset + 7 : offset + 9])[0]
+                break
+            length = struct.unpack(">H", data[offset + 2 : offset + 4])[0]
+            offset += 2 + length
+
+    return None
+
+
+def embed_local_images(body: str, base_dir: Path) -> tuple[str, int]:
+    """Replace local image references with base64 data URI img tags.
+
+    The Drive API HTML import natively handles ``<img>`` tags with
+    ``data:`` URIs, embedding them as inline objects in the Google Doc.
+    This avoids the need to upload images to Drive separately.
+
+    Images wider than the Google Docs content area (624px) are scaled
+    down via the ``width`` HTML attribute, which the Drive API respects
+    during conversion. Smaller images keep their natural size.
+
+    URL-based images (http/https) are left as-is. Missing local files
+    produce a warning and are left unchanged.
+
+    Args:
+        body: Markdown text (frontmatter already stripped).
+        base_dir: Directory to resolve relative image paths against.
+
+    Returns:
+        Tuple of (modified body with img tags, count of embedded images).
+    """
+    import base64
+
+    count = 0
+
+    def _replace(match: re.Match) -> str:
+        nonlocal count
+        alt = match.group(1)
+        raw_path = match.group(2)
+
+        if raw_path.startswith(("http://", "https://")):
+            return match.group(0)
+
+        resolved = (base_dir / raw_path).resolve()
+        if not resolved.is_file():
+            print(f"Warning: image not found: {resolved}", file=sys.stderr)
+            return match.group(0)
+
+        mime_type, _ = mimetypes.guess_type(str(resolved))
+        mime_type = mime_type or "application/octet-stream"
+
+        raw = resolved.read_bytes()
+        data = base64.b64encode(raw).decode()
+
+        width_attr = ""
+        img_width = _get_image_width(raw)
+        if img_width and img_width > _MAX_IMAGE_WIDTH_PX:
+            width_attr = f' width="{_MAX_IMAGE_WIDTH_PX}"'
+
+        count += 1
+        return f'<img src="data:{mime_type};base64,{data}" alt="{alt}"{width_attr} />'
+
+    modified = _IMAGE_RE.sub(_replace, body)
+    return modified, count
 
 
 def import_markdown_as_doc(
@@ -1863,6 +1947,10 @@ def cmd_documents_import(args):
 
     folder_id = args.folder_id or meta.get("folder_id")
 
+    image_count = 0
+    if not getattr(args, "no_images", False):
+        body, image_count = embed_local_images(body, file_path.parent)
+
     html_content = convert_markdown_to_html(body)
 
     drive_service = build_drive_service(DRIVE_SCOPES_FILE)
@@ -1874,8 +1962,8 @@ def cmd_documents_import(args):
 
     doc_id = result.get("id")
 
-    # Post-import formatting (unless --no-format)
-    if not getattr(args, "no_format", False):
+    no_format = getattr(args, "no_format", False)
+    if not no_format:
         line_spacing = int(meta.get("line_spacing", DEFAULT_LINE_SPACING))
         space_below = int(meta.get("space_below", DEFAULT_SPACE_BELOW))
         pageless = meta.get("pageless", "true").lower() not in ("false", "no", "0")
@@ -1886,8 +1974,10 @@ def cmd_documents_import(args):
 
     if args.json:
         output = dict(result)
-        if not getattr(args, "no_format", False):
+        if not no_format:
             output["readability"] = readability
+        if image_count:
+            output["images"] = image_count
         print(json.dumps(output, indent=2))
     else:
         link = result.get("webViewLink", f"https://docs.google.com/document/d/{doc_id}/edit")
@@ -1898,8 +1988,10 @@ def cmd_documents_import(args):
         print(f"  Title: {result.get('name')}")
         print(f"  Document ID: {doc_id}")
         print(f"  URL: {link}")
+        if image_count:
+            print(f"  Images: {image_count} embedded")
 
-        if not getattr(args, "no_format", False):
+        if not no_format:
             print(
                 f"  Formatting: {line_spacing / 100:.2f}x line spacing, {space_below}pt space below"
             )
@@ -1980,6 +2072,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-format",
         action="store_true",
         help="Skip post-import formatting (line spacing, paragraph spacing)",
+    )
+    import_parser.add_argument(
+        "--no-images",
+        action="store_true",
+        help="Skip embedding local images from the markdown file",
     )
     import_parser.add_argument("--json", action="store_true", help="Output as JSON")
 

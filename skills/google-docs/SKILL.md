@@ -3,7 +3,7 @@ name: google-docs
 description: Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.
 metadata:
   author: odyssey4me
-  version: "0.5.1"
+  version: "0.6.0"
   category: google-workspace
   tags: "documents, editing"
   complexity: standard
@@ -205,6 +205,7 @@ $SKILL_DIR/scripts/google-docs.py documents import FILE_PATH [--title TITLE] [--
 - `--document-id` - Existing document ID to update (replaces content)
 - `--folder-id` - Parent folder ID for new documents
 - `--no-format` - Skip post-import formatting
+- `--no-images` - Skip embedding local images
 - `--json` - Output as JSON
 
 **Examples:**
@@ -220,7 +221,12 @@ $SKILL_DIR/scripts/google-docs.py documents import ./updated.md --document-id 1a
 
 # Import without post-import formatting
 $SKILL_DIR/scripts/google-docs.py documents import ./raw.md --no-format
+
+# Import without embedding images
+$SKILL_DIR/scripts/google-docs.py documents import ./doc.md --no-images
 ```
+
+**Images:** Local image references in markdown (`![alt text](path/to/image.png)`) are automatically embedded inline in the Google Doc at their original position. Paths are resolved relative to the markdown file's directory. URL-based images (`![alt](https://...)`) are not supported and will be omitted. Use `--no-images` to skip image processing.
 
 **Frontmatter:** YAML frontmatter (`---` delimited) is stripped from the markdown before import — it is not included in the Google Doc content. Supported frontmatter fields:
 
