@@ -3,7 +3,7 @@ name: google-docs
 description: Create and modify Google Docs documents. Read content, insert tables, apply heading styles, and manage formatting. Use when asked to edit a gdoc, write a Google document, update a doc, or format document content.
 metadata:
   author: odyssey4me
-  version: "0.6.0"
+  version: "0.7.0"
   category: google-workspace
   tags: "documents, editing"
   complexity: standard
@@ -17,7 +17,7 @@ Interact with Google Docs for document creation, editing, and content management
 
 ## Installation
 
-**Dependencies**: `pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml markdown`
+**Dependencies**: `pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml markdown-it-py`
 
 ## Setup Verification
 
@@ -28,7 +28,7 @@ $SKILL_DIR/scripts/google-docs.py check
 ```
 
 This will check:
-- Python dependencies (google-auth, google-auth-oauthlib, google-api-python-client, keyring, pyyaml, markdown)
+- Python dependencies (google-auth, google-auth-oauthlib, google-api-python-client, keyring, pyyaml, markdown-it-py)
 - Authentication configuration
 - Connectivity to Google Docs API
 
@@ -246,7 +246,7 @@ space_below: 10
 
 After formatting, a readability summary is printed showing heading, paragraph, and list item counts.
 
-**Note:** Requires `markdown`, `mdx-breakless-lists` Python libraries and the `drive.file` + `documents` scopes.
+**Note:** Requires `markdown-it-py` Python library and the `drive.file` + `documents` scopes.
 
 **See also:** For uploading files to Google Drive (non-markdown), sharing, organizing into folders, or exporting documents, use the **google-drive** skill.
 

@@ -67,21 +67,11 @@ except ImportError:
     YAML_AVAILABLE = False
 
 try:
-    import markdown as md_lib
+    from markdown_it import MarkdownIt
 
     MARKDOWN_LIB_AVAILABLE = True
 except ImportError:
     MARKDOWN_LIB_AVAILABLE = False
-
-try:
-    import mdx_breakless_lists  # noqa: F401
-except ImportError:
-    print(
-        "Error: 'mdx-breakless-lists' library not found. "
-        "Install with: pip install --user mdx-breakless-lists",
-        file=sys.stderr,
-    )
-    sys.exit(1)
 
 
 # ============================================================================
@@ -1470,12 +1460,14 @@ def extract_frontmatter(text: str) -> tuple[str, dict[str, str]]:
     Returns:
         Tuple of (body without frontmatter, metadata dict).
     """
-    if MARKDOWN_LIB_AVAILABLE:
-        md = md_lib.Markdown(extensions=["meta"])
-        md.convert(text)
-        meta_raw: dict[str, list[str]] = getattr(md, "Meta", {})
-        meta = {k: ", ".join(v) for k, v in meta_raw.items()}
-        return _strip_frontmatter(text), meta
+    if text.startswith("---"):
+        end = text.find("---", 3)
+        if end != -1:
+            front = text[3:end].strip()
+            if YAML_AVAILABLE and front:
+                meta = yaml.safe_load(front) or {}
+                meta = {str(k): str(v) for k, v in meta.items()}
+                return _strip_frontmatter(text), meta
 
     return _strip_frontmatter(text), {}
 
@@ -1503,7 +1495,7 @@ def extract_title_from_markdown(md_content: str) -> str | None:
 
 
 def convert_markdown_to_html(md_content: str) -> str:
-    """Convert markdown content to HTML using the markdown library.
+    """Convert markdown content to HTML using markdown-it-py (CommonMark).
 
     Args:
         md_content: Markdown text.
@@ -1511,7 +1503,38 @@ def convert_markdown_to_html(md_content: str) -> str:
     Returns:
         HTML string.
     """
-    return md_lib.markdown(md_content, extensions=["tables", "fenced_code", "mdx_breakless_lists"])
+    md = MarkdownIt("commonmark", {"html": True}).enable("table").enable("strikethrough")
+    return md.render(md_content)
+
+
+_IMPORT_WARNING_PATTERNS = [
+    (
+        re.compile(r"^- \[[ x]\] ", re.MULTILINE),
+        "Task list checkboxes (- [x]) will appear as plain text in Google Docs",
+    ),
+    (re.compile(r"\[.+?\]\[.+?\]"), "Reference-style links may not be resolved"),
+    (
+        re.compile(r"!\[([^\]]*)\]\(https?://"),
+        "URL-based images will be omitted (only local images are supported)",
+    ),
+    (re.compile(r"\[\^.+?\]"), "Footnotes are not supported by the Google Docs import"),
+]
+
+
+def check_import_warnings(body: str) -> list[str]:
+    """Check markdown content for patterns that won't import cleanly.
+
+    Args:
+        body: Markdown text to check.
+
+    Returns:
+        List of warning messages.
+    """
+    warnings = []
+    for pattern, message in _IMPORT_WARNING_PATTERNS:
+        if pattern.search(body):
+            warnings.append(message)
+    return warnings
 
 
 _IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
@@ -1923,7 +1946,8 @@ def cmd_documents_import(args):
     """Handle 'documents import' command."""
     if not MARKDOWN_LIB_AVAILABLE:
         print(
-            "Error: 'markdown' library not found. Install with: pip install --user markdown",
+            "Error: 'markdown-it-py' library not found. "
+            "Install with: pip install --user markdown-it-py",
             file=sys.stderr,
         )
         return 1
@@ -1937,6 +1961,11 @@ def cmd_documents_import(args):
 
     # Extract frontmatter metadata (CLI flags take precedence)
     body, meta = extract_frontmatter(md_content)
+
+    # Warn about content that won't import cleanly
+    warnings = check_import_warnings(body)
+    for w in warnings:
+        print(f"Warning: {w}", file=sys.stderr)
 
     # Resolve title: --title flag > frontmatter title > first H1 > filename stem
     title = args.title or meta.get("title")

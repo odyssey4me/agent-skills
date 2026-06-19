@@ -77,6 +77,7 @@ read_document_content = google_docs.read_document_content
 save_config = google_docs.save_config
 set_credential = google_docs.set_credential
 embed_local_images = google_docs.embed_local_images
+check_import_warnings = google_docs.check_import_warnings
 _get_image_width = google_docs._get_image_width
 _MAX_IMAGE_WIDTH_PX = google_docs._MAX_IMAGE_WIDTH_PX
 
@@ -2496,6 +2497,26 @@ class TestCmdDocumentsImportWithImages:
 
         captured = capsys.readouterr()
         assert "Images:" not in captured.out
+
+
+class TestCheckImportWarnings:
+    """Tests for check_import_warnings."""
+
+    def test_warns_on_task_lists(self):
+        warnings = check_import_warnings("- [x] Done\n- [ ] Not done")
+        assert any("Task list" in w for w in warnings)
+
+    def test_warns_on_url_images(self):
+        warnings = check_import_warnings("![logo](https://example.com/img.png)")
+        assert any("URL-based images" in w for w in warnings)
+
+    def test_warns_on_footnotes(self):
+        warnings = check_import_warnings("Text[^1]\n\n[^1]: Note")
+        assert any("Footnotes" in w for w in warnings)
+
+    def test_no_warnings_for_clean_markdown(self):
+        warnings = check_import_warnings("# Heading\n\nSome text.\n\n- Bullet")
+        assert warnings == []
 
 
 class TestArgumentParserImportNoImages:
