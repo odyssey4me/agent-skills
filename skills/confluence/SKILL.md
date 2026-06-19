@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "2.0.0"
+  version: "2.1.0"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -214,6 +214,8 @@ $SKILL_DIR/scripts/confluence.py page create --space DEMO --title "Guide" \
 # Update page from file
 $SKILL_DIR/scripts/confluence.py page update 123456 --body-file updated.md
 ```
+
+**Images:** When using `--body-file`, local image references in markdown (`![alt](path/to/image.png)`) are automatically uploaded as page attachments and embedded inline. Paths are resolved relative to the markdown file's directory.
 
 **Frontmatter support:** Markdown files can include YAML frontmatter with page metadata. CLI flags take precedence over frontmatter values. Supported fields: `title`, `space`, `labels`, `parent`, `toc`.
 

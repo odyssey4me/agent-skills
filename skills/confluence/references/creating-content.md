@@ -28,6 +28,28 @@ python confluence.py page create --space DEMO --title "Page" \
   --body '{"type":"doc","content":[...]}' --format editor
 ```
 
+### Images
+
+When creating or updating pages with `--body-file`, local image references in
+markdown are automatically handled:
+
+1. Images referenced as `![alt text](path/to/image.png)` are detected
+2. Each image file is uploaded as a page attachment
+3. The markdown reference is replaced with the Confluence download URL
+
+Paths are resolved relative to the markdown file's directory. URL-based images
+(`![alt](https://...)`) are left unchanged. Missing files produce a warning and
+are kept as-is in the body.
+
+```bash
+# Create a page with images — images in the same directory are uploaded
+python confluence.py page create --space DEMO --title "Design Doc" \
+  --body-file docs/design.md
+
+# Update a page — new images are uploaded automatically
+python confluence.py page update 123456 --body-file docs/design.md
+```
+
 ## Creating Pages
 
 ### Basic Page Creation

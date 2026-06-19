@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import mimetypes
 import os
 import re
 import sys
@@ -593,6 +594,7 @@ def make_request(
     *,
     params: dict[str, Any] | None = None,
     json_data: dict[str, Any] | None = None,
+    files: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     timeout: int = 30,
 ) -> dict[str, Any] | list[Any]:
@@ -604,6 +606,7 @@ def make_request(
         endpoint: API endpoint path (will be appended to base URL).
         params: Query parameters.
         json_data: JSON body data.
+        files: Files for multipart/form-data upload.
         headers: Additional headers.
         timeout: Request timeout in seconds.
 
@@ -621,7 +624,8 @@ def make_request(
 
     # Build headers with authentication
     request_headers = headers.copy() if headers else {}
-    request_headers.setdefault("Content-Type", "application/json")
+    if not files:
+        request_headers.setdefault("Content-Type", "application/json")
     request_headers.setdefault("Accept", "application/json")
 
     # Add authentication
@@ -637,7 +641,8 @@ def make_request(
         method=method.upper(),
         url=url,
         params=params,
-        json=json_data,
+        json=json_data if not files else None,
+        files=files,
         headers=request_headers,
         auth=auth,
         timeout=timeout,
@@ -995,6 +1000,116 @@ def get_page(
         return {}
 
 
+_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+
+
+def extract_local_images(body: str, base_dir: Path) -> tuple[str, list[dict[str, Any]]]:
+    """Extract local image references from markdown.
+
+    URL-based images are left as-is. Missing files produce a warning
+    and are left unchanged.
+
+    Args:
+        body: Markdown text.
+        base_dir: Directory to resolve relative image paths against.
+
+    Returns:
+        Tuple of (body with local images removed, list of image dicts).
+    """
+    images: list[dict[str, Any]] = []
+
+    def _replace(match: re.Match) -> str:
+        alt = match.group(1)
+        raw_path = match.group(2)
+
+        if raw_path.startswith(("http://", "https://")):
+            return match.group(0)
+
+        resolved = (base_dir / raw_path).resolve()
+        if not resolved.is_file():
+            print(f"Warning: image not found: {resolved}", file=sys.stderr)
+            return match.group(0)
+
+        images.append(
+            {
+                "alt": alt,
+                "path": resolved,
+                "original_ref": raw_path,
+                "original": match.group(0),
+            }
+        )
+        return ""
+
+    stripped = _IMAGE_RE.sub(_replace, body)
+    return stripped, images
+
+
+def upload_attachment(page_id: str, file_path: Path) -> dict[str, Any]:
+    """Upload a file as a page attachment.
+
+    Args:
+        page_id: Confluence page ID.
+        file_path: Local path to the file.
+
+    Returns:
+        Attachment metadata from the API response.
+
+    Raises:
+        APIError: If the upload fails.
+    """
+    endpoint = api_path(f"content/{page_id}/child/attachment")
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    mime_type = mime_type or "application/octet-stream"
+
+    return make_request(
+        "confluence",
+        "POST",
+        endpoint,
+        files={"file": (file_path.name, open(file_path, "rb"), mime_type)},
+        headers={"X-Atlassian-Token": "nocheck"},
+    )
+
+
+def replace_image_paths(body: str, replacements: dict[str, str]) -> str:
+    """Replace local image paths with download URLs in markdown.
+
+    Args:
+        body: Original markdown text.
+        replacements: Mapping of original path to download URL.
+
+    Returns:
+        Modified markdown with paths replaced.
+    """
+    for original_ref, url in replacements.items():
+        body = body.replace(f"]({original_ref})", f"]({url})")
+    return body
+
+
+def _upload_images_and_build_urls(page_id: str, images: list[dict[str, Any]]) -> dict[str, str]:
+    """Upload images as attachments and return path-to-URL mapping.
+
+    Args:
+        page_id: Confluence page ID.
+        images: Image dicts from extract_local_images.
+
+    Returns:
+        Dict mapping original_ref to download URL.
+    """
+    creds = get_credentials("confluence")
+    base_url = creds.url.rstrip("/")
+    replacements: dict[str, str] = {}
+
+    for img in images:
+        try:
+            upload_attachment(page_id, img["path"])
+            download_url = f"{base_url}/wiki/download/attachments/{page_id}/{img['path'].name}"
+            replacements[img["original_ref"]] = download_url
+        except APIError as e:
+            print(f"Warning: failed to upload {img['path'].name}: {e}", file=sys.stderr)
+
+    return replacements
+
+
 def create_page(
     space: str,
     title: str,
@@ -1004,6 +1119,7 @@ def create_page(
     body_format: str = "markdown",
     labels: list[str] | None = None,
     include_toc: bool = False,
+    base_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Create a new page.
 
@@ -1015,13 +1131,19 @@ def create_page(
         body_format: Format of body content ("markdown" or "editor").
         labels: List of labels to add.
         include_toc: Prepend a table of contents macro.
+        base_dir: Directory for resolving local image paths.
 
     Returns:
-        Created page dictionary.
+        Created page dictionary with ``image_count`` key if images were uploaded.
 
     Raises:
         APIError: If creation fails.
     """
+    images: list[dict[str, Any]] = []
+    original_body = body
+    if base_dir and body_format == "markdown":
+        body, images = extract_local_images(body, base_dir)
+
     # Convert body to appropriate format
     if body_format == "markdown":
         body_content = json.dumps(markdown_to_adf(body, include_toc=include_toc))
@@ -1054,9 +1176,21 @@ def create_page(
         page_data["metadata"] = {"labels": [{"name": label} for label in labels]}
 
     response = post("confluence", api_path("content"), page_data)
-    if isinstance(response, dict):
-        return response
-    return {}
+    page = response if isinstance(response, dict) else {}
+
+    if images and page.get("id"):
+        replacements = _upload_images_and_build_urls(page["id"], images)
+        if replacements:
+            full_body = replace_image_paths(original_body, replacements)
+            update_page(
+                page["id"],
+                body=full_body,
+                body_format="markdown",
+                include_toc=include_toc,
+            )
+        page["image_count"] = len(images)
+
+    return page
 
 
 def update_page(
@@ -1067,6 +1201,7 @@ def update_page(
     body_format: str = "markdown",
     version: int | None = None,
     include_toc: bool = False,
+    base_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Update an existing page.
 
@@ -1077,13 +1212,22 @@ def update_page(
         body_format: Format of body content ("markdown" or "editor").
         version: Current version number (will auto-detect if not provided).
         include_toc: Prepend a table of contents macro.
+        base_dir: Directory for resolving local image paths.
 
     Returns:
-        Updated page dictionary.
+        Updated page dictionary with ``image_count`` key if images were uploaded.
 
     Raises:
         APIError: If update fails or version conflict.
     """
+    image_count = 0
+    if base_dir and body and body_format == "markdown":
+        _, images = extract_local_images(body, base_dir)
+        if images:
+            replacements = _upload_images_and_build_urls(page_id, images)
+            body = replace_image_paths(body, replacements)
+            image_count = len(images)
+
     # Fetch current page for version and title when not explicitly provided
     if version is None or title is None:
         current_page = get_page(page_id, expand=["version"])
@@ -1120,9 +1264,10 @@ def update_page(
         }
 
     response = put("confluence", api_path(f"content/{page_id}"), update_data)
-    if isinstance(response, dict):
-        return response
-    return {}
+    page = response if isinstance(response, dict) else {}
+    if image_count:
+        page["image_count"] = image_count
+    return page
 
 
 def move_page(page_id: str, parent_id: str | None) -> dict[str, Any]:
@@ -1486,8 +1631,11 @@ def cmd_page(args: argparse.Namespace) -> int:
 
         elif args.page_command == "create":
             # Get body content
+            base_dir = None
             if args.body_file:
-                with open(args.body_file) as f:
+                body_path = Path(args.body_file)
+                base_dir = body_path.parent
+                with open(body_path) as f:
                     body = f.read()
             elif args.body:
                 body = args.body
@@ -1524,6 +1672,7 @@ def cmd_page(args: argparse.Namespace) -> int:
                 body_format=args.format,
                 labels=labels,
                 include_toc=include_toc,
+                base_dir=base_dir,
             )
 
             if args.json:
@@ -1532,12 +1681,17 @@ def cmd_page(args: argparse.Namespace) -> int:
                 print(f"Created page: {page.get('id', 'N/A')}")
                 print(f"Title: {page.get('title', 'N/A')}")
                 print(f"URL: {page.get('_links', {}).get('webui', 'N/A')}")
+                if page.get("image_count"):
+                    print(f"Images: {page['image_count']} uploaded")
 
         elif args.page_command == "update":
             # Get body content
             body = None
+            base_dir = None
             if args.body_file:
-                with open(args.body_file) as f:
+                body_path = Path(args.body_file)
+                base_dir = body_path.parent
+                with open(body_path) as f:
                     body = f.read()
             elif args.body:
                 body = args.body
@@ -1561,6 +1715,7 @@ def cmd_page(args: argparse.Namespace) -> int:
                 body_format=args.format,
                 version=args.version,
                 include_toc=include_toc,
+                base_dir=base_dir,
             )
 
             if args.json:
@@ -1568,6 +1723,8 @@ def cmd_page(args: argparse.Namespace) -> int:
             else:
                 print(f"Updated page: {page.get('id', 'N/A')}")
                 print(f"New version: {page.get('version', {}).get('number', 'N/A')}")
+                if page.get("image_count"):
+                    print(f"Images: {page['image_count']} uploaded")
 
         elif args.page_command == "move":
             parent_id = args.parent if args.parent else None

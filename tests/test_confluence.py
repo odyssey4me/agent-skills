@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 
 # Import from skills module
+from skills.confluence.scripts import confluence
 from skills.confluence.scripts.confluence import (
     APIError,
     ConfluenceDefaults,
@@ -22,6 +24,18 @@ from skills.confluence.scripts.confluence import (
     merge_cql_with_scope,
     save_config,
     set_credential,
+)
+
+extract_local_images = confluence.extract_local_images
+upload_attachment = confluence.upload_attachment
+replace_image_paths = confluence.replace_image_paths
+_upload_images_and_build_urls = confluence._upload_images_and_build_urls
+
+MINIMAL_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+    b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00"
+    b"\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00"
+    b"\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
 )
 
 
@@ -2141,3 +2155,176 @@ class TestFrontmatter:
 
         result = cmd_page(args)
         assert result == 0
+
+
+class TestExtractLocalImages:
+    """Tests for extract_local_images function."""
+
+    def test_extracts_single_image(self, tmp_path):
+        """Create a small file, parse markdown with ![alt](file.png), verify extraction."""
+        img = tmp_path / "photo.png"
+        img.write_bytes(MINIMAL_PNG)
+
+        body = "Some text\n![my alt](photo.png)\nMore text"
+        stripped, images = extract_local_images(body, tmp_path)
+
+        assert len(images) == 1
+        assert images[0]["alt"] == "my alt"
+        assert images[0]["path"] == img.resolve()
+        assert images[0]["original_ref"] == "photo.png"
+        assert "![my alt]" not in stripped
+        assert "Some text" in stripped
+        assert "More text" in stripped
+
+    def test_skips_url_images(self, tmp_path):
+        """URL-based images stay in body unchanged."""
+        body = "![alt](https://example.com/img.png)"
+        stripped, images = extract_local_images(body, tmp_path)
+
+        assert images == []
+        assert stripped == body
+
+    def test_missing_file_warns(self, tmp_path, capsys):
+        """Nonexistent file produces a warning and stays in body."""
+        body = "![alt](nonexistent.png)"
+        stripped, images = extract_local_images(body, tmp_path)
+
+        assert images == []
+        assert stripped == body
+        captured = capsys.readouterr()
+        assert "Warning: image not found" in captured.err
+
+    def test_no_images_returns_unchanged(self, tmp_path):
+        """No images in body returns body unchanged and empty list."""
+        body = "Just some plain text with no images."
+        stripped, images = extract_local_images(body, tmp_path)
+
+        assert stripped == body
+        assert images == []
+
+
+class TestReplaceImagePaths:
+    """Tests for replace_image_paths function."""
+
+    def test_replaces_paths(self):
+        """Local path is replaced with download URL."""
+        body = "![alt](local.png)"
+        replacements = {
+            "local.png": "https://confluence.example.com/download/attachments/123/local.png",
+        }
+        result = replace_image_paths(body, replacements)
+        assert result == "![alt](https://confluence.example.com/download/attachments/123/local.png)"
+
+
+class TestUploadAttachment:
+    """Tests for upload_attachment function."""
+
+    @patch("skills.confluence.scripts.confluence.make_request")
+    def test_upload_calls_make_request(self, mock_make_request, tmp_path):
+        """Verify make_request is called with files and X-Atlassian-Token header."""
+        img = tmp_path / "diagram.png"
+        img.write_bytes(MINIMAL_PNG)
+
+        mock_make_request.return_value = {"results": [{"id": "att1"}]}
+
+        upload_attachment("12345", img)
+
+        mock_make_request.assert_called_once()
+        call_kwargs = mock_make_request.call_args
+        # Check positional args: service, method, endpoint
+        assert call_kwargs[0][0] == "confluence"
+        assert call_kwargs[0][1] == "POST"
+        assert "12345/child/attachment" in call_kwargs[0][2]
+        # Check keyword args
+        assert "files" in call_kwargs[1]
+        assert call_kwargs[1]["headers"]["X-Atlassian-Token"] == "nocheck"
+
+
+class TestUploadImagesAndBuildUrls:
+    """Tests for _upload_images_and_build_urls function."""
+
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    @patch("skills.confluence.scripts.confluence.upload_attachment")
+    def test_uploads_images_and_builds_urls(self, mock_upload, mock_creds):
+        """Verify function uploads images and builds replacement URLs."""
+        mock_creds.return_value = Credentials(
+            url="https://confluence.example.com",
+            token="test123",
+            email="test@example.com",
+        )
+        mock_upload.return_value = None
+
+        images = [
+            {
+                "path": Path("image1.png"),
+                "original_ref": "image1.png",
+            },
+            {
+                "path": Path("image2.jpg"),
+                "original_ref": "subdir/image2.jpg",
+            },
+        ]
+
+        result = _upload_images_and_build_urls("12345", images)
+
+        assert result == {
+            "image1.png": "https://confluence.example.com/wiki/download/attachments/12345/image1.png",
+            "subdir/image2.jpg": "https://confluence.example.com/wiki/download/attachments/12345/image2.jpg",
+        }
+        assert mock_upload.call_count == 2
+
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    @patch("skills.confluence.scripts.confluence.upload_attachment")
+    def test_handles_upload_failures(self, mock_upload, mock_creds):
+        """Verify function handles upload failures gracefully."""
+        mock_creds.return_value = Credentials(
+            url="https://confluence.example.com",
+            token="test123",
+            email="test@example.com",
+        )
+        mock_upload.side_effect = [None, APIError("Upload failed")]
+
+        images = [
+            {"path": Path("image1.png"), "original_ref": "image1.png"},
+            {"path": Path("image2.jpg"), "original_ref": "image2.jpg"},
+        ]
+
+        result = _upload_images_and_build_urls("12345", images)
+
+        # First image should be in result, second should not be
+        assert "image1.png" in result
+        assert "image2.jpg" not in result
+        assert len(result) == 1
+
+
+class TestMakeRequestMultipart:
+    """Tests for make_request when files parameter is passed."""
+
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    @patch("skills.confluence.scripts.confluence.requests.request")
+    def test_skips_content_type_for_files(self, mock_request, mock_creds):
+        """When files is passed, Content-Type should NOT be set to application/json."""
+        from skills.confluence.scripts.confluence import make_request
+
+        mock_creds.return_value = Credentials(
+            url="https://example.atlassian.net",
+            token="test123",
+            email="test@example.com",
+        )
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"results": []}
+        mock_request.return_value = mock_response
+
+        make_request(
+            "confluence",
+            "POST",
+            "/rest/api/content/123/child/attachment",
+            files={"file": ("test.png", b"data", "image/png")},
+            headers={"X-Atlassian-Token": "nocheck"},
+        )
+
+        call_kwargs = mock_request.call_args
+        headers = call_kwargs[1].get("headers", call_kwargs.kwargs.get("headers", {}))
+        assert headers.get("Content-Type") != "application/json"
