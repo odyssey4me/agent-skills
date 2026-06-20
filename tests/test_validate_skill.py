@@ -146,7 +146,7 @@ description: A test skill
 
 No sections here.""")
 
-        errors = validate_skill_md(skill_md, "test")
+        errors = validate_skill_md(skill_md)
 
         assert any("## Authentication" in e.message for e in errors)
         assert any("## Commands" in e.message for e in errors)
@@ -179,7 +179,7 @@ Do something.
 Example here.
 """)
 
-        errors = validate_skill_md(skill_md, "test")
+        errors = validate_skill_md(skill_md)
 
         error_count = sum(1 for e in errors if e.severity == "error")
         assert error_count == 0
@@ -204,12 +204,12 @@ Token.
 Command.
 """)
 
-        errors = validate_skill_md(skill_md, "test")
+        errors = validate_skill_md(skill_md)
 
         assert any("## Examples" in e.message and e.severity == "warning" for e in errors)
 
     def test_validate_skill_md_missing_frontmatter(self, tmp_path):
-        """Test error for missing YAML frontmatter."""
+        """Test no crash when YAML frontmatter is missing (skillsaw handles this)."""
         skill_md = tmp_path / "SKILL.md"
         skill_md.write_text("""# Test
 
@@ -223,12 +223,14 @@ Token.
 Command.
 """)
 
-        errors = validate_skill_md(skill_md, "test")
+        errors = validate_skill_md(skill_md)
 
-        assert any("Missing YAML frontmatter" in e.message for e in errors)
+        # Frontmatter validation is handled by skillsaw; we just check sections
+        error_messages = [e.message for e in errors]
+        assert not any("Missing YAML frontmatter" in m for m in error_messages)
 
     def test_validate_skill_md_metadata_not_dict(self, tmp_path):
-        """Test error when metadata is not a dictionary."""
+        """Test version check when metadata is not a dictionary."""
         skill_md = tmp_path / "SKILL.md"
         skill_md.write_text("""---
 name: test
@@ -248,9 +250,9 @@ Token.
 Command.
 """)
 
-        errors = validate_skill_md(skill_md, "test")
+        errors = validate_skill_md(skill_md)
 
-        assert any("'metadata' must be a dictionary" in e.message for e in errors)
+        assert any("'version'" in e.message for e in errors)
 
     def test_validate_skill_md_missing_version(self, tmp_path):
         """Test error when metadata.version is missing."""
@@ -274,7 +276,7 @@ Token.
 Command.
 """)
 
-        errors = validate_skill_md(skill_md, "test")
+        errors = validate_skill_md(skill_md)
 
         assert any("missing required field: 'version'" in e.message for e in errors)
 
@@ -301,12 +303,12 @@ Token.
 Command.
 """)
 
-        errors = validate_skill_md(skill_md, "test")
+        errors = validate_skill_md(skill_md)
 
-        assert any("'version' must be a non-empty string" in e.message for e in errors)
+        assert any("'version'" in e.message for e in errors)
 
     def test_validate_skill_md_missing_required_fields(self, tmp_path):
-        """Test error for missing required frontmatter fields."""
+        """Test that name/description validation is left to skillsaw."""
         skill_md = tmp_path / "SKILL.md"
         skill_md.write_text("""---
 license: MIT
@@ -315,10 +317,13 @@ license: MIT
 # Test
 """)
 
-        errors = validate_skill_md(skill_md, "test")
+        errors = validate_skill_md(skill_md)
 
-        assert any("missing required field: 'name'" in e.message for e in errors)
-        assert any("missing required field: 'description'" in e.message for e in errors)
+        # name/description are validated by skillsaw, not this script
+        assert not any("missing required field: 'name'" in e.message for e in errors)
+        assert not any("missing required field: 'description'" in e.message for e in errors)
+        # But version should still be flagged
+        assert any("'version'" in e.message for e in errors)
 
 
 class TestValidateSkillScript:

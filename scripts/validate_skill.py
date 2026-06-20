@@ -51,7 +51,7 @@ def validate_skill(skill_dir: Path) -> list[ValidationError]:
     if not skill_md.exists():
         errors.append(ValidationError(str(skill_md), "SKILL.md not found"))
     else:
-        errors.extend(validate_skill_md(skill_md, skill_name))
+        errors.extend(validate_skill_md(skill_md))
 
     # Check for scripts/ directory
     # Documentation-only skills (like github, gitlab) that wrap official CLIs don't need scripts
@@ -83,12 +83,14 @@ def validate_skill(skill_dir: Path) -> list[ValidationError]:
     return errors
 
 
-def validate_skill_md(skill_md: Path, skill_name: str) -> list[ValidationError]:
-    """Validate SKILL.md content.
+def validate_skill_md(skill_md: Path) -> list[ValidationError]:
+    """Validate SKILL.md content for repo-specific conventions.
+
+    Frontmatter structure, name, and description validation is handled by
+    skillsaw — this function only checks conventions specific to this repo.
 
     Args:
         skill_md: Path to SKILL.md file.
-        skill_name: Name of the skill.
 
     Returns:
         List of validation errors.
@@ -96,120 +98,33 @@ def validate_skill_md(skill_md: Path, skill_name: str) -> list[ValidationError]:
     errors: list[ValidationError] = []
     content = skill_md.read_text()
 
-    # Check for YAML frontmatter
-    if not content.startswith("---\n"):
-        errors.append(
-            ValidationError(str(skill_md), "Missing YAML frontmatter (must start with '---')")
-        )
-    else:
-        # Parse frontmatter
+    # Check for metadata.version (used by check_versions.sh for release gating)
+    if content.startswith("---\n"):
         try:
             import yaml
 
-            # Find the end of frontmatter
             end_marker = content.find("\n---\n", 4)
-            if end_marker == -1:
-                errors.append(
-                    ValidationError(
-                        str(skill_md), "Invalid YAML frontmatter (missing closing '---')"
-                    )
-                )
-            else:
-                frontmatter = content[4:end_marker]
-                try:
-                    metadata = yaml.safe_load(frontmatter)
-
-                    # Check required fields
-                    if not isinstance(metadata, dict):
+            if end_marker != -1:
+                metadata = yaml.safe_load(content[4:end_marker])
+                if isinstance(metadata, dict):
+                    meta = metadata.get("metadata")
+                    if not isinstance(meta, dict) or not meta.get("version"):
                         errors.append(
-                            ValidationError(str(skill_md), "Frontmatter must be a YAML dictionary")
+                            ValidationError(
+                                str(skill_md),
+                                "Frontmatter metadata missing required field: 'version'",
+                            )
                         )
-                    else:
-                        # Check for required fields
-                        if "name" not in metadata:
-                            errors.append(
-                                ValidationError(
-                                    str(skill_md), "Frontmatter missing required field: 'name'"
-                                )
+                    if "license" not in metadata:
+                        errors.append(
+                            ValidationError(
+                                str(skill_md),
+                                "Frontmatter missing recommended field: 'license'",
+                                "warning",
                             )
-                        elif metadata["name"] != skill_name:
-                            errors.append(
-                                ValidationError(
-                                    str(skill_md),
-                                    f"Frontmatter 'name' ({metadata['name']}) doesn't match skill directory name ({skill_name})",
-                                    "warning",
-                                )
-                            )
-
-                        if "description" not in metadata:
-                            errors.append(
-                                ValidationError(
-                                    str(skill_md),
-                                    "Frontmatter missing required field: 'description'",
-                                )
-                            )
-                        elif not metadata["description"] or not isinstance(
-                            metadata["description"], str
-                        ):
-                            errors.append(
-                                ValidationError(
-                                    str(skill_md),
-                                    "Frontmatter 'description' must be a non-empty string",
-                                )
-                            )
-
-                        # Check for metadata and version
-                        if "metadata" not in metadata:
-                            errors.append(
-                                ValidationError(
-                                    str(skill_md),
-                                    "Frontmatter missing recommended field: 'metadata'",
-                                    "warning",
-                                )
-                            )
-                        elif not isinstance(metadata["metadata"], dict):
-                            errors.append(
-                                ValidationError(
-                                    str(skill_md),
-                                    "Frontmatter 'metadata' must be a dictionary",
-                                )
-                            )
-                        elif "version" not in metadata["metadata"]:
-                            errors.append(
-                                ValidationError(
-                                    str(skill_md),
-                                    "Frontmatter metadata missing required field: 'version'",
-                                )
-                            )
-                        elif (
-                            not isinstance(metadata["metadata"]["version"], str)
-                            or not metadata["metadata"]["version"]
-                        ):
-                            errors.append(
-                                ValidationError(
-                                    str(skill_md),
-                                    "Frontmatter metadata 'version' must be a non-empty string",
-                                )
-                            )
-                        if "license" not in metadata:
-                            errors.append(
-                                ValidationError(
-                                    str(skill_md),
-                                    "Frontmatter missing recommended field: 'license'",
-                                    "warning",
-                                )
-                            )
-
-                except yaml.YAMLError as e:
-                    errors.append(
-                        ValidationError(str(skill_md), f"Invalid YAML in frontmatter: {e}")
-                    )
-        except ImportError:
-            errors.append(
-                ValidationError(
-                    str(skill_md), "pyyaml not installed - cannot validate frontmatter", "warning"
-                )
-            )
+                        )
+        except Exception:
+            pass
 
     # Check for required sections
     required_sections = ["# ", "## Authentication"]
