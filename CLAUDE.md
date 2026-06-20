@@ -24,9 +24,7 @@ Delegate pre-commit checks to a **haiku** subagent (via the Task tool with
 1. Run `scripts/pre_commit_checks.sh` (or `--skills` if only skills changed).
 2. Fix any issues found and report back.
 
-After the subagent completes, stage everything and commit. The `tessl-sync`
-hook will auto-update `tile.json` files — if it modifies any, stage them and
-re-commit.
+After the subagent completes, stage everything and commit.
 
 ## Skill Versioning
 

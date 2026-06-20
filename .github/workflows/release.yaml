@@ -35,34 +35,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.ref_name }}" dist/*.tar.gz --clobber
-
-  discover-skills:
-    runs-on: ubuntu-latest
-    outputs:
-      skills: ${{ steps.find.outputs.skills }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Find publishable skills
-        id: find
-        run: |
-          skills=$(ls -d skills/*/tile.json 2>/dev/null | xargs -I{} dirname {} | jq -R -s -c 'split("\n") | map(select(. != ""))')
-          echo "skills=$skills" >> "$GITHUB_OUTPUT"
-
-  publish-tiles:
-    runs-on: ubuntu-latest
-    needs: [package-skills, discover-skills]
-    if: needs.discover-skills.outputs.skills != '[]'
-    strategy:
-      matrix:
-        skill: ${{ fromJson(needs.discover-skills.outputs.skills) }}
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Publish ${{ matrix.skill }}
-        uses: tesslio/publish@main
-        with:
-          path: ${{ matrix.skill }}
-          token: ${{ secrets.TESSL_API_TOKEN }}
-          review: 'false'

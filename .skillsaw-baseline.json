@@ -1,0 +1,140 @@
+{
+  "version": "1",
+  "generated_by": "skillsaw 0.14.0",
+  "generated_at": "2026-06-20T08:00:34.843915+00:00",
+  "violations": [
+    {
+      "fingerprint": "39997d74ef65b35b",
+      "rule_id": "context-budget",
+      "file_path": "confluence/SKILL.md",
+      "message": "Estimated 3,038 tokens exceeds skill warn limit of 3,000",
+      "severity": "warning",
+      "value": 3038,
+      "baseline_mode": "ceiling"
+    },
+    {
+      "fingerprint": "e1c6e22ae0632307",
+      "rule_id": "context-budget",
+      "file_path": "gmail/SKILL.md",
+      "message": "Estimated 3,025 tokens exceeds skill warn limit of 3,000",
+      "severity": "warning",
+      "value": 3025,
+      "baseline_mode": "ceiling"
+    },
+    {
+      "fingerprint": "f3832a0211e6acf9",
+      "rule_id": "context-budget",
+      "file_path": "google-docs/SKILL.md",
+      "message": "Estimated 3,841 tokens exceeds skill warn limit of 3,000",
+      "severity": "warning",
+      "value": 3841,
+      "baseline_mode": "ceiling"
+    },
+    {
+      "fingerprint": "e197dc5f56986004",
+      "rule_id": "context-budget",
+      "file_path": "google-sheets/SKILL.md",
+      "message": "Estimated 3,105 tokens exceeds skill warn limit of 3,000",
+      "severity": "warning",
+      "value": 3105,
+      "baseline_mode": "ceiling"
+    },
+    {
+      "fingerprint": "a0d2b156827328a2",
+      "rule_id": "context-budget",
+      "file_path": "jira/SKILL.md",
+      "message": "Estimated 4,271 tokens exceeds skill warn limit of 3,000",
+      "severity": "warning",
+      "value": 4271,
+      "baseline_mode": "ceiling"
+    },
+    {
+      "fingerprint": "7ce51f3394d970d5",
+      "rule_id": "content-weak-language",
+      "file_path": "confluence/SKILL.md",
+      "line": 26,
+      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "7edb274ad72aa7ab",
+      "rule_id": "content-weak-language",
+      "file_path": "gmail/SKILL.md",
+      "line": 24,
+      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "cebaed77bced54b4",
+      "rule_id": "content-weak-language",
+      "file_path": "google-calendar/SKILL.md",
+      "line": 24,
+      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "5f3ba1e7565b37b8",
+      "rule_id": "content-weak-language",
+      "file_path": "google-docs/SKILL.md",
+      "line": 24,
+      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "8faa8284c50820b4",
+      "rule_id": "content-weak-language",
+      "file_path": "google-docs/SKILL.md",
+      "line": 326,
+      "message": "Weak language (vagueness): 'Be careful' \u2014 Replace 'be careful' with specific checks to perform",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "a46118c51d588c40",
+      "rule_id": "content-weak-language",
+      "file_path": "google-drive/SKILL.md",
+      "line": 24,
+      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "bf14fde6210135f3",
+      "rule_id": "content-weak-language",
+      "file_path": "google-sheets/SKILL.md",
+      "line": 24,
+      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "f1aaaf76a36f2772",
+      "rule_id": "content-weak-language",
+      "file_path": "google-slides/SKILL.md",
+      "line": 24,
+      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "7a25ec79ee40bdbb",
+      "rule_id": "content-weak-language",
+      "file_path": "jira/SKILL.md",
+      "line": 29,
+      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "dba2ec9d3cb0ae27",
+      "rule_id": "content-weak-language",
+      "file_path": "jira/SKILL.md",
+      "line": 119,
+      "message": "Weak language (vagueness): 'correctly' \u2014 Remove 'correctly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    },
+    {
+      "fingerprint": "dcb493d9ce7f3c3a",
+      "rule_id": "content-weak-language",
+      "file_path": "jira/SKILL.md",
+      "line": 149,
+      "message": "Weak language (vagueness): 'correctly' \u2014 Remove 'correctly' \u2014 describe what correct behavior looks like",
+      "severity": "warning"
+    }
+  ]
+}

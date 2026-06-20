@@ -25,6 +25,13 @@ repos:
         args: [--check]
         stages: [pre-push]
 
+  # Skillsaw - Agent skill linter
+  - repo: https://github.com/stbenjam/skillsaw
+    rev: v0.14.0
+    hooks:
+      - id: skillsaw
+        stages: [pre-commit]
+
   # Validate skill structure before commit
   - repo: local
     hooks:
@@ -37,22 +44,6 @@ repos:
         args: [skills/*]
         stages: [pre-commit]
 
-      - id: tessl-lint
-        name: tessl skill lint
-        entry: bash -c 'status=0; for t in skills/*/tile.json; do tessl skill lint "$t" || status=1; done; exit $status'
-        language: system
-        files: ^skills/
-        pass_filenames: false
-        stages: [pre-commit]
-
-      - id: tessl-sync
-        name: check tile.json files are up to date
-        entry: bash -c 'scripts/sync_tile_versions.sh && git diff --exit-code skills/*/tile.json'
-        language: system
-        files: ^skills/
-        pass_filenames: false
-        stages: [pre-commit]
-
       - id: diff-cover
         name: coverage for changed lines
         entry: bash -c 'pytest tests/ -q --cov=skills --cov=scripts --cov-report=xml:coverage.xml && diff-cover coverage.xml --compare-branch=HEAD --fail-under=80'
@@ -62,6 +53,15 @@ repos:
         stages: [pre-commit]
 
   # Run full CI checks before push
+  - repo: https://github.com/stbenjam/skillsaw
+    rev: v0.14.0
+    hooks:
+      - id: skillsaw
+        alias: skillsaw-prepush
+        name: skillsaw (pre-push)
+        stages: [pre-push]
+        always_run: true
+
   - repo: local
     hooks:
       - id: validate-skills-prepush
@@ -70,22 +70,6 @@ repos:
         language: system
         pass_filenames: false
         args: [skills/*]
-        stages: [pre-push]
-        always_run: true
-
-      - id: tessl-lint-prepush
-        name: tessl skill lint (pre-push)
-        entry: bash -c 'status=0; for t in skills/*/tile.json; do tessl skill lint "$t" || status=1; done; exit $status'
-        language: system
-        pass_filenames: false
-        stages: [pre-push]
-        always_run: true
-
-      - id: tessl-sync-prepush
-        name: check tile.json files are up to date (pre-push)
-        entry: bash -c 'scripts/sync_tile_versions.sh && git diff --exit-code skills/*/tile.json'
-        language: system
-        pass_filenames: false
         stages: [pre-push]
         always_run: true
 

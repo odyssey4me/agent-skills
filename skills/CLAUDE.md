@@ -8,7 +8,6 @@ following the [Agent Skills specification](https://agentskills.io/specification)
 ```
 skills/<name>/
 ├── SKILL.md           # Documentation + YAML frontmatter (required)
-├── tile.json          # Auto-generated metadata (never edit manually)
 ├── scripts/
 │   └── <name>.py      # Python implementation
 └── references/        # Optional supplementary docs

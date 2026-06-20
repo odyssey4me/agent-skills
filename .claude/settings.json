@@ -1,10 +1,4 @@
 {
-  "permissions": {
-    "deny": [
-      "Edit(**/tile.json)",
-      "Write(**/tile.json)"
-    ]
-  },
   "hooks": {
     "PreToolUse": [
       {
