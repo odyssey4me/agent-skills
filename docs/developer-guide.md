@@ -163,7 +163,7 @@ agent-skills/
 
 ### Prerequisites
 
-- Python 3.10 or later
+- Python 3.11 or later
 - Git
 - `pip` package manager
 
@@ -179,7 +179,7 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install development dependencies
-pip install -e ".[dev]"
+pip install -e ".[dev,google]"
 ```
 
 ### Development Dependencies
@@ -538,7 +538,7 @@ pytest tests/test_jira.py -v
 pytest tests/ --cov=skills --cov-report=html
 
 # Coverage threshold
-pytest tests/ --cov=skills --cov-fail-under=50
+pytest tests/ --cov=skills --cov-fail-under=80
 ```
 
 ### Skill Structure Validation

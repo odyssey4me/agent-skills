@@ -12,7 +12,7 @@ This document covers the essential workflow for contributing.
 # Clone and setup
 git clone https://github.com/odyssey4me/agent-skills.git
 cd agent-skills
-pip install -e ".[dev]"
+pip install -e ".[dev,google]"
 
 # Install pre-commit hooks
 pre-commit install
@@ -23,7 +23,7 @@ pytest
 ruff check .
 ```
 
-**Prerequisites**: Python 3.10+, Git
+**Prerequisites**: Python 3.11+, Git
 
 ## Standards
 
@@ -50,10 +50,11 @@ Pre-commit hooks automatically run before each commit and push:
 **Before each commit:**
 - `ruff check --fix` - Lints and auto-fixes code
 - `ruff format` - Formats code
-- `pytest tests/` - Runs all tests
+- `skillsaw` - Lints skill structure and content
+- `diff-cover` - Checks coverage on changed lines (must be ≥80%)
 
 **Before each push:**
-- `pytest tests/ --cov` - Runs tests with coverage (must be ≥50%)
+- `pytest tests/ --cov` - Runs tests with coverage (must be ≥80%)
 
 **Manual checks** (optional, hooks handle this):
 ```bash
@@ -62,7 +63,7 @@ ruff check .
 ruff format .
 
 # Run tests with coverage
-pytest tests/ -v --cov=skills --cov=scripts --cov-fail-under=50
+pytest tests/ -v --cov=skills --cov=scripts --cov-fail-under=80
 
 # Validate skill structure
 python scripts/validate_skill.py skills/*
@@ -86,11 +87,11 @@ docs(readme): update installation instructions
 
 ## Code Style
 
-- **Python**: 3.10+
+- **Python**: 3.11+
 - **Formatting**: ruff (line-length 100)
 - **Type hints**: Required for all function signatures
 - **Docstrings**: Google style
-- **Coverage**: Minimum 50% (goal: 80%)
+- **Coverage**: Minimum 80%
 
 ## Local Skill Testing
 
