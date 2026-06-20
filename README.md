@@ -62,7 +62,6 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 
 | Skill | Description |
 |-------|-------------|
-| [Code Review](skills/code-review/SKILL.md) | Review PRs, MRs, and Gerrit changes with focus on security, maintainability, and architectural fit |
 | [Confluence](skills/confluence/SKILL.md) | Content management, page CRUD with Markdown support, CQL search |
 | [Gerrit](skills/gerrit/SKILL.md) | Code review, submit changes, download patches via `git-review` CLI |
 | [GitHub](skills/github/SKILL.md) | Issues, pull requests, workflows, and repositories via `gh` CLI |
