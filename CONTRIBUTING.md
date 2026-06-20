@@ -62,6 +62,9 @@ Pre-commit hooks automatically run before each commit and push:
 ruff check .
 ruff format .
 
+# Lint skills (structure, content quality, token budgets)
+skillsaw lint .
+
 # Run tests with coverage
 pytest tests/ -v --cov=skills --cov=scripts --cov-fail-under=80
 

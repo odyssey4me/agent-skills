@@ -202,6 +202,9 @@ ruff check .
 # Format code
 ruff format .
 
+# Lint skills (structure, content quality, token budgets)
+skillsaw lint .
+
 # Validate skill structure
 python scripts/validate_skill.py skills/jira
 ```
