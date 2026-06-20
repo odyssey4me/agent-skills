@@ -6,7 +6,7 @@ Portable skills for AI coding assistants providing integrations with Jira, Confl
 
 - **Self-Contained**: Each skill is a single Python script - no framework dependencies
 - **Multi-Agent Compatible**: Works with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents) including [Claude Code](https://claude.com/claude-code), Cursor, Continue.dev, and more
-- **Simple Installation**: Just Python + 3 packages (`requests`, `keyring`, `pyyaml`)
+- **Simple Installation**: Just Python and a few pip packages
 - **Built-in Validation**: Each skill includes a `check` command for setup verification
 - **Secure Authentication**: Supports system keyring, environment variables, and config files
 
