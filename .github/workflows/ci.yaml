@@ -82,7 +82,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install dependencies
-        run: pip install requests keyring pyyaml
+        run: pip install -e ".[dev,google]"
 
       - name: Test skill execution
         run: |
