@@ -12,11 +12,13 @@ from skills.gerrit.scripts.gerrit import (
     _get_ssh_cmd,
     _read_gitreview,
     build_parser,
+    cmd_changes_diff,
     cmd_changes_list,
     cmd_changes_search,
     cmd_changes_view,
     cmd_check,
     cmd_projects_list,
+    fetch_change_diff,
     format_change_row,
     format_change_summary,
     format_project_row,
@@ -564,3 +566,206 @@ class TestBuildParser:
         parser = build_parser()
         args = parser.parse_args(["changes", "list"])
         assert args.limit == 30
+
+    def test_parser_changes_diff(self):
+        """Test parser for changes diff command."""
+        parser = build_parser()
+        args = parser.parse_args(["changes", "diff", "12345"])
+        assert args.changes_command == "diff"
+        assert args.number == 12345
+        assert args.patchset == "current"
+        assert args.scheme == "https"
+
+    def test_parser_changes_diff_with_options(self):
+        """Test parser for changes diff with patchset and scheme."""
+        parser = build_parser()
+        args = parser.parse_args(
+            ["changes", "diff", "99999", "--patchset", "3", "--scheme", "http"]
+        )
+        assert args.number == 99999
+        assert args.patchset == "3"
+        assert args.scheme == "http"
+
+
+# ============================================================================
+# FETCH_CHANGE_DIFF TESTS
+# ============================================================================
+
+
+class TestFetchChangeDiff:
+    """Tests for fetch_change_diff helper."""
+
+    @patch("skills.gerrit.scripts.gerrit.urllib.request.urlopen")
+    def test_fetch_diff_success(self, mock_urlopen):
+        """Test successful diff fetch with base64 response."""
+        import base64
+
+        diff_content = "diff --git a/file.py b/file.py\n--- a/file.py\n+++ b/file.py\n"
+        encoded = base64.b64encode(diff_content.encode("utf-8")).decode("utf-8")
+        mock_response = Mock()
+        mock_response.read.return_value = encoded.encode("utf-8")
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        result = fetch_change_diff("review.example.com", 12345)
+
+        assert result == diff_content
+        call_args = mock_urlopen.call_args[0][0]
+        assert (
+            call_args.full_url == "https://review.example.com/changes/12345/revisions/current/patch"
+        )
+
+    @patch("skills.gerrit.scripts.gerrit.urllib.request.urlopen")
+    def test_fetch_diff_custom_patchset(self, mock_urlopen):
+        """Test diff fetch for a specific patchset."""
+        import base64
+
+        diff_content = "diff --git a/file.py b/file.py\n"
+        encoded = base64.b64encode(diff_content.encode("utf-8")).decode("utf-8")
+        mock_response = Mock()
+        mock_response.read.return_value = encoded.encode("utf-8")
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        result = fetch_change_diff("review.example.com", 12345, patchset="3", scheme="http")
+
+        assert result == diff_content
+        call_args = mock_urlopen.call_args[0][0]
+        assert call_args.full_url == "http://review.example.com/changes/12345/revisions/3/patch"
+
+    @patch("skills.gerrit.scripts.gerrit.urllib.request.urlopen")
+    def test_fetch_diff_404(self, mock_urlopen):
+        """Test diff fetch with change not found."""
+        import urllib.error
+
+        mock_urlopen.side_effect = urllib.error.HTTPError(
+            url="", code=404, msg="Not Found", hdrs=None, fp=None
+        )
+
+        with pytest.raises(SystemExit):
+            fetch_change_diff("review.example.com", 99999)
+
+    @patch("skills.gerrit.scripts.gerrit.urllib.request.urlopen")
+    def test_fetch_diff_403(self, mock_urlopen):
+        """Test diff fetch with access denied."""
+        import urllib.error
+
+        mock_urlopen.side_effect = urllib.error.HTTPError(
+            url="", code=403, msg="Forbidden", hdrs=None, fp=None
+        )
+
+        with pytest.raises(SystemExit):
+            fetch_change_diff("review.example.com", 12345)
+
+    @patch("skills.gerrit.scripts.gerrit.urllib.request.urlopen")
+    def test_fetch_diff_connection_error(self, mock_urlopen):
+        """Test diff fetch with connection error."""
+        import urllib.error
+
+        mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
+
+        with pytest.raises(SystemExit):
+            fetch_change_diff("review.example.com", 12345)
+
+    @patch("skills.gerrit.scripts.gerrit.urllib.request.urlopen")
+    def test_fetch_diff_xssi_prefix(self, mock_urlopen):
+        """Test diff fetch handles )]}' XSSI prefix."""
+        import base64
+
+        diff_content = "diff --git a/file.py b/file.py\n"
+        encoded = base64.b64encode(diff_content.encode("utf-8")).decode("utf-8")
+        raw = f")]}}'\n{encoded}"
+        mock_response = Mock()
+        mock_response.read.return_value = raw.encode("utf-8")
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        result = fetch_change_diff("review.example.com", 12345)
+
+        assert result == diff_content
+
+
+# ============================================================================
+# CMD_CHANGES_DIFF TESTS
+# ============================================================================
+
+
+class TestCmdChangesDiff:
+    """Tests for changes diff command."""
+
+    @patch("skills.gerrit.scripts.gerrit._read_gitreview")
+    @patch("skills.gerrit.scripts.gerrit.fetch_change_diff")
+    def test_diff_markdown(self, mock_fetch, mock_gitreview, capsys):
+        """Test diff command with default output."""
+        mock_gitreview.return_value = {
+            "host": "review.example.com",
+            "port": "29418",
+            "project": "",
+            "username": "",
+        }
+        mock_fetch.return_value = "diff --git a/file.py b/file.py\n--- a/file.py\n+++ b/file.py\n"
+
+        args = Mock(number=12345, host=None, patchset="current", scheme="https", json=False)
+        result = cmd_changes_diff(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "diff --git a/file.py b/file.py" in captured.out
+        mock_fetch.assert_called_once_with(
+            "review.example.com", 12345, patchset="current", scheme="https"
+        )
+
+    @patch("skills.gerrit.scripts.gerrit._read_gitreview")
+    @patch("skills.gerrit.scripts.gerrit.fetch_change_diff")
+    def test_diff_json(self, mock_fetch, mock_gitreview, capsys):
+        """Test diff command with JSON output."""
+        mock_gitreview.return_value = {
+            "host": "review.example.com",
+            "port": "29418",
+            "project": "",
+            "username": "",
+        }
+        diff_text = "diff --git a/file.py b/file.py\n"
+        mock_fetch.return_value = diff_text
+
+        args = Mock(number=12345, host=None, patchset="current", scheme="https", json=True)
+        result = cmd_changes_diff(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["change"] == 12345
+        assert output["patchset"] == "current"
+        assert output["diff"] == diff_text
+
+    def test_diff_no_host(self):
+        """Test diff command with no host configured."""
+        with patch(
+            "skills.gerrit.scripts.gerrit._read_gitreview",
+            return_value={"host": "", "port": "29418", "project": "", "username": ""},
+        ):
+            args = Mock(number=12345, host=None, patchset="current", scheme="https", json=False)
+            result = cmd_changes_diff(args)
+
+            assert result == 1
+
+    @patch("skills.gerrit.scripts.gerrit._read_gitreview")
+    @patch("skills.gerrit.scripts.gerrit.fetch_change_diff")
+    def test_diff_custom_patchset(self, mock_fetch, mock_gitreview):
+        """Test diff command with specific patchset."""
+        mock_gitreview.return_value = {
+            "host": "review.example.com",
+            "port": "29418",
+            "project": "",
+            "username": "",
+        }
+        mock_fetch.return_value = "diff content\n"
+
+        args = Mock(number=12345, host=None, patchset="3", scheme="http", json=False)
+        result = cmd_changes_diff(args)
+
+        assert result == 0
+        mock_fetch.assert_called_once_with("review.example.com", 12345, patchset="3", scheme="http")

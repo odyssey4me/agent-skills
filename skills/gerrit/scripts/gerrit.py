@@ -19,10 +19,13 @@ Requirements:
 from __future__ import annotations
 
 import argparse
+import base64
 import configparser
 import json
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -292,6 +295,75 @@ def format_project_row(project_name: str) -> str:
 
 
 # ============================================================================
+# REST API HELPERS
+# ============================================================================
+
+
+def fetch_change_diff(
+    host: str,
+    change_number: int,
+    patchset: str = "current",
+    scheme: str = "https",
+) -> str:
+    """Fetch the unified diff for a Gerrit change via the REST API.
+
+    Uses the ``/changes/{id}/revisions/{rev}/patch`` endpoint which returns the
+    diff as base64-encoded content.
+
+    Args:
+        host: Gerrit server hostname.
+        change_number: Gerrit change number.
+        patchset: Patchset revision — ``"current"`` (default) or a number like ``"3"``.
+        scheme: URL scheme (``"https"`` or ``"http"``).
+
+    Returns:
+        Decoded unified diff as a string.
+
+    Raises:
+        SystemExit: On HTTP errors.
+    """
+    url = f"{scheme}://{host}/changes/{change_number}/revisions/{patchset}/patch"
+
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/text"})
+        with urllib.request.urlopen(req) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            print(
+                f"Error: Change {change_number} (patchset {patchset}) not found.",
+                file=sys.stderr,
+            )
+        elif exc.code == 403:
+            print(
+                "Error: Access denied. The change may require authentication.",
+                file=sys.stderr,
+            )
+            print(
+                "Set HTTP password in Gerrit: Settings > HTTP Credentials",
+                file=sys.stderr,
+            )
+        else:
+            print(f"Error: HTTP {exc.code} fetching diff: {exc.reason}", file=sys.stderr)
+        sys.exit(1)
+    except urllib.error.URLError as exc:
+        print(f"Error: Cannot connect to {scheme}://{host}: {exc.reason}", file=sys.stderr)
+        print("Try --scheme http if the server does not support HTTPS.", file=sys.stderr)
+        sys.exit(1)
+
+    # Gerrit returns base64-encoded patch content
+    decoded = raw.decode("utf-8").strip()
+    try:
+        return base64.b64decode(decoded).decode("utf-8")
+    except Exception:
+        # Some Gerrit versions may prefix with )]}' — strip and retry
+        if decoded.startswith(")]}'"):
+            decoded = decoded.split("\n", 1)[1].strip()
+            return base64.b64decode(decoded).decode("utf-8")
+        raise
+
+
+# ============================================================================
 # COMMAND HANDLERS — one per subcommand, return exit code
 # ============================================================================
 
@@ -404,6 +476,34 @@ def cmd_changes_view(args: argparse.Namespace) -> int:
             print(f"Change {args.number} not found")
         else:
             print(format_change_summary(changes[0]))
+    return 0
+
+
+def cmd_changes_diff(args: argparse.Namespace) -> int:
+    """Fetch and display the unified diff for a change.
+
+    Args:
+        args: Parsed arguments with change number, patchset, host, scheme, json flags.
+
+    Returns:
+        Exit code.
+    """
+    gitreview = _read_gitreview()
+    host = args.host or gitreview["host"]
+
+    if not host:
+        print("Error: No Gerrit host specified.", file=sys.stderr)
+        return 1
+
+    scheme = args.scheme
+    patchset = args.patchset
+
+    diff_text = fetch_change_diff(host, args.number, patchset=patchset, scheme=scheme)
+
+    if args.json:
+        print(json.dumps({"change": args.number, "patchset": patchset, "diff": diff_text}))
+    else:
+        print(diff_text, end="")
     return 0
 
 
@@ -540,6 +640,16 @@ def build_parser() -> argparse.ArgumentParser:
     changes_view.add_argument("number", type=int, help="Change number")
     changes_view.add_argument("--json", action="store_true", help="Output raw JSON")
 
+    changes_diff = changes_sub.add_parser("diff", help="Get unified diff of a change")
+    changes_diff.add_argument("number", type=int, help="Change number")
+    changes_diff.add_argument(
+        "--patchset", default="current", help="Patchset number (default: current)"
+    )
+    changes_diff.add_argument(
+        "--scheme", default="https", choices=["https", "http"], help="URL scheme (default: https)"
+    )
+    changes_diff.add_argument("--json", action="store_true", help="Output as JSON")
+
     changes_search = changes_sub.add_parser("search", help="Search changes")
     changes_search.add_argument("query", help="Gerrit query string")
     changes_search.add_argument("--limit", type=int, default=30, help="Max results (default 30)")
@@ -584,6 +694,8 @@ def main() -> int:
             return cmd_changes_list(args)
         elif args.changes_command == "view":
             return cmd_changes_view(args)
+        elif args.changes_command == "diff":
+            return cmd_changes_diff(args)
         elif args.changes_command == "search":
             return cmd_changes_search(args)
     elif args.command == "projects":
