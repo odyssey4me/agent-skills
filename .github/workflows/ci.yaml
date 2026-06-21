@@ -16,6 +16,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install dependencies
+        run: uv sync --group dev
+
       - name: Run ruff check
         run: uv run ruff check .
 
