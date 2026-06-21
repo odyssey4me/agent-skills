@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "agent-skills"
@@ -49,14 +49,12 @@ Homepage = "https://github.com/odyssey4me/agent-skills"
 Repository = "https://github.com/odyssey4me/agent-skills"
 Issues = "https://github.com/odyssey4me/agent-skills/issues"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["skills*", "scripts*"]
-exclude = ["shared*"]
+[tool.hatch.build.targets.wheel]
+packages = ["skills", "scripts"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = [

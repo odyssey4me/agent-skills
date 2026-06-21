@@ -9,9 +9,7 @@
     "before 5am every weekday"
   ],
   "enabledManagers": [
-    "pip_requirements",
-    "pip_setup",
-    "pep621",
+    "uv",
     "github-actions",
     "pre-commit"
   ],

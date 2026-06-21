@@ -164,8 +164,8 @@ agent-skills/
 ### Prerequisites
 
 - Python 3.11 or later
+- [uv](https://docs.astral.sh/uv/) — fast Python package manager
 - Git
-- `pip` package manager
 
 ### Initial Setup
 
@@ -174,12 +174,8 @@ agent-skills/
 git clone https://github.com/odyssey4me/agent-skills.git
 cd agent-skills
 
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install development dependencies
-pip install -e ".[dev,google]"
+# Install all dependencies from lockfile
+uv sync --all-extras
 ```
 
 ### Development Dependencies
@@ -194,19 +190,19 @@ The `[dev]` extra installs:
 
 ```bash
 # Run tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Lint code
-ruff check .
+uv run ruff check .
 
 # Format code
-ruff format .
+uv run ruff format .
 
 # Lint skills (structure, content quality, token budgets)
 skillsaw lint .
 
 # Validate skill structure
-python scripts/validate_skill.py skills/jira
+uv run python scripts/validate_skill.py skills/jira
 ```
 
 ## Creating New Skills

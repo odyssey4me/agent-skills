@@ -23,7 +23,7 @@ import configparser
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -145,7 +145,7 @@ def format_timestamp(timestamp: int | None) -> str:
     if not timestamp:
         return "N/A"
     try:
-        dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        dt = datetime.fromtimestamp(timestamp, tz=UTC)
         return dt.strftime("%Y-%m-%d %H:%M")
     except (OSError, ValueError, OverflowError):
         return "N/A"

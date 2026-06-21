@@ -25,6 +25,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -1793,11 +1794,11 @@ def format_automation_detail(rule_config: dict[str, Any]) -> str:
 
 def _format_timestamp(ts: float | int) -> str:
     """Format a Unix timestamp (seconds or milliseconds) as ISO date."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     if ts > 1e12:
         ts = ts / 1000.0
-    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    dt = datetime.fromtimestamp(ts, tz=UTC)
     return dt.strftime("%Y-%m-%d %H:%M UTC")
 
 

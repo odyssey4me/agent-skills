@@ -12,18 +12,18 @@ This document covers the essential workflow for contributing.
 # Clone and setup
 git clone https://github.com/odyssey4me/agent-skills.git
 cd agent-skills
-pip install -e ".[dev,google]"
+uv sync --all-extras
 
 # Install pre-commit hooks
 pre-commit install
 pre-commit install --hook-type pre-push
 
 # Verify setup
-pytest
-ruff check .
+uv run pytest
+uv run ruff check .
 ```
 
-**Prerequisites**: Python 3.11+, Git
+**Prerequisites**: Python 3.11+, [uv](https://docs.astral.sh/uv/), Git
 
 ## Standards
 
