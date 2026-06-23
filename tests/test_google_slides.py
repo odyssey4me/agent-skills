@@ -3026,6 +3026,46 @@ class TestCustomLayoutRoundTrip:
         assert "title: Weird Deck" in result
         assert "presentation_id: pres-999" in result
 
+    def test_title_with_colon_is_quoted(self):
+        """Titles containing colons are quoted in YAML output."""
+        mock_service = Mock()
+        mock_service.presentations().get().execute.return_value = {
+            "presentationId": "pres-colon",
+            "title": "Gemba: Use data",
+            "slides": [{"objectId": "s1", "pageElements": []}],
+            "pageSize": {
+                "width": {"magnitude": 9144000},
+                "height": {"magnitude": 6858000},
+            },
+        }
+
+        result = presentation_to_markdown(mock_service, "pres-colon")
+        assert '"Gemba: Use data"' in result
+
+    def test_list_data_in_text_placeholder(self):
+        """List data in a text-role placeholder renders as bullets."""
+        spec = {
+            "title": "Test",
+            "palette": "red-hat",
+            "aspect_ratio": "widescreen",
+            "custom_layouts": {},
+            "slides": [
+                {
+                    "layout": "data",
+                    "title": "Metrics",
+                    "metric": "99.9%",
+                    "bullets": ["Item A", "Item B"],
+                }
+            ],
+        }
+        builder = PresentationBuilder()
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as f:
+            out = builder.build_from_spec(spec, f.name)
+            assert out.exists()
+            Path(f.name).unlink()
+
     def test_custom_layout_used_by_builder(self):
         """Custom layouts from frontmatter are used by PresentationBuilder."""
         md = """---
@@ -3408,35 +3448,35 @@ class TestIconSystemExtended:
 class TestPresentationBuilderExtended:
     """Extended tests for PresentationBuilder slide methods."""
 
-    def test_add_bullet_list_with_icons(self, tmp_path):
-        """Bullet list with icon dicts renders text and attempts icon resolution."""
+    def test_bullet_list_with_icons(self):
+        """Content slide with icon dicts renders text via template placeholder."""
         builder = PresentationBuilder()
-        slide_layout = builder.prs.slide_layouts[6]
-        slide = builder.prs.slides.add_slide(slide_layout)
-
-        bullets = [
-            {"icon": "nonexistent-icon", "text": "With icon"},
-            "Plain bullet",
-        ]
-
         with patch("google_slides.CAIROSVG_AVAILABLE", False):
-            builder._add_bullet_list(
-                slide,
-                bullets,
-                left=Inches(1),
-                top=Inches(2),
-                width=Inches(8),
-                height=Inches(4),
+            builder._add_layout_slide(
+                "content",
+                {
+                    "title": "Icons Test",
+                    "bullets": [
+                        {"icon": "nonexistent-icon", "text": "With icon"},
+                        "Plain bullet",
+                    ],
+                },
             )
-
-        # Verify shapes were created (text box at minimum)
-        assert len(slide.shapes) >= 1
+        slide = builder.prs.slides[0]
+        # Placeholder shapes exist with text
+        texts = []
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for p in shape.text_frame.paragraphs:
+                    if p.text:
+                        texts.append(p.text)
+        assert "With icon" in texts
+        assert "Plain bullet" in texts
 
     @patch("google_slides.CAIROSVG_AVAILABLE", True)
     @patch("google_slides.resolve_icon")
-    def test_add_bullet_list_with_valid_icon(self, mock_resolve, tmp_path):
-        """Bullet list with resolvable icon adds picture shape."""
-        # Create a real PNG for the icon
+    def test_bullet_list_with_valid_icon(self, mock_resolve, tmp_path):
+        """Content slide with resolvable icon adds picture shape."""
         import struct
         import zlib
 
@@ -3457,21 +3497,13 @@ class TestPresentationBuilderExtended:
         mock_resolve.return_value = icon_png
 
         builder = PresentationBuilder()
-        slide_layout = builder.prs.slide_layouts[6]
-        slide = builder.prs.slides.add_slide(slide_layout)
-
-        bullets = [{"icon": "test-icon", "text": "Icon bullet"}]
-        builder._add_bullet_list(
-            slide,
-            bullets,
-            left=Inches(1),
-            top=Inches(2),
-            width=Inches(8),
-            height=Inches(4),
+        builder._add_layout_slide(
+            "content",
+            {"title": "Icon Test", "bullets": [{"icon": "test-icon", "text": "Icon bullet"}]},
         )
-
-        # Should have text box + picture
-        assert len(slide.shapes) >= 2
+        slide = builder.prs.slides[0]
+        # Should have placeholder shapes + picture
+        assert len(slide.shapes) >= 3
 
     def test_add_two_column_slide_with_headings_and_notes(self):
         """Two-column slide with headings, bullets, and notes."""

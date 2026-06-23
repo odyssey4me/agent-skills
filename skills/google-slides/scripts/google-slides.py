@@ -72,7 +72,6 @@ except ImportError:
 try:
     from pptx import Presentation
     from pptx.dml.color import RGBColor
-    from pptx.enum.text import PP_ALIGN
     from pptx.util import Inches, Pt
 
     PPTX_AVAILABLE = True
@@ -208,10 +207,10 @@ COLOR_PALETTES: dict[str, dict[str, str]] = {
 
 FONT_CONFIG = {
     "title_size": 36,
-    "subtitle_size": 20,
+    "subtitle_size": 24,
     "heading_size": 28,
-    "body_size": 18,
-    "caption_size": 14,
+    "body_size": 20,
+    "caption_size": 16,
     "font_family": "Calibri",
 }
 
@@ -274,7 +273,7 @@ SLIDE_LAYOUTS: dict[str, dict[str, Any]] = {
                 "x": 7.5,
                 "y": 53.3,
                 "w": 85.0,
-                "h": 13.3,
+                "h": 8.0,
                 "role": "text",
                 "font": "subtitle_size",
                 "color": "subtitle",
@@ -1584,9 +1583,18 @@ def presentation_to_markdown(
             slide_results.append((layout, md_content, score))
 
     # Build frontmatter
+    def _yaml_val(v: Any) -> str:
+        if v is None:
+            return "null"
+        if isinstance(v, bool):
+            return "true" if v else "false"
+        if isinstance(v, str) and (":" in v or '"' in v or "'" in v or v.startswith("#")):
+            return f'"{v}"'
+        return str(v)
+
     fm_lines = [
         "---",
-        f"title: {title}",
+        f"title: {_yaml_val(title)}",
         f"presentation_id: {presentation_id}",
         "palette: red-hat",
         "aspect_ratio: widescreen",
@@ -1596,13 +1604,13 @@ def presentation_to_markdown(
         for cl_name, cl_def in custom_layouts.items():
             fm_lines.append(f"  {cl_name}:")
             fm_lines.append(f"    background: {cl_def['background']}")
-            fm_lines.append(f"    accent_bar: {cl_def['accent_bar']}")
-            fm_lines.append(f"    slide_number: {str(cl_def['slide_number']).lower()}")
+            fm_lines.append(f"    accent_bar: {_yaml_val(cl_def['accent_bar'])}")
+            fm_lines.append(f"    slide_number: {_yaml_val(cl_def['slide_number'])}")
             fm_lines.append("    placeholders:")
             for ph_name, ph in cl_def["placeholders"].items():
                 fm_lines.append(f"      {ph_name}:")
                 for k, v in ph.items():
-                    fm_lines.append(f"        {k}: {v}")
+                    fm_lines.append(f"        {k}: {_yaml_val(v)}")
     fm_lines.append("---")
     fm_lines.append("")
 
@@ -1831,6 +1839,8 @@ def _parse_standard_slide(content: str, slide: dict[str, Any]) -> None:
                     slide["contact"] = stripped
                 elif layout == "data" and "metric" not in slide:
                     slide["metric"] = stripped
+                elif layout in ("title", "title-dark", "section"):
+                    slide.setdefault("description", stripped)
 
     if bullets:
         slide["bullets"] = bullets
@@ -2107,8 +2117,134 @@ def hex_to_rgb(hex_color: str) -> RGBColor:
     return RGBColor(r, g, b)
 
 
+TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
+
+# Placeholder styling: (idx, font_size_pt, color_palette_key, bold)
+_T = FONT_CONFIG["title_size"]
+_H = FONT_CONFIG["heading_size"]
+_S = FONT_CONFIG["subtitle_size"]
+_B = FONT_CONFIG["body_size"]
+_C = FONT_CONFIG["caption_size"]
+
+TEMPLATE_LAYOUTS: dict[str, dict[str, Any]] = {
+    "title": {
+        "index": 0,
+        "placeholders": {
+            "title": (0, _T, "heading", True),
+            "subtitle": (1, _S, "subtitle", False),
+        },
+    },
+    "title-dark": {
+        "index": 1,
+        "placeholders": {
+            "title": (0, _T, "heading", True),
+            "subtitle": (1, _S, "subtitle", False),
+        },
+    },
+    "section": {
+        "index": 2,
+        "placeholders": {
+            "title": (0, _T, "heading", True),
+            "subtitle": (1, _S, "subtitle", False),
+        },
+    },
+    "content": {
+        "index": 3,
+        "placeholders": {
+            "title": (0, _H, "heading", True),
+            "body": (1, _B, "text", False),
+        },
+    },
+    "content-with-icon": {
+        "index": 4,
+        "placeholders": {
+            "title": (0, _H, "heading", True),
+            "body": (1, _B, "text", False),
+            "icon": (10, _B, "text", False),
+        },
+    },
+    "content-with-graphic": {
+        "index": 5,
+        "placeholders": {
+            "title": (0, _H, "heading", True),
+            "body": (1, _B, "text", False),
+            "graphic": (10, _B, "text", False),
+        },
+    },
+    "two-column": {
+        "index": 6,
+        "placeholders": {
+            "title": (0, _H, "heading", True),
+            "left_heading": (10, _S, "primary", True),
+            "left_body": (11, _B, "text", False),
+            "right_heading": (12, _S, "primary", True),
+            "right_body": (13, _B, "text", False),
+        },
+    },
+    "two-column-uneven": {
+        "index": 7,
+        "placeholders": {
+            "title": (0, _H, "heading", True),
+            "left_heading": (10, _S, "primary", True),
+            "left_body": (11, _B, "text", False),
+            "right_heading": (12, _S, "primary", True),
+            "right_body": (13, _B, "text", False),
+        },
+    },
+    "image": {
+        "index": 8,
+        "placeholders": {
+            "title": (0, _H, "heading", True),
+            "image": (10, _B, "text", False),
+            "caption": (11, _C, "subtitle", False),
+        },
+    },
+    "image-with-text": {
+        "index": 9,
+        "placeholders": {
+            "title": (0, _H, "heading", True),
+            "image": (10, _B, "text", False),
+            "body": (1, _B, "text", False),
+        },
+    },
+    "comparison": {
+        "index": 10,
+        "placeholders": {
+            "title": (0, _H, "heading", True),
+            "left_heading": (10, _S, "accent", True),
+            "left_body": (11, _B, "text", False),
+            "right_heading": (12, _S, "primary", True),
+            "right_body": (13, _B, "text", False),
+        },
+    },
+    "data": {
+        "index": 11,
+        "placeholders": {
+            "title": (0, _H, "heading", True),
+            "metric": (10, _T, "primary", True),
+            "body": (1, _B, "text", False),
+        },
+    },
+    "quote": {
+        "index": 12,
+        "placeholders": {
+            "quote": (0, _H, "heading", False),
+            "attribution": (1, _B, "subtitle", False),
+        },
+    },
+    "closing": {
+        "index": 13,
+        "placeholders": {
+            "title": (0, _T, "heading", True),
+            "subtitle": (1, _S, "subtitle", False),
+            "contact": (10, _B, "primary", False),
+        },
+    },
+}
+
+
 class PresentationBuilder:
-    """Builds professional .pptx presentations from parsed Markdown specs."""
+    """Builds professional .pptx presentations from a template with slide layouts."""
 
     def __init__(self, palette_name: str = "red-hat", aspect_ratio: str = "widescreen"):
         if palette_name not in COLOR_PALETTES:
@@ -2119,7 +2255,9 @@ class PresentationBuilder:
         self.palette = COLOR_PALETTES[palette_name]
         self.palette_name = palette_name
         self.aspect_ratio = aspect_ratio
-        self.prs = Presentation()
+
+        template_path = TEMPLATE_DIR / "default.pptx"
+        self.prs = Presentation(str(template_path))
 
         if aspect_ratio == "widescreen":
             self.prs.slide_width = SLIDE_WIDTH_WIDESCREEN
@@ -2139,7 +2277,7 @@ class PresentationBuilder:
             layout = slide_spec.get("layout", slide_spec.get("type", "content"))
             if layout in TYPE_TO_LAYOUT:
                 layout = TYPE_TO_LAYOUT[layout]
-            if layout not in SLIDE_LAYOUTS and layout not in self._custom_layouts:
+            if layout not in TEMPLATE_LAYOUTS and layout not in self._custom_layouts:
                 layout = "content"
             self._add_layout_slide(layout, slide_spec)
 
@@ -2151,224 +2289,149 @@ class PresentationBuilder:
         self.prs.save(str(out))
         return out
 
-    def _add_text_box(
-        self,
-        slide,
-        text: str,
-        left: int,
-        top: int,
-        width: int,
-        height: int,
-        font_size: int = 18,
-        font_color: str | None = None,
-        bold: bool = False,
-        alignment=None,
-        font_family: str | None = None,
-    ):
-        """Add a text box to a slide with styling."""
-        if alignment is None:
-            alignment = PP_ALIGN.LEFT
-
-        txBox = slide.shapes.add_textbox(left, top, width, height)
-        tf = txBox.text_frame
-        tf.word_wrap = True
-
-        p = tf.paragraphs[0]
-        p.text = text
-        p.alignment = alignment
-
-        run = p.runs[0] if p.runs else p.add_run()
-        if not p.runs:
-            run.text = text
-        run.font.size = Pt(font_size)
-        run.font.bold = bold
-        run.font.name = font_family or FONT_CONFIG["font_family"]
-        if font_color:
-            run.font.color.rgb = hex_to_rgb(font_color)
-
-        return txBox
-
-    def _set_slide_background(self, slide, color: str) -> None:
-        """Set the background color of a slide."""
-        background = slide.background
-        fill = background.fill
-        fill.solid()
-        fill.fore_color.rgb = hex_to_rgb(color)
-
-    def _add_accent_bar(self, slide, top: int, width: int | None = None) -> None:
-        """Add a horizontal accent bar/divider."""
-        bar_width = width or self.slide_width
-        bar_height = Pt(4)
-        shape = slide.shapes.add_shape(
-            1,  # MSO_SHAPE.RECTANGLE
-            Inches(0),
-            top,
-            bar_width,
-            bar_height,
-        )
-        shape.fill.solid()
-        shape.fill.fore_color.rgb = hex_to_rgb(self.palette["divider"])
-        shape.line.fill.background()
-
-    def _add_slide_number(self, slide, slide_num: int) -> None:
-        """Add slide number to bottom-right corner."""
-        self._add_text_box(
-            slide,
-            str(slide_num),
-            left=self.slide_width - Inches(1),
-            top=self.slide_height - Inches(0.5),
-            width=Inches(0.75),
-            height=Inches(0.35),
-            font_size=FONT_CONFIG["caption_size"],
-            font_color=self.palette["subtitle"],
-            alignment=PP_ALIGN.RIGHT,
-        )
-
     def _add_speaker_notes(self, slide, notes: str) -> None:
         """Add speaker notes to a slide."""
         notes_slide = slide.notes_slide
         notes_slide.notes_text_frame.text = notes
 
-    def _add_bullet_list(
+    @staticmethod
+    def _suppress_bullets(p) -> None:
+        """Explicitly disable bullets on a paragraph."""
+        ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        pPr = p._p.get_or_add_pPr()
+        for old in pPr.findall(f"{{{ns}}}buChar") + pPr.findall(f"{{{ns}}}buAutoNum"):
+            pPr.remove(old)
+        if pPr.find(f"{{{ns}}}buNone") is None:
+            pPr.append(pPr.makeelement(f"{{{ns}}}buNone", {}))
+
+    @staticmethod
+    def _set_bullet_format(p) -> None:
+        """Explicitly enable bullet character with indent on a paragraph."""
+        ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        pPr = p._p.get_or_add_pPr()
+        pPr.set("marL", str(Inches(0.35)))
+        pPr.set("indent", str(-Inches(0.25)))
+        for old in pPr.findall(f"{{{ns}}}buNone"):
+            pPr.remove(old)
+        if pPr.find(f"{{{ns}}}buChar") is None:
+            pPr.append(pPr.makeelement(f"{{{ns}}}buFont", {"typeface": "Arial", "charset": "0"}))
+            pPr.append(pPr.makeelement(f"{{{ns}}}buChar", {"char": "•"}))
+
+    def _fill_text_placeholder(
         self,
         slide,
-        bullets: list[Any],
-        left: int,
-        top: int,
-        width: int,
-        height: int,
+        ph_idx: int,
+        text: str,
+        font_size: int = 20,
+        color_key: str = "text",
+        bold: bool = False,
     ) -> None:
-        """Add a bullet list to a slide, with optional icon support.
+        """Fill a text placeholder with explicit font styling and no bullets."""
+        try:
+            placeholder = slide.placeholders[ph_idx]
+        except KeyError:
+            return
 
-        Bullets can be plain strings or dicts with 'icon' and 'text' keys.
-        Icons are rendered as small images to the left of the text.
-        """
-        has_icons = any(isinstance(b, dict) and "icon" in b for b in bullets)
-        icon_size = Inches(0.35)
-        icon_col_width = Inches(0.5) if has_icons else 0
-        text_left = left + icon_col_width
-        text_width = width - icon_col_width
+        tf = placeholder.text_frame
+        tf.clear()
+        p = tf.paragraphs[0]
+        p.text = text
+        self._suppress_bullets(p)
+        for run in p.runs:
+            run.font.size = Pt(font_size)
+            run.font.bold = bold
+            run.font.color.rgb = hex_to_rgb(self.palette.get(color_key, self.palette["text"]))
+            run.font.name = FONT_CONFIG["font_family"]
 
-        txBox = slide.shapes.add_textbox(text_left, top, text_width, height)
-        tf = txBox.text_frame
-        tf.word_wrap = True
+    def _fill_bullet_placeholder(
+        self,
+        slide,
+        ph_idx: int,
+        bullets: list[Any],
+        font_size: int = 20,
+        color_key: str = "text",
+    ) -> None:
+        """Fill a bullet placeholder with explicit bullet and font styling."""
+        try:
+            placeholder = slide.placeholders[ph_idx]
+        except KeyError:
+            return
 
-        line_height = Pt(FONT_CONFIG["body_size"]) + Pt(8)
-        current_top = top
+        tf = placeholder.text_frame
+        tf.clear()
 
         for i, bullet in enumerate(bullets):
             if isinstance(bullet, dict):
                 text = bullet.get("text", "")
                 icon_name = bullet.get("icon", "")
             else:
-                text = bullet
+                text = str(bullet)
                 icon_name = ""
 
             p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
             p.text = text
-            p.space_after = Pt(8)
+            p.level = 0
+            self._set_bullet_format(p)
             for run in p.runs:
-                run.font.size = Pt(FONT_CONFIG["body_size"])
+                run.font.size = Pt(font_size)
+                run.font.color.rgb = hex_to_rgb(self.palette.get(color_key, self.palette["text"]))
                 run.font.name = FONT_CONFIG["font_family"]
-                run.font.color.rgb = hex_to_rgb(self.palette["text"])
 
-            if icon_name and has_icons:
+            if icon_name:
                 icon_path = resolve_icon(icon_name)
                 if icon_path and icon_path.exists():
                     slide.shapes.add_picture(
                         str(icon_path),
-                        left,
-                        current_top,
-                        icon_size,
-                        icon_size,
+                        placeholder.left,
+                        placeholder.top + i * (Pt(FONT_CONFIG["body_size"]) + Pt(8)),
+                        Inches(0.35),
+                        Inches(0.35),
                     )
 
-            current_top += line_height
+    def _fill_image_placeholder(self, slide, ph_idx: int, image_path: str) -> None:
+        """Fill a picture placeholder with an image."""
+        if not image_path or not Path(image_path).exists():
+            return
+        try:
+            placeholder = slide.placeholders[ph_idx]
+            placeholder.insert_picture(image_path)
+        except (KeyError, AttributeError):
+            pass
 
     def _add_layout_slide(self, layout_name: str, spec: dict[str, Any]) -> None:
-        """Add a slide using a named layout template.
+        """Add a slide using a template layout and fill its placeholders."""
+        if layout_name not in TEMPLATE_LAYOUTS:
+            layout_name = "content"
 
-        Checks custom_layouts (from frontmatter) first, then SLIDE_LAYOUTS.
-        """
-        custom = getattr(self, "_custom_layouts", {})
-        if layout_name in custom:
-            layout = custom[layout_name]
-        elif layout_name in SLIDE_LAYOUTS:
-            layout = SLIDE_LAYOUTS[layout_name]
-        else:
-            layout = SLIDE_LAYOUTS["content"]
-
-        positions = _resolve_layout_positions_from_layout(
-            layout, self.slide_width, self.slide_height
-        )
-
-        slide_layout = self.prs.slide_layouts[6]  # Blank layout
+        tmpl = TEMPLATE_LAYOUTS[layout_name]
+        slide_layout = self.prs.slide_layouts[tmpl["index"]]
         slide = self.prs.slides.add_slide(slide_layout)
-        self._set_slide_background(slide, self.palette[layout["background"]])
 
-        # Map spec data to placeholder names
         content = self._map_spec_to_placeholders(layout_name, spec)
+        ph_map = tmpl["placeholders"]
 
-        # Render each placeholder
-        for ph_name, ph_def in layout["placeholders"].items():
-            pos = positions[ph_name]
-            role = ph_def["role"]
-            data = content.get(ph_name)
+        for content_name, ph_info in ph_map.items():
+            ph_idx, font_size, color_key, bold = ph_info
+            data = content.get(content_name)
             if not data:
                 continue
 
-            if role == "text":
-                align_name = ph_def.get("align")
-                alignment = {
-                    "left": PP_ALIGN.LEFT,
-                    "center": PP_ALIGN.CENTER,
-                    "right": PP_ALIGN.RIGHT,
-                }.get(align_name)
-
-                self._add_text_box(
-                    slide,
-                    data,
-                    left=pos["x"],
-                    top=pos["y"],
-                    width=pos["w"],
-                    height=pos["h"],
-                    font_size=FONT_CONFIG.get(ph_def.get("font", "body_size"), 18),
-                    font_color=self.palette.get(ph_def.get("color", "text"), self.palette["text"]),
-                    bold=ph_def.get("bold", False),
-                    alignment=alignment,
+            if isinstance(data, list):
+                self._fill_bullet_placeholder(
+                    slide, ph_idx, data, font_size=font_size, color_key=color_key
                 )
-            elif role == "bullets":
-                self._add_bullet_list(
+            elif content_name in ("image", "icon", "graphic"):
+                self._fill_image_placeholder(slide, ph_idx, data)
+            else:
+                self._fill_text_placeholder(
                     slide,
-                    data,
-                    left=pos["x"],
-                    top=pos["y"],
-                    width=pos["w"],
-                    height=pos["h"],
+                    ph_idx,
+                    str(data),
+                    font_size=font_size,
+                    color_key=color_key,
+                    bold=bold,
                 )
-            elif role == "image":
-                image_path = data if isinstance(data, str) else str(data)
-                if Path(image_path).exists():
-                    slide.shapes.add_picture(
-                        image_path,
-                        pos["x"],
-                        pos["y"],
-                        pos["w"],
-                        pos["h"],
-                    )
 
-        # Accent bar
-        bar = layout["accent_bar"]
-        if bar is not None:
-            bar_top = int(bar["y"] / 100 * self.slide_height)
-            bar_width = int(bar["w"] / 100 * self.slide_width)
-            self._add_accent_bar(slide, top=bar_top, width=bar_width)
-
-        # Slide number
-        if layout["slide_number"]:
-            self._add_slide_number(slide, len(self.prs.slides))
-
-        # Speaker notes
         if spec.get("notes"):
             self._add_speaker_notes(slide, spec["notes"])
 
@@ -2377,7 +2440,14 @@ class PresentationBuilder:
         content: dict[str, Any] = {}
 
         content["title"] = spec.get("title", "")
-        content["subtitle"] = spec.get("subtitle", "")
+        subtitle = spec.get("subtitle", "")
+        description = spec.get("description", "")
+        if description and subtitle:
+            subtitle = f"{subtitle}\n{description}"
+        elif description:
+            subtitle = description
+        content["subtitle"] = subtitle
+        content["description"] = description
         content["body"] = spec.get("bullets", []) or []
         content["contact"] = spec.get("contact", "")
         content["caption"] = spec.get("image_alt") or spec.get("caption", "")
