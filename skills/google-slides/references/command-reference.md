@@ -38,8 +38,10 @@ $SKILL_DIR/scripts/google-slides.py create --file deck.md --title "Q2 Team Updat
 
 ## get
 
-Download a Google Slides presentation and output as Markdown. Prints to
-stdout by default, or writes to a file with `-o`.
+Download a Google Slides presentation and output as Markdown. Uses layout
+detection to score each slide against all 14 built-in templates, emitting
+the best-matching `<!-- layout: name -->` directive for each slide. Prints
+to stdout by default, or writes to a file with `-o`.
 
 ```bash
 $SKILL_DIR/scripts/google-slides.py get PRESENTATION_ID
@@ -71,6 +73,8 @@ $SKILL_DIR/scripts/google-slides.py get 1abc...xyz -o deck.md
 # ## June 2026
 #
 # ---
+#
+# <!-- layout: content -->
 #
 # ## Key Metrics
 #
@@ -146,10 +150,10 @@ $SKILL_DIR/scripts/google-slides.py preview --file deck.pptx --format images
 $SKILL_DIR/scripts/google-slides.py preview --file deck.pptx --format summary
 
 # Output:
-# Slide 1 (title): Q2 Team Update / June 2026
-# Slide 2 (section): Progress Review
-# Slide 3 (content): Key Metrics - 3 bullets
-# Slide 4 (two-column): Comparison - 3+3 bullets
+# Slide 1 [title]: Q2 Team Update / June 2026
+# Slide 2 [section]: Progress Review
+# Slide 3 [content]: Key Metrics - 3 bullets
+# Slide 4 [two-column]: Comparison - 3+3 bullets
 # ...
 ```
 
@@ -177,8 +181,11 @@ $SKILL_DIR/scripts/google-slides.py verify --file deck.pptx
 # [PASS] All slides have titles
 # [PASS] No empty slides
 # [PASS] Images have alt text
+# [PASS] Color contrast meets WCAG AA (4.5:1 body, 3:1 large text)
+# [PASS] Image DPI >= 150
 # [WARN] Slide 7: bullet count exceeds 6 (readability)
-# Result: 3 passed, 1 warning, 0 errors
+# [WARN] Slide 9: text may overflow placeholder (estimated 112% fill)
+# Result: 5 passed, 2 warnings, 0 errors
 
 # Compare local file against cloud version
 $SKILL_DIR/scripts/google-slides.py verify --file deck.pptx --presentation-id 1abc...xyz

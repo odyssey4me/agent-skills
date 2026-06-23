@@ -215,6 +215,562 @@ FONT_CONFIG = {
     "font_family": "Calibri",
 }
 
+# ============================================================================
+# SLIDE LAYOUT TEMPLATES
+# ============================================================================
+# Positions as percentages of slide dimensions. Converted to EMU at build time.
+# Derived from existing hard-coded Inches() values on 13.333x7.5" widescreen.
+#
+# Placeholder roles:
+#   "text"   — rendered via _add_text_box()
+#   "bullets" — rendered via _add_bullet_list()
+#   "image"  — rendered via slide.shapes.add_picture()
+
+SLIDE_LAYOUTS: dict[str, dict[str, Any]] = {
+    "title": {
+        "background": "background",
+        "accent_bar": {"y": 48.0, "w": 22.5},
+        "slide_number": False,
+        "placeholders": {
+            "title": {
+                "x": 7.5,
+                "y": 26.7,
+                "w": 85.0,
+                "h": 20.0,
+                "role": "text",
+                "font": "title_size",
+                "color": "heading",
+                "bold": True,
+                "align": "left",
+            },
+            "subtitle": {
+                "x": 7.5,
+                "y": 53.3,
+                "w": 85.0,
+                "h": 13.3,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "subtitle",
+            },
+        },
+    },
+    "title-dark": {
+        "background": "background_alt",
+        "accent_bar": {"y": 48.0, "w": 22.5},
+        "slide_number": False,
+        "placeholders": {
+            "title": {
+                "x": 7.5,
+                "y": 26.7,
+                "w": 85.0,
+                "h": 20.0,
+                "role": "text",
+                "font": "title_size",
+                "color": "heading",
+                "bold": True,
+                "align": "left",
+            },
+            "subtitle": {
+                "x": 7.5,
+                "y": 53.3,
+                "w": 85.0,
+                "h": 13.3,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "subtitle",
+            },
+        },
+    },
+    "section": {
+        "background": "background_alt",
+        "accent_bar": {"y": 54.7, "w": 22.5},
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 11.3,
+                "y": 33.3,
+                "w": 77.5,
+                "h": 20.0,
+                "role": "text",
+                "font": "title_size",
+                "color": "heading",
+                "bold": True,
+                "align": "left",
+            },
+            "subtitle": {
+                "x": 11.3,
+                "y": 60.0,
+                "w": 77.5,
+                "h": 10.7,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "subtitle",
+            },
+        },
+    },
+    "content": {
+        "background": "background",
+        "accent_bar": {"y": 16.7, "w": 15.0},
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 5.6,
+                "y": 5.3,
+                "w": 88.8,
+                "h": 10.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "bold": True,
+            },
+            "body": {
+                "x": 5.6,
+                "y": 21.3,
+                "w": 88.8,
+                "h": 68.7,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+        },
+    },
+    "content-with-icon": {
+        "background": "background",
+        "accent_bar": {"y": 16.7, "w": 15.0},
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 5.6,
+                "y": 5.3,
+                "w": 88.8,
+                "h": 10.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "bold": True,
+            },
+            "body": {
+                "x": 5.6,
+                "y": 21.3,
+                "w": 58.0,
+                "h": 68.7,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+            "icon": {
+                "x": 68.0,
+                "y": 25.0,
+                "w": 25.0,
+                "h": 33.3,
+                "role": "image",
+            },
+        },
+    },
+    "content-with-graphic": {
+        "background": "background",
+        "accent_bar": {"y": 16.7, "w": 15.0},
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 5.6,
+                "y": 5.3,
+                "w": 88.8,
+                "h": 10.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "bold": True,
+            },
+            "body": {
+                "x": 5.6,
+                "y": 21.3,
+                "w": 48.0,
+                "h": 68.7,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+            "graphic": {
+                "x": 56.0,
+                "y": 21.3,
+                "w": 38.0,
+                "h": 68.7,
+                "role": "image",
+            },
+        },
+    },
+    "two-column": {
+        "background": "background",
+        "accent_bar": {"y": 16.7, "w": 15.0},
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 5.6,
+                "y": 5.3,
+                "w": 88.8,
+                "h": 10.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "bold": True,
+            },
+            "left_heading": {
+                "x": 5.6,
+                "y": 21.3,
+                "w": 42.0,
+                "h": 8.0,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "primary",
+                "bold": True,
+            },
+            "left_body": {
+                "x": 5.6,
+                "y": 30.7,
+                "w": 42.0,
+                "h": 59.3,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+            "right_heading": {
+                "x": 52.4,
+                "y": 21.3,
+                "w": 42.0,
+                "h": 8.0,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "primary",
+                "bold": True,
+            },
+            "right_body": {
+                "x": 52.4,
+                "y": 30.7,
+                "w": 42.0,
+                "h": 59.3,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+        },
+    },
+    "two-column-uneven": {
+        "background": "background",
+        "accent_bar": {"y": 16.7, "w": 15.0},
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 5.6,
+                "y": 5.3,
+                "w": 88.8,
+                "h": 10.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "bold": True,
+            },
+            "left_heading": {
+                "x": 5.6,
+                "y": 21.3,
+                "w": 56.0,
+                "h": 8.0,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "primary",
+                "bold": True,
+            },
+            "left_body": {
+                "x": 5.6,
+                "y": 30.7,
+                "w": 56.0,
+                "h": 59.3,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+            "right_heading": {
+                "x": 65.0,
+                "y": 21.3,
+                "w": 29.4,
+                "h": 8.0,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "primary",
+                "bold": True,
+            },
+            "right_body": {
+                "x": 65.0,
+                "y": 30.7,
+                "w": 29.4,
+                "h": 59.3,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+        },
+    },
+    "image": {
+        "background": "background",
+        "accent_bar": None,
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 5.6,
+                "y": 5.3,
+                "w": 88.8,
+                "h": 10.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "bold": True,
+            },
+            "image": {
+                "x": 7.5,
+                "y": 20.0,
+                "w": 85.0,
+                "h": 64.0,
+                "role": "image",
+            },
+            "caption": {
+                "x": 7.5,
+                "y": 89.3,
+                "w": 85.0,
+                "h": 6.7,
+                "role": "text",
+                "font": "caption_size",
+                "color": "subtitle",
+                "align": "center",
+            },
+        },
+    },
+    "image-with-text": {
+        "background": "background",
+        "accent_bar": None,
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 5.6,
+                "y": 5.3,
+                "w": 88.8,
+                "h": 10.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "bold": True,
+            },
+            "image": {
+                "x": 5.6,
+                "y": 21.3,
+                "w": 45.0,
+                "h": 68.7,
+                "role": "image",
+            },
+            "body": {
+                "x": 54.0,
+                "y": 21.3,
+                "w": 40.4,
+                "h": 68.7,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+        },
+    },
+    "comparison": {
+        "background": "background",
+        "accent_bar": {"y": 16.7, "w": 15.0},
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 5.6,
+                "y": 5.3,
+                "w": 88.8,
+                "h": 10.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "bold": True,
+            },
+            "left_heading": {
+                "x": 5.6,
+                "y": 21.3,
+                "w": 42.0,
+                "h": 8.0,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "accent",
+                "bold": True,
+            },
+            "left_body": {
+                "x": 5.6,
+                "y": 30.7,
+                "w": 42.0,
+                "h": 59.3,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+            "right_heading": {
+                "x": 52.4,
+                "y": 21.3,
+                "w": 42.0,
+                "h": 8.0,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "primary",
+                "bold": True,
+            },
+            "right_body": {
+                "x": 52.4,
+                "y": 30.7,
+                "w": 42.0,
+                "h": 59.3,
+                "role": "bullets",
+                "font": "body_size",
+                "color": "text",
+            },
+        },
+    },
+    "data": {
+        "background": "background",
+        "accent_bar": None,
+        "slide_number": True,
+        "placeholders": {
+            "title": {
+                "x": 5.6,
+                "y": 5.3,
+                "w": 88.8,
+                "h": 10.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "bold": True,
+            },
+            "metric": {
+                "x": 10.0,
+                "y": 26.7,
+                "w": 80.0,
+                "h": 30.0,
+                "role": "text",
+                "font": "title_size",
+                "color": "primary",
+                "bold": True,
+                "align": "center",
+            },
+            "body": {
+                "x": 15.0,
+                "y": 60.0,
+                "w": 70.0,
+                "h": 26.7,
+                "role": "text",
+                "font": "body_size",
+                "color": "text",
+                "align": "center",
+            },
+        },
+    },
+    "quote": {
+        "background": "background_alt",
+        "accent_bar": None,
+        "slide_number": True,
+        "placeholders": {
+            "quote": {
+                "x": 11.3,
+                "y": 20.0,
+                "w": 77.5,
+                "h": 46.7,
+                "role": "text",
+                "font": "heading_size",
+                "color": "heading",
+                "align": "center",
+            },
+            "attribution": {
+                "x": 11.3,
+                "y": 70.0,
+                "w": 77.5,
+                "h": 10.0,
+                "role": "text",
+                "font": "body_size",
+                "color": "subtitle",
+                "align": "center",
+            },
+        },
+    },
+    "closing": {
+        "background": "background_alt",
+        "accent_bar": None,
+        "slide_number": False,
+        "placeholders": {
+            "title": {
+                "x": 11.3,
+                "y": 26.7,
+                "w": 77.5,
+                "h": 20.0,
+                "role": "text",
+                "font": "title_size",
+                "color": "heading",
+                "bold": True,
+                "align": "center",
+            },
+            "subtitle": {
+                "x": 11.3,
+                "y": 46.7,
+                "w": 77.5,
+                "h": 10.7,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "subtitle",
+                "align": "center",
+            },
+            "contact": {
+                "x": 11.3,
+                "y": 60.0,
+                "w": 77.5,
+                "h": 6.7,
+                "role": "text",
+                "font": "body_size",
+                "color": "primary",
+                "align": "center",
+            },
+        },
+    },
+}
+
+# Layout names that correspond to old type names (backward compat)
+TYPE_TO_LAYOUT = {
+    "title": "title",
+    "content": "content",
+    "section": "section",
+    "two-column": "two-column",
+    "image": "image",
+    "closing": "closing",
+}
+
+
+def _resolve_layout_positions_from_layout(
+    layout: dict, slide_width: int, slide_height: int
+) -> dict[str, dict[str, int]]:
+    """Convert percentage-based layout placeholders to absolute EMU positions."""
+    resolved: dict[str, dict[str, int]] = {}
+    for name, ph in layout["placeholders"].items():
+        resolved[name] = {
+            "x": int(ph["x"] / 100 * slide_width),
+            "y": int(ph["y"] / 100 * slide_height),
+            "w": int(ph["w"] / 100 * slide_width),
+            "h": int(ph["h"] / 100 * slide_height),
+        }
+    return resolved
+
+
+def _resolve_layout_positions(
+    layout_name: str, slide_width: int, slide_height: int
+) -> dict[str, dict[str, int]]:
+    """Convert percentage-based layout placeholders to absolute EMU positions."""
+    return _resolve_layout_positions_from_layout(
+        SLIDE_LAYOUTS[layout_name], slide_width, slide_height
+    )
+
 
 # ============================================================================
 # KEYRING CREDENTIAL STORAGE
@@ -596,67 +1152,248 @@ def _slide_has_image(slide: dict) -> bool:
     return any("image" in elem for elem in slide.get("pageElements", []))
 
 
-def detect_slide_type(slide: dict, slide_width: float, slide_height: float) -> str:
-    """Detect the layout type of a slide by matching element positions against known patterns.
+def detect_slide_layout(slide: dict, slide_width: float, slide_height: float) -> tuple[str, float]:
+    """Detect the layout of a slide by analyzing element positions and content.
 
-    Returns one of: title, section, content, two-column, image, closing.
+    Uses heuristic rules for broad classification, then scores against
+    layout templates for fine-grained matching within each category.
+    Returns (layout_name, score).
     """
     text_elems = _get_text_elements(slide, slide_width, slide_height)
     has_image = _slide_has_image(slide)
 
     if not text_elems:
-        return "content"
+        return "content", 0.0
 
     max_font = max(e["font"] for e in text_elems)
     num_text = len(text_elems)
 
-    # Check for two-column layout: text boxes on both sides of the midpoint
     left_texts = [e for e in text_elems if e["x_pct"] < 45]
     right_texts = [e for e in text_elems if e["x_pct"] > 45]
     has_two_cols = len(left_texts) > 1 and len(right_texts) > 1
 
-    # Image slide: has a picture element
     if has_image:
         if has_two_cols:
-            return "two-column"
-        return "image"
+            return _best_scoring_layout(
+                text_elems, has_image, ["two-column", "two-column-uneven", "comparison"]
+            )
+        return _best_scoring_layout(text_elems, has_image, ["image", "image-with-text"])
 
-    # Title slide: few text boxes, very large font, no columns
     if num_text <= 4 and max_font >= 40 and not has_two_cols:
-        # Distinguish title vs closing by position — title text is typically
-        # in the upper-middle area, closing is centered
         large_elems = [e for e in text_elems if e["font"] >= 40]
         if large_elems:
             avg_y = sum(e["y_pct"] for e in large_elems) / len(large_elems)
             if avg_y > 50:
-                return "closing"
-        return "title"
+                score = _score_layout_match(text_elems, has_image, SLIDE_LAYOUTS["closing"])
+                return "closing", score
+        return _best_scoring_layout(text_elems, has_image, ["title", "title-dark"])
 
-    # Section slide: 1-2 text boxes, large font, centered
     if num_text <= 2 and max_font >= 30:
-        return "section"
+        return _best_scoring_layout(text_elems, has_image, ["section", "quote"])
 
-    # Two-column: text on both halves
     if has_two_cols:
-        return "two-column"
+        return _best_scoring_layout(
+            text_elems, has_image, ["two-column", "two-column-uneven", "comparison"]
+        )
 
-    # Default: content
-    return "content"
+    return _best_scoring_layout(
+        text_elems, has_image, ["content", "content-with-icon", "content-with-graphic", "data"]
+    )
+
+
+# Minimum score for a layout match to be considered a good fit.
+# Below this, a custom layout is emitted during download.
+LAYOUT_SCORE_THRESHOLD = 15.0
+
+
+def _best_scoring_layout(
+    text_elems: list[dict], has_image: bool, candidates: list[str]
+) -> tuple[str, float]:
+    """Pick the best layout from a set of candidates by scoring."""
+    best_layout = candidates[0]
+    best_score = -999.0
+
+    for name in candidates:
+        if name not in SLIDE_LAYOUTS:
+            continue
+        score = _score_layout_match(text_elems, has_image, SLIDE_LAYOUTS[name])
+        if score > best_score:
+            best_score = score
+            best_layout = name
+
+    return best_layout, best_score
+
+
+def _score_layout_match(
+    text_elems: list[dict],
+    has_image: bool,
+    layout_def: dict,
+) -> float:
+    """Score how well text elements match a layout's placeholders."""
+    placeholders = layout_def["placeholders"]
+    text_phs = {k: v for k, v in placeholders.items() if v["role"] != "image"}
+    image_phs = {k: v for k, v in placeholders.items() if v["role"] == "image"}
+
+    score = 0.0
+
+    count_diff = abs(len(text_elems) - len(text_phs))
+    score -= count_diff * 10
+
+    if has_image and image_phs:
+        score += 15
+    elif has_image and not image_phs:
+        score -= 10
+    elif not has_image and image_phs:
+        score -= 5
+
+    for elem in text_elems:
+        min_dist = 100.0
+        best_ph = None
+        for _ph_name, ph in text_phs.items():
+            dx = elem["x_pct"] - ph["x"]
+            dy = elem["y_pct"] - ph["y"]
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist < min_dist:
+                min_dist = dist
+                best_ph = ph
+
+        if best_ph is not None:
+            score += max(0, 20 - min_dist)
+
+            ph_font_key = best_ph.get("font", "body_size")
+            expected_font = FONT_CONFIG.get(ph_font_key, 18)
+            if elem["font"] > 0:
+                font_ratio = min(elem["font"], expected_font) / max(elem["font"], expected_font)
+                score += font_ratio * 5
+
+    return score
+
+
+def _build_custom_layout_from_slide(
+    slide: dict, slide_width: float, slide_height: float
+) -> dict[str, Any]:
+    """Build a custom layout definition from a slide's actual element positions.
+
+    Used during download when no built-in layout matches well enough.
+    """
+    text_elems = _get_text_elements(slide, slide_width, slide_height)
+    has_image = _slide_has_image(slide)
+
+    text_elems.sort(key=lambda e: (e["y_pct"], e["x_pct"]))
+
+    placeholders: dict[str, dict[str, Any]] = {}
+    for i, elem in enumerate(text_elems):
+        if i == 0 and elem["font"] >= 24:
+            name = "title"
+            font_key = "title_size" if elem["font"] >= 32 else "heading_size"
+            ph: dict[str, Any] = {
+                "x": round(elem["x_pct"], 1),
+                "y": round(elem["y_pct"], 1),
+                "w": round(elem["w_pct"], 1),
+                "h": 12.0,
+                "role": "text",
+                "font": font_key,
+                "color": "heading",
+                "bold": True,
+            }
+        elif i == 1 and elem["font"] >= 16 and elem["font"] < 28:
+            name = "subtitle"
+            ph = {
+                "x": round(elem["x_pct"], 1),
+                "y": round(elem["y_pct"], 1),
+                "w": round(elem["w_pct"], 1),
+                "h": 10.0,
+                "role": "text",
+                "font": "subtitle_size",
+                "color": "subtitle",
+            }
+        else:
+            name = f"text_{i + 1}"
+            ph = {
+                "x": round(elem["x_pct"], 1),
+                "y": round(elem["y_pct"], 1),
+                "w": round(elem["w_pct"], 1),
+                "h": 15.0,
+                "role": "text",
+                "font": "body_size",
+                "color": "text",
+            }
+        placeholders[name] = ph
+
+    if has_image:
+        placeholders["image"] = {
+            "x": 5.0,
+            "y": 20.0,
+            "w": 90.0,
+            "h": 70.0,
+            "role": "image",
+        }
+
+    return {
+        "background": "background",
+        "accent_bar": None,
+        "slide_number": True,
+        "placeholders": placeholders,
+    }
+
+
+def detect_slide_type(slide: dict, slide_width: float, slide_height: float) -> str:
+    """Detect the type of a slide (backward-compatible wrapper).
+
+    Returns one of the original 6 type names: title, section, content,
+    two-column, image, closing.
+    """
+    layout, _score = detect_slide_layout(slide, slide_width, slide_height)
+    _layout_to_type = {
+        "title": "title",
+        "title-dark": "title",
+        "section": "section",
+        "content": "content",
+        "content-with-icon": "content",
+        "content-with-graphic": "content",
+        "two-column": "two-column",
+        "two-column-uneven": "two-column",
+        "image": "image",
+        "image-with-text": "image",
+        "comparison": "two-column",
+        "data": "content",
+        "quote": "section",
+        "closing": "closing",
+    }
+    return _layout_to_type.get(layout, "content")
 
 
 def _extract_slide_as_markdown(
     slide: dict, slide_width: float, slide_height: float
-) -> tuple[str, str]:
-    """Extract a slide's content as structured Markdown with detected type.
+) -> tuple[str, str, float]:
+    """Extract a slide's content as structured Markdown with detected layout.
 
     Returns:
-        Tuple of (slide_type, markdown_content).
+        Tuple of (layout_name, markdown_content, match_score).
     """
-    slide_type = detect_slide_type(slide, slide_width, slide_height)
+    layout, score = detect_slide_layout(slide, slide_width, slide_height)
+    # Use the original type-based rendering logic, mapped from layout
+    layout_to_type = {
+        "title": "title",
+        "title-dark": "title",
+        "section": "section",
+        "content": "content",
+        "content-with-icon": "content",
+        "content-with-graphic": "content",
+        "two-column": "two-column",
+        "two-column-uneven": "two-column",
+        "image": "image",
+        "image-with-text": "image",
+        "comparison": "two-column",
+        "data": "content",
+        "quote": "section",
+        "closing": "closing",
+    }
+    slide_type = layout_to_type.get(layout, "content")
     text_elems = _get_text_elements(slide, slide_width, slide_height)
 
     if not text_elems:
-        return slide_type, ""
+        return layout, "", score
 
     # Sort by vertical position, then horizontal
     text_elems.sort(key=lambda e: (e["y_pct"], e["x_pct"]))
@@ -720,7 +1457,7 @@ def _extract_slide_as_markdown(
                     if bullet_line:
                         lines.append(f"- {bullet_line}")
 
-    return slide_type, "\n".join(lines)
+    return layout, "\n".join(lines), score
 
 
 def upload_pptx_to_google(
@@ -812,7 +1549,7 @@ def presentation_to_markdown(
 ) -> str:
     """Convert a Google Slides presentation to Markdown with frontmatter.
 
-    Uses layout detection to add appropriate `<!-- type: ... -->` directives
+    Uses layout detection to add appropriate `<!-- layout: ... -->` directives
     and structure the content (headings, bullets, columns) based on the
     spatial arrangement of text boxes.
 
@@ -830,31 +1567,59 @@ def presentation_to_markdown(
     slide_width = page_size.get("width", {}).get("magnitude", 9144000)
     slide_height = page_size.get("height", {}).get("magnitude", 6858000)
 
-    lines = [
+    # First pass: detect layouts and collect custom layout defs for low-score slides
+    slide_results: list[tuple[str, str, float]] = []
+    custom_layouts: dict[str, dict] = {}
+
+    for idx, slide in enumerate(slides):
+        layout, md_content, score = _extract_slide_as_markdown(slide, slide_width, slide_height)
+
+        if score < LAYOUT_SCORE_THRESHOLD:
+            custom_name = f"custom-slide-{idx + 1}"
+            custom_layouts[custom_name] = _build_custom_layout_from_slide(
+                slide, slide_width, slide_height
+            )
+            slide_results.append((custom_name, md_content, score))
+        else:
+            slide_results.append((layout, md_content, score))
+
+    # Build frontmatter
+    fm_lines = [
         "---",
         f"title: {title}",
         f"presentation_id: {presentation_id}",
         "palette: red-hat",
         "aspect_ratio: widescreen",
-        "---",
-        "",
     ]
+    if custom_layouts:
+        fm_lines.append("custom_layouts:")
+        for cl_name, cl_def in custom_layouts.items():
+            fm_lines.append(f"  {cl_name}:")
+            fm_lines.append(f"    background: {cl_def['background']}")
+            fm_lines.append(f"    accent_bar: {cl_def['accent_bar']}")
+            fm_lines.append(f"    slide_number: {str(cl_def['slide_number']).lower()}")
+            fm_lines.append("    placeholders:")
+            for ph_name, ph in cl_def["placeholders"].items():
+                fm_lines.append(f"      {ph_name}:")
+                for k, v in ph.items():
+                    fm_lines.append(f"        {k}: {v}")
+    fm_lines.append("---")
+    fm_lines.append("")
 
-    for idx, slide in enumerate(slides):
+    lines = fm_lines
+
+    for idx, (layout, md_content, _score) in enumerate(slide_results):
         slide_num = idx + 1
         if idx > 0:
             lines.append("---")
             lines.append("")
 
-        slide_type, md_content = _extract_slide_as_markdown(slide, slide_width, slide_height)
-
-        if slide_type != "content":
-            lines.append(f"<!-- type: {slide_type} -->")
+        if layout != "content":
+            lines.append(f"<!-- layout: {layout} -->")
 
         if md_content.strip():
             lines.append(md_content)
 
-        # Add image references from extracted images
         if image_map and slide_num in image_map:
             for img_path in image_map[slide_num]:
                 img_name = Path(img_path).name
@@ -985,9 +1750,16 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
 
 
 def parse_slide_type(text: str) -> str:
-    """Extract slide type from HTML comment directive."""
-    match = re.search(r"<!--\s*type:\s*(\w[\w-]*)\s*-->", text)
-    return match.group(1) if match else "content"
+    """Extract slide layout from HTML comment directive.
+
+    Accepts both <!-- layout: name --> and <!-- type: name --> for
+    backward compatibility. Returns the layout name.
+    """
+    match = re.search(r"<!--\s*(?:layout|type):\s*([\w-]+)\s*-->", text)
+    if match:
+        name = match.group(1)
+        return TYPE_TO_LAYOUT.get(name, name)
+    return "content"
 
 
 def parse_slides(body: str) -> list[dict[str, Any]]:
@@ -1006,12 +1778,12 @@ def parse_slides(body: str) -> list[dict[str, Any]]:
 
 def _parse_single_slide(raw: str) -> dict[str, Any]:
     """Parse a single slide's Markdown content into a structured dict."""
-    slide_type = parse_slide_type(raw)
-    content = re.sub(r"<!--\s*type:\s*\w[\w-]*\s*-->\s*\n?", "", raw).strip()
+    layout = parse_slide_type(raw)
+    content = re.sub(r"<!--\s*(?:layout|type):\s*[\w-]+\s*-->\s*\n?", "", raw).strip()
 
-    slide: dict[str, Any] = {"type": slide_type}
+    slide: dict[str, Any] = {"type": layout, "layout": layout}
 
-    if slide_type == "two-column":
+    if layout in ("two-column", "two-column-uneven", "comparison"):
         _parse_two_column(content, slide)
     else:
         _parse_standard_slide(content, slide)
@@ -1020,7 +1792,8 @@ def _parse_single_slide(raw: str) -> dict[str, Any]:
 
 
 def _parse_standard_slide(content: str, slide: dict[str, Any]) -> None:
-    """Parse a standard slide (title, section, content, image, closing)."""
+    """Parse a standard slide (title, section, content, image, closing, quote, data)."""
+    layout = slide.get("layout", "content")
     lines = content.split("\n")
     bullets: list[str] = []
     notes: list[str] = []
@@ -1033,9 +1806,14 @@ def _parse_standard_slide(content: str, slide: dict[str, Any]) -> None:
             slide["title"] = stripped[2:].strip()
         elif stripped.startswith("## ") and "subtitle" not in slide:
             slide["subtitle"] = stripped[3:].strip()
+        elif stripped.startswith("### ") and "attribution" not in slide and layout == "quote":
+            slide["attribution"] = stripped[4:].strip()
         elif stripped.startswith("> "):
-            notes.append(stripped[2:].strip())
-            in_notes = True
+            if layout == "quote" and "quote" not in slide:
+                slide["quote"] = stripped[2:].strip()
+            else:
+                notes.append(stripped[2:].strip())
+                in_notes = True
         elif in_notes and stripped.startswith("> "):
             notes.append(stripped[2:].strip())
         else:
@@ -1049,8 +1827,10 @@ def _parse_standard_slide(content: str, slide: dict[str, Any]) -> None:
                 bullet_entry = _parse_bullet_icons(bullet_text)
                 bullets.append(bullet_entry)
             elif stripped and not stripped.startswith("#"):
-                if slide["type"] == "closing" and "contact" not in slide:
+                if layout == "closing" and "contact" not in slide:
                     slide["contact"] = stripped
+                elif layout == "data" and "metric" not in slide:
+                    slide["metric"] = stripped
 
     if bullets:
         slide["bullets"] = bullets
@@ -1133,6 +1913,7 @@ def parse_markdown(content: str) -> dict[str, Any]:
         "aspect_ratio": frontmatter.get("aspect_ratio", "widescreen"),
         "presentation_id": frontmatter.get("presentation_id"),
         "logo_path": frontmatter.get("logo_path"),
+        "custom_layouts": frontmatter.get("custom_layouts", {}),
         "slides": slides,
     }
 
@@ -1352,19 +2133,15 @@ class PresentationBuilder:
 
     def build_from_spec(self, spec: dict[str, Any], output_path: str | None = None) -> Path:
         """Build a presentation from a parsed spec dict."""
-        slide_builders = {
-            "title": self._add_title_slide,
-            "content": self._add_content_slide,
-            "section": self._add_section_slide,
-            "two-column": self._add_two_column_slide,
-            "image": self._add_image_slide,
-            "closing": self._add_closing_slide,
-        }
+        self._custom_layouts = spec.get("custom_layouts", {})
 
         for slide_spec in spec.get("slides", []):
-            slide_type = slide_spec.get("type", "content")
-            builder = slide_builders.get(slide_type, self._add_content_slide)
-            builder(slide_spec)
+            layout = slide_spec.get("layout", slide_spec.get("type", "content"))
+            if layout in TYPE_TO_LAYOUT:
+                layout = TYPE_TO_LAYOUT[layout]
+            if layout not in SLIDE_LAYOUTS and layout not in self._custom_layouts:
+                layout = "content"
+            self._add_layout_slide(layout, slide_spec)
 
         if output_path:
             out = Path(output_path)
@@ -1508,287 +2285,125 @@ class PresentationBuilder:
 
             current_top += line_height
 
-    def _add_title_slide(self, spec: dict[str, Any]) -> None:
-        """Add a title slide."""
+    def _add_layout_slide(self, layout_name: str, spec: dict[str, Any]) -> None:
+        """Add a slide using a named layout template.
+
+        Checks custom_layouts (from frontmatter) first, then SLIDE_LAYOUTS.
+        """
+        custom = getattr(self, "_custom_layouts", {})
+        if layout_name in custom:
+            layout = custom[layout_name]
+        elif layout_name in SLIDE_LAYOUTS:
+            layout = SLIDE_LAYOUTS[layout_name]
+        else:
+            layout = SLIDE_LAYOUTS["content"]
+
+        positions = _resolve_layout_positions_from_layout(
+            layout, self.slide_width, self.slide_height
+        )
+
         slide_layout = self.prs.slide_layouts[6]  # Blank layout
         slide = self.prs.slides.add_slide(slide_layout)
-        self._set_slide_background(slide, self.palette["background"])
+        self._set_slide_background(slide, self.palette[layout["background"]])
 
-        title = spec.get("title", "")
-        self._add_text_box(
-            slide,
-            title,
-            left=Inches(1),
-            top=Inches(2),
-            width=self.slide_width - Inches(2),
-            height=Inches(1.5),
-            font_size=FONT_CONFIG["title_size"],
-            font_color=self.palette["heading"],
-            bold=True,
-            alignment=PP_ALIGN.LEFT,
-        )
+        # Map spec data to placeholder names
+        content = self._map_spec_to_placeholders(layout_name, spec)
 
-        self._add_accent_bar(slide, top=Inches(3.6), width=Inches(3))
+        # Render each placeholder
+        for ph_name, ph_def in layout["placeholders"].items():
+            pos = positions[ph_name]
+            role = ph_def["role"]
+            data = content.get(ph_name)
+            if not data:
+                continue
 
-        subtitle = spec.get("subtitle", "")
-        if subtitle:
-            self._add_text_box(
-                slide,
-                subtitle,
-                left=Inches(1),
-                top=Inches(4),
-                width=self.slide_width - Inches(2),
-                height=Inches(1),
-                font_size=FONT_CONFIG["subtitle_size"],
-                font_color=self.palette["subtitle"],
-            )
+            if role == "text":
+                align_name = ph_def.get("align")
+                alignment = {
+                    "left": PP_ALIGN.LEFT,
+                    "center": PP_ALIGN.CENTER,
+                    "right": PP_ALIGN.RIGHT,
+                }.get(align_name)
 
-        if spec.get("notes"):
-            self._add_speaker_notes(slide, spec["notes"])
-
-    def _add_content_slide(self, spec: dict[str, Any]) -> None:
-        """Add a content slide with title and bullets."""
-        slide_layout = self.prs.slide_layouts[6]
-        slide = self.prs.slides.add_slide(slide_layout)
-        self._set_slide_background(slide, self.palette["background"])
-
-        title = spec.get("title", "")
-        if title:
-            self._add_text_box(
-                slide,
-                title,
-                left=Inches(0.75),
-                top=Inches(0.4),
-                width=self.slide_width - Inches(1.5),
-                height=Inches(0.8),
-                font_size=FONT_CONFIG["heading_size"],
-                font_color=self.palette["heading"],
-                bold=True,
-            )
-            self._add_accent_bar(slide, top=Inches(1.25), width=Inches(2))
-
-        bullets = spec.get("bullets", [])
-        if bullets:
-            bullet_top = Inches(1.6) if title else Inches(0.75)
-            self._add_bullet_list(
-                slide,
-                bullets,
-                left=Inches(0.75),
-                top=bullet_top,
-                width=self.slide_width - Inches(1.5),
-                height=self.slide_height - bullet_top - Inches(0.75),
-            )
-
-        slide_num = len(self.prs.slides)
-        self._add_slide_number(slide, slide_num)
-
-        if spec.get("notes"):
-            self._add_speaker_notes(slide, spec["notes"])
-
-    def _add_section_slide(self, spec: dict[str, Any]) -> None:
-        """Add a section divider slide."""
-        slide_layout = self.prs.slide_layouts[6]
-        slide = self.prs.slides.add_slide(slide_layout)
-        self._set_slide_background(slide, self.palette["background_alt"])
-
-        title = spec.get("title", "")
-        self._add_text_box(
-            slide,
-            title,
-            left=Inches(1.5),
-            top=Inches(2.5),
-            width=self.slide_width - Inches(3),
-            height=Inches(1.5),
-            font_size=FONT_CONFIG["title_size"],
-            font_color=self.palette["heading"],
-            bold=True,
-            alignment=PP_ALIGN.LEFT,
-        )
-
-        self._add_accent_bar(slide, top=Inches(4.1), width=Inches(3))
-
-        subtitle = spec.get("subtitle", "")
-        if subtitle:
-            self._add_text_box(
-                slide,
-                subtitle,
-                left=Inches(1.5),
-                top=Inches(4.5),
-                width=self.slide_width - Inches(3),
-                height=Inches(0.8),
-                font_size=FONT_CONFIG["subtitle_size"],
-                font_color=self.palette["subtitle"],
-            )
-
-        slide_num = len(self.prs.slides)
-        self._add_slide_number(slide, slide_num)
-
-        if spec.get("notes"):
-            self._add_speaker_notes(slide, spec["notes"])
-
-    def _add_two_column_slide(self, spec: dict[str, Any]) -> None:
-        """Add a two-column slide."""
-        slide_layout = self.prs.slide_layouts[6]
-        slide = self.prs.slides.add_slide(slide_layout)
-        self._set_slide_background(slide, self.palette["background"])
-
-        title = spec.get("title", "")
-        if title:
-            self._add_text_box(
-                slide,
-                title,
-                left=Inches(0.75),
-                top=Inches(0.4),
-                width=self.slide_width - Inches(1.5),
-                height=Inches(0.8),
-                font_size=FONT_CONFIG["heading_size"],
-                font_color=self.palette["heading"],
-                bold=True,
-            )
-            self._add_accent_bar(slide, top=Inches(1.25), width=Inches(2))
-
-        col_top = Inches(1.6) if title else Inches(0.75)
-        col_width = (self.slide_width - Inches(2)) // 2
-
-        for col_idx, col_key in enumerate(("left", "right")):
-            col_data = spec.get(col_key, {})
-            col_left = Inches(0.75) + col_idx * (col_width + Inches(0.5))
-
-            heading = col_data.get("heading", "")
-            if heading:
                 self._add_text_box(
                     slide,
-                    heading,
-                    left=col_left,
-                    top=col_top,
-                    width=col_width,
-                    height=Inches(0.6),
-                    font_size=FONT_CONFIG["subtitle_size"],
-                    font_color=self.palette["primary"],
-                    bold=True,
+                    data,
+                    left=pos["x"],
+                    top=pos["y"],
+                    width=pos["w"],
+                    height=pos["h"],
+                    font_size=FONT_CONFIG.get(ph_def.get("font", "body_size"), 18),
+                    font_color=self.palette.get(ph_def.get("color", "text"), self.palette["text"]),
+                    bold=ph_def.get("bold", False),
+                    alignment=alignment,
                 )
-
-            bullets = col_data.get("bullets", [])
-            if bullets:
-                bullet_top = col_top + Inches(0.7) if heading else col_top
+            elif role == "bullets":
                 self._add_bullet_list(
                     slide,
-                    bullets,
-                    left=col_left,
-                    top=bullet_top,
-                    width=col_width,
-                    height=self.slide_height - bullet_top - Inches(0.75),
+                    data,
+                    left=pos["x"],
+                    top=pos["y"],
+                    width=pos["w"],
+                    height=pos["h"],
                 )
+            elif role == "image":
+                image_path = data if isinstance(data, str) else str(data)
+                if Path(image_path).exists():
+                    slide.shapes.add_picture(
+                        image_path,
+                        pos["x"],
+                        pos["y"],
+                        pos["w"],
+                        pos["h"],
+                    )
 
-        slide_num = len(self.prs.slides)
-        self._add_slide_number(slide, slide_num)
+        # Accent bar
+        bar = layout["accent_bar"]
+        if bar is not None:
+            bar_top = int(bar["y"] / 100 * self.slide_height)
+            bar_width = int(bar["w"] / 100 * self.slide_width)
+            self._add_accent_bar(slide, top=bar_top, width=bar_width)
 
+        # Slide number
+        if layout["slide_number"]:
+            self._add_slide_number(slide, len(self.prs.slides))
+
+        # Speaker notes
         if spec.get("notes"):
             self._add_speaker_notes(slide, spec["notes"])
 
-    def _add_image_slide(self, spec: dict[str, Any]) -> None:
-        """Add an image slide."""
-        slide_layout = self.prs.slide_layouts[6]
-        slide = self.prs.slides.add_slide(slide_layout)
-        self._set_slide_background(slide, self.palette["background"])
+    def _map_spec_to_placeholders(self, _layout_name: str, spec: dict[str, Any]) -> dict[str, Any]:
+        """Map slide spec data to layout placeholder names."""
+        content: dict[str, Any] = {}
 
-        title = spec.get("title", "")
-        if title:
-            self._add_text_box(
-                slide,
-                title,
-                left=Inches(0.75),
-                top=Inches(0.4),
-                width=self.slide_width - Inches(1.5),
-                height=Inches(0.8),
-                font_size=FONT_CONFIG["heading_size"],
-                font_color=self.palette["heading"],
-                bold=True,
-            )
+        content["title"] = spec.get("title", "")
+        content["subtitle"] = spec.get("subtitle", "")
+        content["body"] = spec.get("bullets", []) or []
+        content["contact"] = spec.get("contact", "")
+        content["caption"] = spec.get("image_alt") or spec.get("caption", "")
 
-        image_path = spec.get("image_path")
-        if image_path and Path(image_path).exists():
-            img_top = Inches(1.5) if title else Inches(0.75)
-            img_height = self.slide_height - img_top - Inches(1.2)
-            img_width = self.slide_width - Inches(2)
-            slide.shapes.add_picture(
-                image_path,
-                Inches(1),
-                img_top,
-                img_width,
-                img_height,
-            )
+        # Quote layout
+        content["quote"] = spec.get("quote", "")
+        content["attribution"] = spec.get("attribution", "")
 
-        caption = spec.get("image_alt") or spec.get("caption", "")
-        if caption:
-            self._add_text_box(
-                slide,
-                caption,
-                left=Inches(1),
-                top=self.slide_height - Inches(0.8),
-                width=self.slide_width - Inches(2),
-                height=Inches(0.5),
-                font_size=FONT_CONFIG["caption_size"],
-                font_color=self.palette["subtitle"],
-                alignment=PP_ALIGN.CENTER,
-            )
+        # Data layout
+        content["metric"] = spec.get("metric", "")
 
-        slide_num = len(self.prs.slides)
-        self._add_slide_number(slide, slide_num)
+        # Image placeholders
+        image_path = spec.get("image_path", "")
+        content["image"] = image_path
+        content["icon"] = spec.get("icon_path", "")
+        content["graphic"] = spec.get("graphic_path") or image_path
 
-        if spec.get("notes"):
-            self._add_speaker_notes(slide, spec["notes"])
+        # Two-column data
+        left = spec.get("left", {})
+        right = spec.get("right", {})
+        content["left_heading"] = left.get("heading", "")
+        content["left_body"] = left.get("bullets", []) or []
+        content["right_heading"] = right.get("heading", "")
+        content["right_body"] = right.get("bullets", []) or []
 
-    def _add_closing_slide(self, spec: dict[str, Any]) -> None:
-        """Add a closing/thank-you slide."""
-        slide_layout = self.prs.slide_layouts[6]
-        slide = self.prs.slides.add_slide(slide_layout)
-        self._set_slide_background(slide, self.palette["background_alt"])
-
-        title = spec.get("title", "")
-        self._add_text_box(
-            slide,
-            title,
-            left=Inches(1.5),
-            top=Inches(2),
-            width=self.slide_width - Inches(3),
-            height=Inches(1.5),
-            font_size=FONT_CONFIG["title_size"],
-            font_color=self.palette["heading"],
-            bold=True,
-            alignment=PP_ALIGN.CENTER,
-        )
-
-        subtitle = spec.get("subtitle", "")
-        if subtitle:
-            self._add_text_box(
-                slide,
-                subtitle,
-                left=Inches(1.5),
-                top=Inches(3.5),
-                width=self.slide_width - Inches(3),
-                height=Inches(0.8),
-                font_size=FONT_CONFIG["subtitle_size"],
-                font_color=self.palette["subtitle"],
-                alignment=PP_ALIGN.CENTER,
-            )
-
-        contact = spec.get("contact", "")
-        if contact:
-            self._add_text_box(
-                slide,
-                contact,
-                left=Inches(1.5),
-                top=Inches(4.5),
-                width=self.slide_width - Inches(3),
-                height=Inches(0.5),
-                font_size=FONT_CONFIG["body_size"],
-                font_color=self.palette["primary"],
-                alignment=PP_ALIGN.CENTER,
-            )
-
-        if spec.get("notes"):
-            self._add_speaker_notes(slide, spec["notes"])
+        return content
 
 
 # ============================================================================
@@ -2112,6 +2727,29 @@ def cmd_preview(args):
             return 1
 
 
+def _image_dimensions_from_blob(blob: bytes) -> tuple[int | None, int | None]:
+    """Extract pixel dimensions from PNG or JPEG image blob without PIL."""
+    if blob[:8] == b"\x89PNG\r\n\x1a\n" and len(blob) >= 24:
+        w = int.from_bytes(blob[16:20], "big")
+        h = int.from_bytes(blob[20:24], "big")
+        return w, h
+
+    if blob[:2] == b"\xff\xd8":
+        i = 2
+        while i < len(blob) - 9:
+            if blob[i] != 0xFF:
+                break
+            marker = blob[i + 1]
+            if marker in (0xC0, 0xC1, 0xC2):
+                h = int.from_bytes(blob[i + 5 : i + 7], "big")
+                w = int.from_bytes(blob[i + 7 : i + 9], "big")
+                return w, h
+            seg_len = int.from_bytes(blob[i + 2 : i + 4], "big")
+            i += 2 + seg_len
+
+    return None, None
+
+
 def verify_presentation(pptx_path: str) -> list[dict[str, Any]]:
     """Run quality and accessibility checks on a local .pptx file.
 
@@ -2173,6 +2811,127 @@ def verify_presentation(pptx_path: str) -> list[dict[str, Any]]:
                     "message": f"Slide {i}: unexpected fonts: {', '.join(sorted(unexpected))}",
                 }
             )
+
+    # Color contrast check (WCAG AA)
+    for i, slide in enumerate(prs.slides, 1):
+        bg_color = None
+        try:
+            fill = slide.background.fill
+            if fill.type is not None and fill.fore_color and fill.fore_color.rgb:
+                bg_color = f"#{fill.fore_color.rgb}"
+        except (AttributeError, TypeError):
+            pass
+
+        for shape in slide.shapes:
+            if not shape.has_text_frame:
+                continue
+            shape_bg = None
+            try:
+                sfill = shape.fill
+                if sfill.type is not None and sfill.fore_color and sfill.fore_color.rgb:
+                    shape_bg = f"#{sfill.fore_color.rgb}"
+            except (AttributeError, TypeError):
+                pass
+            effective_bg = shape_bg or bg_color or "#FFFFFF"
+
+            for para in shape.text_frame.paragraphs:
+                for run in para.runs:
+                    if not run.text.strip():
+                        continue
+                    fg_color = None
+                    try:
+                        if run.font.color.rgb:
+                            fg_color = f"#{run.font.color.rgb}"
+                    except (AttributeError, TypeError):
+                        pass
+                    if not fg_color:
+                        continue
+
+                    ratio = contrast_ratio(fg_color, effective_bg)
+                    font_size = run.font.size
+                    is_bold = run.font.bold
+                    is_large = (font_size and font_size >= Pt(18)) or (
+                        is_bold and font_size and font_size >= Pt(14)
+                    )
+                    threshold = 3.0 if is_large else 4.5
+
+                    if ratio < threshold:
+                        results.append(
+                            {
+                                "check": "color_contrast",
+                                "severity": "warning",
+                                "message": (
+                                    f"Slide {i}: low contrast {ratio:.1f}:1 "
+                                    f"({fg_color} on {effective_bg}), "
+                                    f"WCAG AA requires {threshold:.1f}:1"
+                                ),
+                            }
+                        )
+
+    # Text overflow detection
+    for i, slide in enumerate(prs.slides, 1):
+        for shape in slide.shapes:
+            if not shape.has_text_frame:
+                continue
+            if not shape.height or not shape.width:
+                continue
+
+            total_height_emu = 0
+            for para in shape.text_frame.paragraphs:
+                text = para.text
+                if not text:
+                    total_height_emu += Pt(8)
+                    continue
+
+                font_size = Pt(FONT_CONFIG["body_size"])
+                for run in para.runs:
+                    if run.font.size:
+                        font_size = run.font.size
+                        break
+
+                avg_char_width = int(font_size * 0.6)
+                chars_per_line = max(1, shape.width // avg_char_width) if avg_char_width else 1
+                line_count = max(1, -(-len(text) // chars_per_line))
+                total_height_emu += line_count * int(font_size * 1.3) + Pt(8)
+
+            if total_height_emu > shape.height:
+                results.append(
+                    {
+                        "check": "text_overflow",
+                        "severity": "info",
+                        "message": (
+                            f"Slide {i}: text may overflow its container "
+                            f"(estimated {total_height_emu / EMU_PER_PT:.0f}pt "
+                            f"in {shape.height / EMU_PER_PT:.0f}pt box)"
+                        ),
+                    }
+                )
+
+    # Image resolution check (150 DPI minimum)
+    for i, slide in enumerate(prs.slides, 1):
+        for shape in slide.shapes:
+            if not hasattr(shape, "image"):
+                continue
+            try:
+                blob = shape.image.blob
+                pixel_w, pixel_h = _image_dimensions_from_blob(blob)
+                if pixel_w and pixel_h and shape.width and shape.height:
+                    dpi_x = pixel_w / (shape.width / EMU_PER_INCH)
+                    dpi_y = pixel_h / (shape.height / EMU_PER_INCH)
+                    min_dpi = min(dpi_x, dpi_y)
+                    if min_dpi < 150:
+                        results.append(
+                            {
+                                "check": "image_dpi",
+                                "severity": "warning",
+                                "message": (
+                                    f"Slide {i}: image resolution {min_dpi:.0f} DPI "
+                                    f"(minimum 150 DPI recommended)"
+                                ),
+                            }
+                        )
+            except (AttributeError, ValueError):
+                pass
 
     # Speaker notes check
     slides_with_notes = []
