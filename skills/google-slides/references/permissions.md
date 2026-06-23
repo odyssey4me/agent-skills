@@ -6,7 +6,7 @@ enforce appropriate permission controls.
 - **read**: Safe to execute without user confirmation. These commands
   only retrieve or display information.
 - **write**: Requires user confirmation before execution. These
-  commands create, modify, or delete data.
+  commands create, modify, or delete data, or produce files on disk.
 
 | Command | Access | Description |
 |---------|--------|-------------|
@@ -14,11 +14,10 @@ enforce appropriate permission controls.
 | auth status | read | Show OAuth token information |
 | auth setup | write | Store OAuth client credentials |
 | auth reset | write | Clear stored OAuth token |
-| presentations get | read | Get presentation metadata |
-| presentations read | read | Read slide content |
-| presentations create | write | Create a new presentation |
-| slides create | write | Add a slide |
-| slides delete | write | Delete a slide |
-| text insert | write | Insert text into a shape |
-| shapes create | write | Create a shape |
-| images create | write | Insert an image |
+| get | read | Download presentation as Markdown |
+| palettes | read | List available color palettes |
+| verify | read | Check .pptx for quality/accessibility issues |
+| preview --format summary | read | Print text summary of slides |
+| create | write | Build .pptx from Markdown (and optionally upload) |
+| update | write | Upload .pptx to an existing presentation |
+| preview --format images | write | Render slide images to disk |

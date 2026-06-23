@@ -1,9 +1,9 @@
 ---
 name: google-slides
-description: Create and edit Google Slides presentations. Add or delete slides, insert text, shapes, and images. Use when asked to build a deck, create a slideshow, update a Google presentation, or edit slides.
+description: Markdown-driven presentation builder with Google Slides upload. Write Markdown, build .pptx locally, review in LibreOffice, upload to Google Slides.
 metadata:
   author: odyssey4me
-  version: "0.1.3"
+  version: "1.0.0"
   category: google-workspace
   tags: "presentations, slides"
   complexity: standard
@@ -13,11 +13,28 @@ allowed-tools: Bash($SKILL_DIR/scripts/google-slides.py:*)
 
 # Google Slides
 
-Interact with Google Slides for presentation creation, slide management, and content insertion.
+Build presentations from Markdown files with YAML frontmatter. The skill
+generates .pptx files locally using python-pptx, with optional upload to
+Google Slides via the Drive API. A round-trip workflow lets you download an
+existing presentation as Markdown, edit it, rebuild, and re-upload.
 
 ## Installation
 
-**Dependencies**: `pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml`
+**Required Python packages:**
+
+```bash
+pip install --user google-auth google-auth-oauthlib google-api-python-client keyring pyyaml
+```
+
+**For local .pptx building:**
+
+```bash
+pip install --user python-pptx cairosvg
+```
+
+**Optional system dependency:** LibreOffice (for `preview` command). The
+skill auto-detects `libreoffice`, `soffice`, Flatpak, or the path set in
+the `LIBREOFFICE_PATH` environment variable.
 
 ## Setup Verification
 
@@ -28,9 +45,10 @@ $SKILL_DIR/scripts/google-slides.py check
 ```
 
 This will check:
-- Python dependencies (google-auth, google-auth-oauthlib, google-api-python-client, keyring, pyyaml)
+- Python dependencies (google-auth, google-auth-oauthlib, google-api-python-client, keyring, pyyaml, python-pptx, cairosvg)
 - Authentication configuration
-- Connectivity to Google Slides API
+- Connectivity to Google APIs
+- LibreOffice availability (optional)
 
 If anything is missing, the check command will provide setup instructions.
 
@@ -38,7 +56,7 @@ If anything is missing, the check command will provide setup instructions.
 
 Google Slides uses OAuth 2.0 for authentication. For complete setup instructions, see:
 
-1. [GCP Project Setup Guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/gcp-project-setup.md) - Create project, enable Slides API
+1. [GCP Project Setup Guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/gcp-project-setup.md) - Create project, enable Drive API
 2. [Google OAuth Setup Guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md) - Configure credentials
 
 ### Quick Start
@@ -65,174 +83,219 @@ $SKILL_DIR/scripts/google-slides.py auth setup --client-id ID --client-secret SE
 $SKILL_DIR/scripts/google-slides.py auth reset
 $SKILL_DIR/scripts/google-slides.py auth status
 
-# Presentations
-$SKILL_DIR/scripts/google-slides.py presentations create --title "Title"
-$SKILL_DIR/scripts/google-slides.py presentations get PRESENTATION_ID
-$SKILL_DIR/scripts/google-slides.py presentations read PRESENTATION_ID [--format text|pdf] [--output PATH]
+# Build a presentation from Markdown
+$SKILL_DIR/scripts/google-slides.py create --file deck.md
+$SKILL_DIR/scripts/google-slides.py create --file deck.md --output deck.pptx --palette redhat-brand
+$SKILL_DIR/scripts/google-slides.py create --file deck.md --title "My Deck"  # build and upload
 
-# Slides — use presentations get to find slide IDs
-$SKILL_DIR/scripts/google-slides.py slides create PRESENTATION_ID --layout LAYOUT [--index N]
-$SKILL_DIR/scripts/google-slides.py slides delete PRESENTATION_ID --slide-id SLIDE_ID
+# Download a presentation as Markdown
+$SKILL_DIR/scripts/google-slides.py get PRESENTATION_ID
+$SKILL_DIR/scripts/google-slides.py get PRESENTATION_ID -o deck.md
 
-# Content — coordinates are in points; origin (0,0) is top-left
-$SKILL_DIR/scripts/google-slides.py text insert PRESENTATION_ID --slide-id ID --text "..." [--x N --y N --width N --height N]
-$SKILL_DIR/scripts/google-slides.py shapes create PRESENTATION_ID --slide-id ID --shape-type TYPE [--x N --y N --width N --height N]
-$SKILL_DIR/scripts/google-slides.py images create PRESENTATION_ID --slide-id ID --image-url URL [--x N --y N --width N --height N]
+# Upload or replace slides in an existing presentation
+$SKILL_DIR/scripts/google-slides.py update PRESENTATION_ID --file deck.pptx
+$SKILL_DIR/scripts/google-slides.py update PRESENTATION_ID --file deck.pptx --mode append
+
+# Preview and verify
+$SKILL_DIR/scripts/google-slides.py preview --file deck.pptx
+$SKILL_DIR/scripts/google-slides.py preview --file deck.pptx --format summary
+$SKILL_DIR/scripts/google-slides.py verify --file deck.pptx
+
+# List available color palettes
+$SKILL_DIR/scripts/google-slides.py palettes
 ```
 
 See [command-reference.md](references/command-reference.md) for full argument details and examples.
 
+## Markdown Format
+
+Presentations are written as Markdown files with YAML frontmatter. Slides
+are separated by `---` on its own line. Slide types are set with HTML
+comment directives.
+
+```markdown
+---
+title: Team Update
+subtitle: Q2 2026
+author: Jane Smith
+date: 2026-06-23
+palette: redhat-brand
+---
+
+# Team Update
+
+## Q2 2026
+
+> Speaker notes go in blockquotes.
+
+---
+
+<!-- type: section -->
+
+# Progress Review
+
+---
+
+## Key Metrics
+
+- Revenue: $1.2M (up 15%)
+- Active users: 50,000
+- NPS: 72
+
+::icon:trending-up::
+
+> Mention the NPS improvement from last quarter.
+
+---
+
+<!-- type: two-column -->
+
+## Comparison
+
+<!-- left -->
+
+### Before
+
+- Manual process
+- 3-day turnaround
+- Error-prone
+
+<!-- right -->
+
+### After
+
+- Fully automated
+- 15-minute turnaround
+- 99.9% accuracy
+
+---
+
+<!-- type: image -->
+
+# Architecture
+
+![System architecture diagram](images/architecture.png)
+
+---
+
+<!-- type: closing -->
+
+# Thank You
+
+## Questions?
+```
+
+### Slide Types
+
+| Type | Directive | Description |
+|------|-----------|-------------|
+| Title | *(first slide, auto-detected)* | Presentation title and subtitle |
+| Section | `<!-- type: section -->` | Section divider with large heading |
+| Content | *(default)* | Standard slide with heading and bullets |
+| Two-column | `<!-- type: two-column -->` | Side-by-side content with `<!-- left -->` / `<!-- right -->` markers |
+| Image | `<!-- type: image -->` | Full-slide image with optional heading |
+| Closing | `<!-- type: closing -->` | Closing slide (e.g., "Thank You") |
+
+### Formatting
+
+- `# H1` -- slide title
+- `## H2` -- slide subtitle
+- `- bullets` -- bullet points (nested supported)
+- `> blockquote` -- speaker notes (not rendered on slide)
+- `![alt](path)` -- image
+- `::icon:name::` -- icon from the Red Hat icons repository
+
+See [presentations-guide.md](references/presentations-guide.md) for the full
+Markdown format specification, icon categories, and color palettes.
+
+## Color Palettes
+
+Seven built-in palettes are available -- four Red Hat brand palettes and
+three general-purpose palettes. Use `palettes` to list them.
+
+Set the palette in frontmatter (`palette: name`) or on the command line
+(`--palette name`). The command-line flag overrides frontmatter.
+
 ## Examples
 
-### Create a simple presentation
+### Build and preview a deck
 
 ```bash
-# Create presentation
-$SKILL_DIR/scripts/google-slides.py presentations create --title "Team Update"
+# Create .pptx from Markdown
+$SKILL_DIR/scripts/google-slides.py create --file deck.md --output deck.pptx
 
-# Verify creation and get the default slide ID
-$SKILL_DIR/scripts/google-slides.py presentations get $PRES_ID
+# Preview as images (requires LibreOffice)
+$SKILL_DIR/scripts/google-slides.py preview --file deck.pptx --format images
 
-# Add title text
-$SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
-  --slide-id $SLIDE_ID \
-  --text "Q4 Team Update" \
-  --x 50 --y 50 --width 600 --height 100
-
-# Add subtitle
-$SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
-  --slide-id $SLIDE_ID \
-  --text "December 2024" \
-  --x 50 --y 180 --width 600 --height 50
-
-# Verify content was inserted correctly
-$SKILL_DIR/scripts/google-slides.py presentations read $PRES_ID
+# Get a text summary instead
+$SKILL_DIR/scripts/google-slides.py preview --file deck.pptx --format summary
 ```
 
-### Build a multi-slide presentation
+### Build and upload in one step
 
 ```bash
-#!/bin/bash
-PRES_ID="your-presentation-id"
-
-# Add content slide
-$SKILL_DIR/scripts/google-slides.py slides create $PRES_ID --layout TITLE_AND_BODY
-
-# Verify slide was added and get its ID
-$SKILL_DIR/scripts/google-slides.py presentations get $PRES_ID
-
-# Add title
-$SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
-  --slide-id $SLIDE_ID \
-  --text "Key Metrics" \
-  --x 50 --y 30 --width 600 --height 60
-
-# Add chart image
-$SKILL_DIR/scripts/google-slides.py images create $PRES_ID \
-  --slide-id $SLIDE_ID \
-  --image-url "https://example.com/metrics.png" \
-  --x 100 --y 120 --width 500 --height 350
-
-# Add another slide with shapes
-$SKILL_DIR/scripts/google-slides.py slides create $PRES_ID --layout BLANK
-
-# Verify and get the new slide ID
-$SKILL_DIR/scripts/google-slides.py presentations get $PRES_ID
-
-# Add decorative shape
-$SKILL_DIR/scripts/google-slides.py shapes create $PRES_ID \
-  --slide-id $SLIDE2_ID \
-  --shape-type STAR_5 \
-  --x 550 --y 30 --width 80 --height 80
-
-# Verify final presentation content
-$SKILL_DIR/scripts/google-slides.py presentations read $PRES_ID
+$SKILL_DIR/scripts/google-slides.py create --file deck.md --title "Q2 Team Update"
+# Builds .pptx, uploads to Google Drive, returns the presentation URL
 ```
 
-### Create presentation from data
+### Round-trip workflow
 
 ```bash
-#!/bin/bash
+# Download existing presentation as Markdown
+$SKILL_DIR/scripts/google-slides.py get 1abc...xyz -o deck.md
 
-# Create presentation
-$SKILL_DIR/scripts/google-slides.py presentations create --title "Sales Report"
+# Edit deck.md in your editor...
 
-# Verify creation
-$SKILL_DIR/scripts/google-slides.py presentations get $PRES_ID
+# Rebuild
+$SKILL_DIR/scripts/google-slides.py create --file deck.md --output deck.pptx
 
-# Add a slide for each region
-$SKILL_DIR/scripts/google-slides.py slides create $PRES_ID --layout TITLE_AND_BODY
+# Verify quality and accessibility
+$SKILL_DIR/scripts/google-slides.py verify --file deck.pptx
 
-# Verify slide was added and get its ID
-$SKILL_DIR/scripts/google-slides.py presentations get $PRES_ID
-
-# Insert text on each slide using the slide ID from the output above
-$SKILL_DIR/scripts/google-slides.py text insert $PRES_ID \
-  --slide-id $SLIDE_ID \
-  --text "North Region Sales" \
-  --x 50 --y 30 --width 600 --height 80
-
-# Verify content
-$SKILL_DIR/scripts/google-slides.py presentations read $PRES_ID
+# Replace slides in the original presentation
+$SKILL_DIR/scripts/google-slides.py update 1abc...xyz --file deck.pptx --mode replace
 ```
 
-## Coordinate System
+### Verify against a cloud version
 
-Google Slides uses **points** for positioning and sizing:
-- 1 point = 1/72 inch
-- 1 inch = 72 points
-- Origin (0, 0) is at the top-left corner
-- Standard slide size: 720 x 540 points (10 x 7.5 inches)
-
-**Common reference positions:**
-
-```
-(0, 0)                                    (720, 0)
-  ┌───────────────────────────────────────┐
-  │  Title area                           │
-  │  (50, 50, 620, 80)                    │
-  │                                       │
-  │  Content area                         │
-  │  (50, 150, 620, 350)                  │
-  │                                       │
-  │                                       │
-  └───────────────────────────────────────┘
-(0, 540)                                (720, 540)
+```bash
+$SKILL_DIR/scripts/google-slides.py verify --file deck.pptx --presentation-id 1abc...xyz
 ```
 
 ## Error Handling
 
-**Authentication and scope errors are not retryable.** If a command fails with an authentication error, insufficient scope error, or permission denied error (exit code 1), **stop and inform the user**. Do not retry or attempt to fix the issue autonomously — these errors require user interaction (browser-based OAuth consent). Point the user to the [OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
+**Authentication and scope errors are not retryable.** If a command fails
+with an authentication error, insufficient scope error, or permission denied
+error (exit code 1), **stop and inform the user**. Do not retry or attempt
+to fix the issue autonomously -- these errors require user interaction
+(browser-based OAuth consent). Point the user to the
+[OAuth troubleshooting guide](https://github.com/odyssey4me/agent-skills/blob/main/docs/google-oauth-setup.md#troubleshooting).
 
-**Retryable errors**: Rate limiting (HTTP 429) and temporary server errors (HTTP 5xx) may succeed on retry after a brief wait. All other errors should be reported to the user.
+**Retryable errors**: Rate limiting (HTTP 429) and temporary server errors
+(HTTP 5xx) may succeed on retry after a brief wait. All other errors should
+be reported to the user.
 
 ## Model Guidance
 
-This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
+This skill makes API calls requiring structured input/output. A
+standard-capability model is recommended.
 
 ## Troubleshooting
 
 ### Cannot find presentation
 
-Make sure you're using the correct presentation ID from the URL:
+Make sure you are using the correct presentation ID from the URL:
 - URL: `https://docs.google.com/presentation/d/1abc...xyz/edit`
 - Presentation ID: `1abc...xyz`
 
-### Image not appearing
+### LibreOffice not found
 
-The image URL must be:
-- Publicly accessible (no authentication required), OR
-- Accessible to the Google account you're using
+The `preview` command requires LibreOffice. Install it via your package
+manager, or set `LIBREOFFICE_PATH` to the binary location. The skill checks
+for `libreoffice`, `soffice`, and Flatpak installations automatically.
 
-Test the URL in a browser. If it requires authentication, you'll need to:
-1. Upload the image to Google Drive
-2. Make it publicly accessible or share it with your Google account
-3. Use the Google Drive URL
+## Reference
 
-## API Reference
-
-For advanced usage, see:
-- [Google Slides API Documentation](https://developers.google.com/slides/api)
-- [Working with presentations](https://developers.google.com/slides/api/guides/presentations)
-- [Layouts guide](references/layouts-guide.md)
-- [Shapes guide](references/shapes-guide.md)
+- [Command reference](references/command-reference.md) -- full argument details
+- [Permissions](references/permissions.md) -- read/write classification
+- [Presentations guide](references/presentations-guide.md) -- Markdown format, palettes, icons

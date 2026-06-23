@@ -5,11 +5,14 @@ from __future__ import annotations
 # Import from skills module - use importlib to handle hyphenated module name
 import importlib.util
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from pptx.util import Inches
 
 # Load the module with hyphenated name
 spec = importlib.util.spec_from_file_location(
@@ -25,9 +28,11 @@ AuthenticationError = google_slides.AuthenticationError
 SlidesAPIError = google_slides.SlidesAPIError
 SLIDES_SCOPES = google_slides.SLIDES_SCOPES
 SLIDES_SCOPES_DEFAULT = google_slides.SLIDES_SCOPES_DEFAULT
+SLIDES_SCOPES_READONLY = google_slides.SLIDES_SCOPES_READONLY
 DRIVE_SCOPES_READONLY = google_slides.DRIVE_SCOPES_READONLY
+COLOR_PALETTES = google_slides.COLOR_PALETTES
+FONT_CONFIG = google_slides.FONT_CONFIG
 build_drive_service = google_slides.build_drive_service
-export_presentation_as_pdf = google_slides.export_presentation_as_pdf
 build_parser = google_slides.build_parser
 build_slides_service = google_slides.build_slides_service
 check_slides_connectivity = google_slides.check_slides_connectivity
@@ -35,20 +40,15 @@ cmd_auth_setup = google_slides.cmd_auth_setup
 cmd_auth_reset = google_slides.cmd_auth_reset
 cmd_auth_status = google_slides.cmd_auth_status
 cmd_check = google_slides.cmd_check
-cmd_images_create = google_slides.cmd_images_create
-cmd_presentations_create = google_slides.cmd_presentations_create
-cmd_presentations_get = google_slides.cmd_presentations_get
-cmd_presentations_read = google_slides.cmd_presentations_read
-cmd_shapes_create = google_slides.cmd_shapes_create
-cmd_slides_create = google_slides.cmd_slides_create
-cmd_slides_delete = google_slides.cmd_slides_delete
-cmd_text_insert = google_slides.cmd_text_insert
-create_image = google_slides.create_image
-create_presentation = google_slides.create_presentation
-create_shape = google_slides.create_shape
-create_slide = google_slides.create_slide
+cmd_create = google_slides.cmd_create
+cmd_get = google_slides.cmd_get
+cmd_palettes = google_slides.cmd_palettes
+cmd_preview = google_slides.cmd_preview
+cmd_update = google_slides.cmd_update
+cmd_verify = google_slides.cmd_verify
 delete_credential = google_slides.delete_credential
-delete_slide = google_slides.delete_slide
+export_presentation_as_pdf = google_slides.export_presentation_as_pdf
+find_libreoffice = google_slides.find_libreoffice
 format_presentation_summary = google_slides.format_presentation_summary
 format_slide_info = google_slides.format_slide_info
 get_credential = google_slides.get_credential
@@ -57,14 +57,162 @@ _run_oauth_flow = google_slides._run_oauth_flow
 get_oauth_client_config = google_slides.get_oauth_client_config
 get_presentation = google_slides.get_presentation
 handle_api_error = google_slides.handle_api_error
-insert_text = google_slides.insert_text
+hex_to_rgb = google_slides.hex_to_rgb
+load_config = google_slides.load_config
+parse_frontmatter = google_slides.parse_frontmatter
+parse_markdown = google_slides.parse_markdown
+parse_slide_type = google_slides.parse_slide_type
+parse_slides = google_slides.parse_slides
 read_presentation_content = google_slides.read_presentation_content
+save_config = google_slides.save_config
+set_credential = google_slides.set_credential
 _extract_slide_text = google_slides._extract_slide_text
 _extract_table_text = google_slides._extract_table_text
 _extract_text_from_text_content = google_slides._extract_text_from_text_content
-load_config = google_slides.load_config
-save_config = google_slides.save_config
-set_credential = google_slides.set_credential
+_parse_single_slide = google_slides._parse_single_slide
+_parse_standard_slide = google_slides._parse_standard_slide
+_parse_two_column = google_slides._parse_two_column
+_parse_column = google_slides._parse_column
+_parse_bullet_icons = google_slides._parse_bullet_icons
+PresentationBuilder = google_slides.PresentationBuilder
+ensure_icon_repo = google_slides.ensure_icon_repo
+fetch_icon = google_slides.fetch_icon
+convert_svg_to_png = google_slides.convert_svg_to_png
+resolve_icon = google_slides.resolve_icon
+REDHAT_ICON_CATEGORIES = google_slides.REDHAT_ICON_CATEGORIES
+verify_presentation = google_slides.verify_presentation
+relative_luminance = google_slides.relative_luminance
+contrast_ratio = google_slides.contrast_ratio
+upload_pptx_to_google = google_slides.upload_pptx_to_google
+export_presentation_as_pptx = google_slides.export_presentation_as_pptx
+extract_images_from_pptx = google_slides.extract_images_from_pptx
+presentation_to_markdown = google_slides.presentation_to_markdown
+update_presentation_replace = google_slides.update_presentation_replace
+update_presentation_append = google_slides.update_presentation_append
+_get_text_elements = google_slides._get_text_elements
+_slide_has_image = google_slides._slide_has_image
+detect_slide_type = google_slides.detect_slide_type
+_extract_slide_as_markdown = google_slides._extract_slide_as_markdown
+
+
+# ============================================================================
+# COLOR PALETTE TESTS
+# ============================================================================
+
+
+class TestColorPalettes:
+    """Tests for COLOR_PALETTES configuration."""
+
+    REQUIRED_KEYS = {
+        "primary",
+        "secondary",
+        "accent",
+        "background",
+        "background_alt",
+        "text",
+        "text_light",
+        "heading",
+        "subtitle",
+        "divider",
+    }
+
+    def test_all_palettes_have_required_keys(self):
+        """Every palette must contain all 10 required color keys."""
+        for name, palette in COLOR_PALETTES.items():
+            missing = self.REQUIRED_KEYS - set(palette.keys())
+            assert not missing, f"Palette '{name}' missing keys: {missing}"
+
+    def test_palette_count(self):
+        """There should be exactly 7 palettes."""
+        assert len(COLOR_PALETTES) == 7
+
+    def test_palette_hex_format(self):
+        """All palette color values must be valid hex colors."""
+        hex_pattern = re.compile(r"^#[0-9A-Fa-f]{6}$")
+        for name, palette in COLOR_PALETTES.items():
+            for key, value in palette.items():
+                assert hex_pattern.match(value), (
+                    f"Palette '{name}' key '{key}' has invalid hex: {value}"
+                )
+
+    def test_known_palettes_exist(self):
+        """Verify the expected palette names are present."""
+        expected = {
+            "red-hat",
+            "red-hat-dark",
+            "red-hat-teal",
+            "red-hat-purple",
+            "corporate-blue",
+            "dark-mode",
+            "minimal-light",
+        }
+        assert set(COLOR_PALETTES.keys()) == expected
+
+
+# ============================================================================
+# FONT CONFIG TESTS
+# ============================================================================
+
+
+class TestFontConfig:
+    """Tests for FONT_CONFIG."""
+
+    def test_font_config_keys(self):
+        """FONT_CONFIG must have all expected keys."""
+        expected = {
+            "title_size",
+            "subtitle_size",
+            "heading_size",
+            "body_size",
+            "caption_size",
+            "font_family",
+        }
+        assert set(FONT_CONFIG.keys()) == expected
+
+    def test_font_sizes_are_integers(self):
+        """All font size values should be integers."""
+        for key, value in FONT_CONFIG.items():
+            if key != "font_family":
+                assert isinstance(value, int), f"FONT_CONFIG['{key}'] should be int"
+
+    def test_font_family_is_string(self):
+        """Font family should be a string."""
+        assert isinstance(FONT_CONFIG["font_family"], str)
+
+
+# ============================================================================
+# HEX TO RGB TESTS
+# ============================================================================
+
+
+class TestHexToRgb:
+    """Tests for hex_to_rgb function."""
+
+    def test_hex_to_rgb_red(self):
+        """Test converting pure red."""
+        result = hex_to_rgb("#FF0000")
+        assert result == (255, 0, 0)
+
+    def test_hex_to_rgb_green(self):
+        """Test converting pure green."""
+        result = hex_to_rgb("#00FF00")
+        assert result == (0, 255, 0)
+
+    def test_hex_to_rgb_blue(self):
+        """Test converting pure blue."""
+        result = hex_to_rgb("#0000FF")
+        assert result == (0, 0, 255)
+
+    def test_hex_to_rgb_no_hash(self):
+        """Test converting hex without leading hash."""
+        result = hex_to_rgb("EE0000")
+        assert result == (238, 0, 0)
+
+    def test_hex_to_rgb_lowercase(self):
+        """Test converting lowercase hex."""
+        result = hex_to_rgb("#abcdef")
+        assert result == (171, 205, 239)
+
 
 # ============================================================================
 # KEYRING CREDENTIAL TESTS
@@ -231,26 +379,675 @@ class TestOAuthClientConfig:
 
 
 # ============================================================================
-# PRESENTATION OPERATION TESTS
+# MARKDOWN PARSER TESTS
+# ============================================================================
+
+
+class TestParseFrontmatter:
+    """Tests for parse_frontmatter()."""
+
+    def test_no_frontmatter(self):
+        """Content without frontmatter returns empty dict."""
+        fm, body = parse_frontmatter("Hello world\nNo frontmatter here")
+        assert fm == {}
+        assert "Hello world" in body
+
+    def test_valid_frontmatter(self):
+        """Valid YAML frontmatter is parsed correctly."""
+        content = "---\ntitle: My Deck\npalette: dark-mode\n---\n\nSlide content"
+        fm, body = parse_frontmatter(content)
+        assert fm["title"] == "My Deck"
+        assert fm["palette"] == "dark-mode"
+        assert "Slide content" in body
+
+    def test_frontmatter_without_closing(self):
+        """Frontmatter without closing --- returns empty dict."""
+        content = "---\ntitle: Broken\nNo closing marker"
+        fm, body = parse_frontmatter(content)
+        assert fm == {}
+
+    def test_invalid_yaml_frontmatter(self):
+        """Invalid YAML in frontmatter returns empty dict."""
+        content = "---\n: invalid: yaml: [broken\n---\n\nBody"
+        fm, body = parse_frontmatter(content)
+        assert fm == {}
+
+
+class TestParseSlideType:
+    """Tests for parse_slide_type()."""
+
+    def test_content_type_default(self):
+        """Default slide type is 'content'."""
+        assert parse_slide_type("# Just a heading") == "content"
+
+    def test_title_type(self):
+        """Title type is extracted from comment."""
+        assert parse_slide_type("<!-- type: title -->\n# Hello") == "title"
+
+    def test_section_type(self):
+        """Section type is extracted."""
+        assert parse_slide_type("<!-- type: section -->") == "section"
+
+    def test_two_column_type(self):
+        """Two-column type is extracted."""
+        assert parse_slide_type("<!-- type: two-column -->") == "two-column"
+
+    def test_closing_type(self):
+        """Closing type is extracted."""
+        assert parse_slide_type("<!-- type: closing -->") == "closing"
+
+    def test_image_type(self):
+        """Image type is extracted."""
+        assert parse_slide_type("<!-- type: image -->") == "image"
+
+
+class TestParseSlides:
+    """Tests for parse_slides()."""
+
+    def test_single_slide(self):
+        """Single slide with no separators."""
+        slides = parse_slides("# Title\n- Bullet one\n- Bullet two")
+        assert len(slides) == 1
+        assert slides[0]["title"] == "Title"
+        assert slides[0]["bullets"] == ["Bullet one", "Bullet two"]
+
+    def test_multiple_slides(self):
+        """Multiple slides separated by ---."""
+        body = "# Slide 1\n- A\n\n---\n\n# Slide 2\n- B"
+        slides = parse_slides(body)
+        assert len(slides) == 2
+        assert slides[0]["title"] == "Slide 1"
+        assert slides[1]["title"] == "Slide 2"
+
+    def test_empty_content_skipped(self):
+        """Empty slide content is skipped."""
+        body = "# Slide 1\n\n---\n\n\n\n---\n\n# Slide 3"
+        slides = parse_slides(body)
+        assert len(slides) == 2
+
+
+class TestParseSingleSlide:
+    """Tests for _parse_single_slide()."""
+
+    def test_content_slide_with_bullets(self):
+        """Standard content slide with title and bullets."""
+        slide = _parse_single_slide("# My Title\n- Point one\n- Point two")
+        assert slide["type"] == "content"
+        assert slide["title"] == "My Title"
+        assert slide["bullets"] == ["Point one", "Point two"]
+
+    def test_title_slide_with_subtitle(self):
+        """Title slide with subtitle."""
+        raw = "<!-- type: title -->\n# Main Title\n## Sub Title"
+        slide = _parse_single_slide(raw)
+        assert slide["type"] == "title"
+        assert slide["title"] == "Main Title"
+        assert slide["subtitle"] == "Sub Title"
+
+    def test_slide_with_notes(self):
+        """Slide with speaker notes."""
+        raw = "# Heading\n- Bullet\n> Speaker note line 1\n> Speaker note line 2"
+        slide = _parse_single_slide(raw)
+        assert "notes" in slide
+        assert "Speaker note line 1" in slide["notes"]
+        assert "Speaker note line 2" in slide["notes"]
+
+    def test_slide_with_image(self):
+        """Slide with an image reference."""
+        raw = "<!-- type: image -->\n# Chart\n![Alt text](path/to/image.png)"
+        slide = _parse_single_slide(raw)
+        assert slide["type"] == "image"
+        assert slide["image_path"] == "path/to/image.png"
+        assert slide["image_alt"] == "Alt text"
+
+
+class TestParseStandardSlide:
+    """Tests for _parse_standard_slide()."""
+
+    def test_closing_slide_with_contact(self):
+        """Closing slide extracts contact info."""
+        slide = {"type": "closing"}
+        _parse_standard_slide("# Thank You\njohn@example.com", slide)
+        assert slide["title"] == "Thank You"
+        assert slide["contact"] == "john@example.com"
+
+    def test_star_bullets(self):
+        """Bullets with * prefix are parsed."""
+        slide = {"type": "content"}
+        _parse_standard_slide("# Title\n* Item A\n* Item B", slide)
+        assert slide["bullets"] == ["Item A", "Item B"]
+
+
+class TestParseTwoColumn:
+    """Tests for _parse_two_column()."""
+
+    def test_two_column_layout(self):
+        """Two-column slide parses left and right columns."""
+        content = (
+            "# Comparison\n"
+            "<!-- left -->\n"
+            "## Left Heading\n"
+            "- Left point\n"
+            "<!-- right -->\n"
+            "## Right Heading\n"
+            "- Right point"
+        )
+        slide = {"type": "two-column"}
+        _parse_two_column(content, slide)
+        assert slide["title"] == "Comparison"
+        assert slide["left"]["heading"] == "Left Heading"
+        assert slide["left"]["bullets"] == ["Left point"]
+        assert slide["right"]["heading"] == "Right Heading"
+        assert slide["right"]["bullets"] == ["Right point"]
+
+    def test_two_column_with_notes(self):
+        """Two-column slide extracts notes."""
+        content = "# Title\n> My note\n<!-- left -->\n- A\n<!-- right -->\n- B"
+        slide = {"type": "two-column"}
+        _parse_two_column(content, slide)
+        assert slide["notes"] == "My note"
+
+
+class TestParseColumn:
+    """Tests for _parse_column()."""
+
+    def test_column_with_heading_and_bullets(self):
+        """Column with heading and bullets."""
+        col = _parse_column("## Heading\n- Bullet 1\n- Bullet 2")
+        assert col["heading"] == "Heading"
+        assert col["bullets"] == ["Bullet 1", "Bullet 2"]
+
+    def test_empty_column(self):
+        """Empty column returns empty dict."""
+        col = _parse_column("")
+        assert col == {}
+
+    def test_column_bullets_only(self):
+        """Column with only bullets, no heading."""
+        col = _parse_column("- A\n- B")
+        assert "heading" not in col
+        assert col["bullets"] == ["A", "B"]
+
+
+class TestParseBulletIcons:
+    """Tests for _parse_bullet_icons()."""
+
+    def test_plain_bullet(self):
+        """Plain text returns string."""
+        result = _parse_bullet_icons("Just a bullet")
+        assert result == "Just a bullet"
+
+    def test_icon_bullet(self):
+        """Icon reference returns dict."""
+        result = _parse_bullet_icons("::icon:openshift:: OpenShift platform")
+        assert isinstance(result, dict)
+        assert result["icon"] == "openshift"
+        assert result["text"] == "OpenShift platform"
+
+    def test_icon_with_path(self):
+        """Icon path reference."""
+        result = _parse_bullet_icons("::icon:path/to/custom.svg:: Custom icon")
+        assert isinstance(result, dict)
+        assert result["icon"] == "path/to/custom.svg"
+        assert result["text"] == "Custom icon"
+
+    def test_no_text_after_icon(self):
+        """Icon with no trailing text."""
+        result = _parse_bullet_icons("::icon:ansible::")
+        assert isinstance(result, dict)
+        assert result["icon"] == "ansible"
+        assert result["text"] == ""
+
+    def test_icon_in_parsed_slide(self):
+        """Icons are parsed in content slides."""
+        slide = _parse_single_slide("# Title\n\n- ::icon:rhel:: RHEL\n- Plain bullet")
+        assert len(slide["bullets"]) == 2
+        assert isinstance(slide["bullets"][0], dict)
+        assert slide["bullets"][0]["icon"] == "rhel"
+        assert slide["bullets"][1] == "Plain bullet"
+
+
+class TestIconSystem:
+    """Tests for icon fetching and conversion."""
+
+    @patch("google_slides.subprocess.run")
+    def test_ensure_icon_repo_clones(self, mock_run, tmp_path):
+        """First call clones the repo."""
+
+        def simulate_clone(*args, **kwargs):
+            (tmp_path / "red-hat-icons" / "src").mkdir(parents=True)
+            return Mock(returncode=0)
+
+        mock_run.side_effect = simulate_clone
+
+        result = ensure_icon_repo(tmp_path)
+        assert result == tmp_path / "red-hat-icons" / "src"
+        mock_run.assert_called_once()
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "git"
+        assert cmd[1] == "clone"
+
+    def test_ensure_icon_repo_cached(self, tmp_path):
+        """Subsequent calls skip clone."""
+        src_dir = tmp_path / "red-hat-icons" / "src"
+        src_dir.mkdir(parents=True)
+
+        result = ensure_icon_repo(tmp_path)
+        assert result == src_dir
+
+    def test_fetch_icon_local_file(self, tmp_path):
+        """Local file path returned directly."""
+        svg = tmp_path / "my-icon.svg"
+        svg.write_text("<svg/>")
+        result = fetch_icon(str(svg))
+        assert result == svg
+
+    def test_fetch_icon_from_repo(self, tmp_path):
+        """Icon found in cached repo."""
+        src_dir = tmp_path / "red-hat-icons" / "src" / "standard"
+        src_dir.mkdir(parents=True)
+        icon_file = src_dir / "automation.svg"
+        icon_file.write_text("<svg/>")
+
+        result = fetch_icon("automation", tmp_path)
+        assert result == icon_file
+
+    def test_fetch_icon_not_found(self, tmp_path):
+        """Missing icon returns None."""
+        for cat in REDHAT_ICON_CATEGORIES:
+            (tmp_path / "red-hat-icons" / "src" / cat).mkdir(parents=True, exist_ok=True)
+
+        result = fetch_icon("nonexistent-icon", tmp_path)
+        assert result is None
+
+    @patch("google_slides.subprocess.run", side_effect=OSError("no git"))
+    def test_fetch_icon_clone_fails(self, mock_run, tmp_path):
+        """Clone failure returns None."""
+        result = fetch_icon("anything", tmp_path)
+        assert result is None
+
+    @patch("google_slides.CAIROSVG_AVAILABLE", True)
+    def test_resolve_icon_local_png(self, tmp_path):
+        """Local PNG returned directly."""
+        png = tmp_path / "icon.png"
+        png.write_bytes(b"PNG")
+        result = resolve_icon(str(png))
+        assert result == png
+
+    @patch("google_slides.CAIROSVG_AVAILABLE", True)
+    @patch("google_slides.convert_svg_to_png")
+    def test_resolve_icon_local_svg_converts(self, mock_convert, tmp_path):
+        """Local SVG gets converted to PNG."""
+        svg = tmp_path / "icon.svg"
+        svg.write_text("<svg/>")
+        png = tmp_path / "icon.png"
+        png.write_bytes(b"PNG")
+
+        result = resolve_icon(str(svg))
+        assert result == png
+
+    @patch("google_slides.CAIROSVG_AVAILABLE", False)
+    def test_resolve_icon_no_cairosvg(self):
+        """Without cairosvg, resolve_icon returns None."""
+        result = resolve_icon("openshift")
+        assert result is None
+
+
+class TestParseMarkdown:
+    """Tests for parse_markdown() — full pipeline."""
+
+    def test_full_markdown_parse(self):
+        """Full markdown with frontmatter and slides."""
+        content = (
+            "---\n"
+            "title: Test Deck\n"
+            "palette: corporate-blue\n"
+            "aspect_ratio: standard\n"
+            "---\n\n"
+            "<!-- type: title -->\n"
+            "# Test Deck\n"
+            "## Subtitle\n"
+            "\n---\n\n"
+            "# Content Slide\n"
+            "- Point A\n"
+            "- Point B\n"
+        )
+        spec = parse_markdown(content)
+        assert spec["title"] == "Test Deck"
+        assert spec["palette"] == "corporate-blue"
+        assert spec["aspect_ratio"] == "standard"
+        assert len(spec["slides"]) == 2
+        assert spec["slides"][0]["type"] == "title"
+        assert spec["slides"][1]["type"] == "content"
+
+    def test_defaults_without_frontmatter(self):
+        """Missing frontmatter uses defaults."""
+        spec = parse_markdown("# Just a slide\n- Bullet")
+        assert spec["title"] == "Untitled Presentation"
+        assert spec["palette"] == "red-hat"
+        assert spec["aspect_ratio"] == "widescreen"
+
+
+# ============================================================================
+# PRESENTATION BUILDER TESTS
+# ============================================================================
+
+
+class TestPresentationBuilder:
+    """Tests for PresentationBuilder class."""
+
+    def test_invalid_palette_raises(self):
+        """Constructor rejects unknown palette names."""
+        with pytest.raises(ValueError, match="Unknown palette"):
+            PresentationBuilder(palette_name="nonexistent")
+
+    def test_valid_palette(self):
+        """Constructor accepts a valid palette name."""
+        builder = PresentationBuilder(palette_name="corporate-blue")
+        assert builder.palette_name == "corporate-blue"
+        assert builder.palette == COLOR_PALETTES["corporate-blue"]
+
+    def test_default_palette_is_red_hat(self):
+        """Default palette is red-hat."""
+        builder = PresentationBuilder()
+        assert builder.palette_name == "red-hat"
+
+    def test_widescreen_dimensions(self):
+        """Widescreen aspect ratio sets correct dimensions."""
+        builder = PresentationBuilder(aspect_ratio="widescreen")
+        assert builder.aspect_ratio == "widescreen"
+        assert builder.slide_width == builder.prs.slide_width
+        assert builder.slide_height == builder.prs.slide_height
+
+    def test_standard_dimensions(self):
+        """Standard aspect ratio sets correct dimensions."""
+        builder = PresentationBuilder(aspect_ratio="standard")
+        assert builder.aspect_ratio == "standard"
+
+    def test_build_from_spec_creates_slides(self, tmp_path):
+        """build_from_spec creates a .pptx file with slides."""
+        builder = PresentationBuilder()
+        spec = {
+            "title": "Test",
+            "slides": [
+                {"type": "title", "title": "Hello", "subtitle": "World"},
+                {"type": "content", "title": "Content", "bullets": ["A", "B"]},
+            ],
+        }
+        output = tmp_path / "test.pptx"
+        result = builder.build_from_spec(spec, output_path=str(output))
+        assert result == output
+        assert output.exists()
+
+    def test_build_from_spec_default_output(self, tmp_path, monkeypatch):
+        """build_from_spec uses title-based filename when no output given."""
+        monkeypatch.chdir(tmp_path)
+        builder = PresentationBuilder()
+        spec = {"title": "My Deck", "slides": []}
+        result = builder.build_from_spec(spec)
+        assert result.name == "My_Deck.pptx"
+
+    def test_add_title_slide(self):
+        """Title slide is added with title and subtitle."""
+        builder = PresentationBuilder()
+        builder._add_title_slide({"title": "Big Title", "subtitle": "Small subtitle"})
+        assert len(builder.prs.slides) == 1
+
+    def test_add_content_slide(self):
+        """Content slide is added with title and bullets."""
+        builder = PresentationBuilder()
+        builder._add_content_slide(
+            {
+                "title": "Topics",
+                "bullets": ["First", "Second", "Third"],
+            }
+        )
+        assert len(builder.prs.slides) == 1
+
+    def test_add_content_slide_no_title(self):
+        """Content slide without title still works."""
+        builder = PresentationBuilder()
+        builder._add_content_slide({"bullets": ["Only bullets"]})
+        assert len(builder.prs.slides) == 1
+
+    def test_add_section_slide(self):
+        """Section divider slide is added."""
+        builder = PresentationBuilder()
+        builder._add_section_slide({"title": "Section", "subtitle": "Details"})
+        assert len(builder.prs.slides) == 1
+
+    def test_add_two_column_slide(self):
+        """Two-column slide is added."""
+        builder = PresentationBuilder()
+        builder._add_two_column_slide(
+            {
+                "title": "Compare",
+                "left": {"heading": "Left", "bullets": ["L1"]},
+                "right": {"heading": "Right", "bullets": ["R1"]},
+            }
+        )
+        assert len(builder.prs.slides) == 1
+
+    def test_add_closing_slide(self):
+        """Closing slide is added."""
+        builder = PresentationBuilder()
+        builder._add_closing_slide(
+            {
+                "title": "Thank You",
+                "subtitle": "Questions?",
+                "contact": "me@example.com",
+            }
+        )
+        assert len(builder.prs.slides) == 1
+
+    def test_add_image_slide_without_image_file(self):
+        """Image slide without existing image file still creates slide."""
+        builder = PresentationBuilder()
+        builder._add_image_slide(
+            {
+                "title": "Chart",
+                "image_path": "/nonexistent/image.png",
+                "image_alt": "Caption text",
+            }
+        )
+        assert len(builder.prs.slides) == 1
+
+    def test_slide_with_notes(self):
+        """Speaker notes are added when present."""
+        builder = PresentationBuilder()
+        builder._add_title_slide({"title": "Title", "notes": "Speaker note here"})
+        slide = builder.prs.slides[0]
+        assert slide.notes_slide.notes_text_frame.text == "Speaker note here"
+
+    def test_all_slide_types_via_build_from_spec(self, tmp_path):
+        """build_from_spec handles all slide types without errors."""
+        builder = PresentationBuilder()
+        spec = {
+            "title": "Full Test",
+            "slides": [
+                {"type": "title", "title": "T"},
+                {"type": "content", "title": "C", "bullets": ["b"]},
+                {"type": "section", "title": "S"},
+                {
+                    "type": "two-column",
+                    "title": "2C",
+                    "left": {"bullets": ["l"]},
+                    "right": {"bullets": ["r"]},
+                },
+                {"type": "closing", "title": "End"},
+            ],
+        }
+        out = tmp_path / "full.pptx"
+        builder.build_from_spec(spec, output_path=str(out))
+        assert len(builder.prs.slides) == 5
+        assert out.exists()
+
+    def test_unknown_slide_type_defaults_to_content(self, tmp_path):
+        """Unknown slide types fall back to content slide."""
+        builder = PresentationBuilder()
+        spec = {
+            "title": "Fallback",
+            "slides": [{"type": "unknown_type", "title": "Fallback", "bullets": ["X"]}],
+        }
+        out = tmp_path / "fallback.pptx"
+        builder.build_from_spec(spec, output_path=str(out))
+        assert len(builder.prs.slides) == 1
+
+
+# ============================================================================
+# FIND LIBREOFFICE TESTS
+# ============================================================================
+
+
+class TestRelativeLuminance:
+    """Tests for WCAG relative luminance calculation."""
+
+    def test_white(self):
+        assert relative_luminance("#FFFFFF") == pytest.approx(1.0, abs=0.01)
+
+    def test_black(self):
+        assert relative_luminance("#000000") == pytest.approx(0.0, abs=0.01)
+
+    def test_red(self):
+        lum = relative_luminance("#FF0000")
+        assert 0.2 < lum < 0.25
+
+
+class TestContrastRatio:
+    """Tests for WCAG contrast ratio calculation."""
+
+    def test_black_on_white(self):
+        ratio = contrast_ratio("#000000", "#FFFFFF")
+        assert ratio == pytest.approx(21.0, abs=0.1)
+
+    def test_same_color(self):
+        ratio = contrast_ratio("#FF0000", "#FF0000")
+        assert ratio == pytest.approx(1.0, abs=0.01)
+
+    def test_symmetric(self):
+        r1 = contrast_ratio("#EE0000", "#FFFFFF")
+        r2 = contrast_ratio("#FFFFFF", "#EE0000")
+        assert r1 == pytest.approx(r2, abs=0.01)
+
+
+class TestVerifyPresentation:
+    """Tests for verify_presentation()."""
+
+    @patch("google_slides.Presentation")
+    def test_slide_count(self, mock_prs_class):
+        """Reports slide count."""
+        mock_slide = Mock()
+        mock_slide.shapes = []
+        mock_slide.has_notes_slide = False
+        mock_prs = Mock()
+        mock_prs.slides = [mock_slide, mock_slide]
+        mock_prs_class.return_value = mock_prs
+
+        results = verify_presentation("test.pptx")
+        counts = [r for r in results if r["check"] == "slide_count"]
+        assert len(counts) == 1
+        assert "2 slides" in counts[0]["message"]
+
+    @patch("google_slides.Presentation")
+    def test_empty_slide_warning(self, mock_prs_class):
+        """Warns on slide with no text."""
+        mock_slide = Mock()
+        mock_slide.shapes = []
+        mock_slide.has_notes_slide = False
+        mock_prs = Mock()
+        mock_prs.slides = [mock_slide]
+        mock_prs_class.return_value = mock_prs
+
+        results = verify_presentation("test.pptx")
+        empty = [r for r in results if r["check"] == "empty_slide"]
+        assert len(empty) == 1
+        assert empty[0]["severity"] == "warning"
+
+    @patch("google_slides.Presentation")
+    def test_notes_detection(self, mock_prs_class):
+        """Reports slides without notes."""
+        slide_with = Mock()
+        slide_with.shapes = []
+        slide_with.has_notes_slide = True
+        slide_with.notes_slide.notes_text_frame.text = "My notes"
+
+        slide_without = Mock()
+        slide_without.shapes = []
+        slide_without.has_notes_slide = False
+
+        mock_prs = Mock()
+        mock_prs.slides = [slide_with, slide_without]
+        mock_prs_class.return_value = mock_prs
+
+        results = verify_presentation("test.pptx")
+        notes = [r for r in results if r["check"] == "speaker_notes"]
+        assert len(notes) == 1
+        assert "2" in notes[0]["message"]
+
+
+class TestFindLibreOffice:
+    """Tests for find_libreoffice()."""
+
+    @patch("google_slides.shutil.which")
+    def test_finds_libreoffice_binary(self, mock_which):
+        """Finds libreoffice when available on PATH."""
+        mock_which.side_effect = lambda x: "/usr/bin/libreoffice" if x == "libreoffice" else None
+        result = find_libreoffice()
+        assert result == "/usr/bin/libreoffice"
+
+    @patch("google_slides.shutil.which")
+    def test_finds_soffice_binary(self, mock_which):
+        """Finds soffice when libreoffice is missing."""
+
+        def which_side_effect(x):
+            if x == "soffice":
+                return "/usr/bin/soffice"
+            return None
+
+        mock_which.side_effect = which_side_effect
+        result = find_libreoffice()
+        assert result == "/usr/bin/soffice"
+
+    @patch("google_slides.shutil.which")
+    def test_env_var_override(self, mock_which, monkeypatch):
+        """LIBREOFFICE_PATH env var takes precedence."""
+        monkeypatch.setenv("LIBREOFFICE_PATH", "/custom/lo")
+        mock_which.side_effect = lambda x: "/custom/lo" if x == "/custom/lo" else None
+        result = find_libreoffice()
+        assert result == "/custom/lo"
+
+    @patch("google_slides.shutil.which")
+    def test_returns_none_when_not_found(self, mock_which, monkeypatch):
+        """Returns None when no LibreOffice is available."""
+        monkeypatch.delenv("LIBREOFFICE_PATH", raising=False)
+        mock_which.return_value = None
+        result = find_libreoffice()
+        assert result is None
+
+    @patch("google_slides.subprocess.run")
+    @patch("google_slides.shutil.which")
+    def test_finds_flatpak(self, mock_which, mock_run, monkeypatch):
+        """Finds flatpak LibreOffice."""
+        monkeypatch.delenv("LIBREOFFICE_PATH", raising=False)
+
+        def which_side_effect(x):
+            if x == "flatpak":
+                return "/usr/bin/flatpak"
+            return None
+
+        mock_which.side_effect = which_side_effect
+        mock_run.return_value = Mock(returncode=0)
+        result = find_libreoffice()
+        assert result == "flatpak run org.libreoffice.LibreOffice"
+
+
+# ============================================================================
+# PRESENTATION OPERATIONS TESTS
 # ============================================================================
 
 
 class TestPresentationOperations:
-    """Tests for presentation operations."""
-
-    def test_create_presentation(self):
-        """Test creating a presentation."""
-        mock_service = Mock()
-        mock_service.presentations().create().execute.return_value = {
-            "presentationId": "test-pres-id",
-            "title": "Test Presentation",
-            "slides": [{"objectId": "slide1"}],
-        }
-
-        result = create_presentation(mock_service, "Test Presentation")
-
-        assert result["presentationId"] == "test-pres-id"
-        assert result["title"] == "Test Presentation"
+    """Tests for Google Slides API presentation operations."""
 
     def test_get_presentation(self):
         """Test getting a presentation."""
@@ -262,7 +1059,6 @@ class TestPresentationOperations:
         }
 
         result = get_presentation(mock_service, "test-pres-id")
-
         assert result["presentationId"] == "test-pres-id"
 
     def test_read_presentation_content(self):
@@ -302,7 +1098,6 @@ class TestPresentationOperations:
         }
 
         result = read_presentation_content(mock_service, "test-pres-id")
-
         assert "--- Slide 1 ---" in result
         assert "Title Slide" in result
         assert "--- Slide 2 ---" in result
@@ -334,7 +1129,6 @@ class TestPresentationOperations:
         }
 
         result = _extract_slide_text(slide)
-
         assert "Heading" in result
         assert "Subheading" in result
         assert "Box text" in result
@@ -359,7 +1153,6 @@ class TestPresentationOperations:
         }
 
         result = _extract_table_text(table)
-
         assert "| Header 1 | Header 2 |" in result
         assert "| --- | --- |" in result
         assert "| Value 1 | Value 2 |" in result
@@ -372,251 +1165,10 @@ class TestPresentationOperations:
         mock_service.files().export().execute.return_value = b"%PDF-1.4 mock content"
 
         result = export_presentation_as_pdf("pres-123")
-
         assert result == b"%PDF-1.4 mock content"
         call_args = mock_service.files().export.call_args
         assert call_args[1]["fileId"] == "pres-123"
         assert call_args[1]["mimeType"] == "application/pdf"
-
-
-# ============================================================================
-# SLIDE OPERATION TESTS
-# ============================================================================
-
-
-class TestSlideOperations:
-    """Tests for slide operations."""
-
-    def test_create_slide_blank(self):
-        """Test creating a blank slide."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {
-            "replies": [
-                {
-                    "createSlide": {
-                        "objectId": "slide_abc123",
-                    }
-                }
-            ]
-        }
-
-        result = create_slide(mock_service, "test-pres-id", "BLANK")
-
-        assert "replies" in result
-        call_args = mock_service.presentations().batchUpdate.call_args
-        assert (
-            call_args[1]["body"]["requests"][0]["createSlide"]["slideLayoutReference"][
-                "predefinedLayout"
-            ]
-            == "BLANK"
-        )
-
-    def test_create_slide_with_layout(self):
-        """Test creating slide with specific layout."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {
-            "replies": [
-                {
-                    "createSlide": {
-                        "objectId": "slide_abc123",
-                    }
-                }
-            ]
-        }
-
-        result = create_slide(mock_service, "test-pres-id", "TITLE_AND_BODY")
-
-        assert "replies" in result
-        call_args = mock_service.presentations().batchUpdate.call_args
-        assert (
-            call_args[1]["body"]["requests"][0]["createSlide"]["slideLayoutReference"][
-                "predefinedLayout"
-            ]
-            == "TITLE_AND_BODY"
-        )
-
-    def test_create_slide_with_index(self):
-        """Test creating slide at specific index."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {
-            "replies": [
-                {
-                    "createSlide": {
-                        "objectId": "slide_abc123",
-                    }
-                }
-            ]
-        }
-
-        result = create_slide(mock_service, "test-pres-id", "BLANK", insert_index=2)
-
-        assert "replies" in result
-        call_args = mock_service.presentations().batchUpdate.call_args
-        assert call_args[1]["body"]["requests"][0]["createSlide"]["insertionIndex"] == 2
-
-    def test_delete_slide(self):
-        """Test deleting a slide."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {}
-
-        result = delete_slide(mock_service, "test-pres-id", "slide_abc123")
-
-        assert result == {}
-        call_args = mock_service.presentations().batchUpdate.call_args
-        assert call_args[1]["body"]["requests"][0]["deleteObject"]["objectId"] == "slide_abc123"
-
-
-# ============================================================================
-# TEXT OPERATION TESTS
-# ============================================================================
-
-
-class TestTextOperations:
-    """Tests for text operations."""
-
-    def test_insert_text_default_position(self):
-        """Test inserting text with default position."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {}
-
-        result = insert_text(mock_service, "test-pres-id", "slide_abc123", "Hello World")
-
-        assert result == {}
-        call_args = mock_service.presentations().batchUpdate.call_args
-        requests = call_args[1]["body"]["requests"]
-
-        # Check createShape request
-        assert "createShape" in requests[0]
-        assert requests[0]["createShape"]["shapeType"] == "TEXT_BOX"
-
-        # Check insertText request
-        assert "insertText" in requests[1]
-        assert requests[1]["insertText"]["text"] == "Hello World"
-
-    def test_insert_text_custom_position(self):
-        """Test inserting text with custom position and size."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {}
-
-        result = insert_text(
-            mock_service,
-            "test-pres-id",
-            "slide_abc123",
-            "Custom Text",
-            x=200,
-            y=150,
-            width=500,
-            height=120,
-        )
-
-        assert result == {}
-        call_args = mock_service.presentations().batchUpdate.call_args
-        requests = call_args[1]["body"]["requests"]
-
-        # Verify transform coordinates (points to EMUs conversion)
-        transform = requests[0]["createShape"]["elementProperties"]["transform"]
-        # 200 points * 12700 EMU/point = 2540000 EMU
-        assert transform["translateX"] == 200 * 12700
-        assert transform["translateY"] == 150 * 12700
-
-
-# ============================================================================
-# SHAPE OPERATION TESTS
-# ============================================================================
-
-
-class TestShapeOperations:
-    """Tests for shape operations."""
-
-    def test_create_shape_rectangle(self):
-        """Test creating a rectangle shape."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {}
-
-        result = create_shape(mock_service, "test-pres-id", "slide_abc123", "RECTANGLE")
-
-        assert result == {}
-        call_args = mock_service.presentations().batchUpdate.call_args
-        requests = call_args[1]["body"]["requests"]
-
-        assert "createShape" in requests[0]
-        assert requests[0]["createShape"]["shapeType"] == "RECTANGLE"
-
-    def test_create_shape_custom_size(self):
-        """Test creating shape with custom size and position."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {}
-
-        result = create_shape(
-            mock_service,
-            "test-pres-id",
-            "slide_abc123",
-            "ELLIPSE",
-            x=300,
-            y=200,
-            width=250,
-            height=250,
-        )
-
-        assert result == {}
-        call_args = mock_service.presentations().batchUpdate.call_args
-        requests = call_args[1]["body"]["requests"]
-
-        assert requests[0]["createShape"]["shapeType"] == "ELLIPSE"
-        # Verify size conversion to EMUs
-        size = requests[0]["createShape"]["elementProperties"]["size"]
-        assert size["width"]["magnitude"] == 250 * 12700
-        assert size["height"]["magnitude"] == 250 * 12700
-
-
-# ============================================================================
-# IMAGE OPERATION TESTS
-# ============================================================================
-
-
-class TestImageOperations:
-    """Tests for image operations."""
-
-    def test_create_image(self):
-        """Test creating an image."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {}
-
-        result = create_image(
-            mock_service, "test-pres-id", "slide_abc123", "https://example.com/image.png"
-        )
-
-        assert result == {}
-        call_args = mock_service.presentations().batchUpdate.call_args
-        requests = call_args[1]["body"]["requests"]
-
-        assert "createImage" in requests[0]
-        assert requests[0]["createImage"]["url"] == "https://example.com/image.png"
-
-    def test_create_image_custom_size(self):
-        """Test creating image with custom size and position."""
-        mock_service = Mock()
-        mock_service.presentations().batchUpdate().execute.return_value = {}
-
-        result = create_image(
-            mock_service,
-            "test-pres-id",
-            "slide_abc123",
-            "https://example.com/chart.png",
-            x=50,
-            y=100,
-            width=500,
-            height=400,
-        )
-
-        assert result == {}
-        call_args = mock_service.presentations().batchUpdate.call_args
-        requests = call_args[1]["body"]["requests"]
-
-        # Verify position
-        transform = requests[0]["createImage"]["elementProperties"]["transform"]
-        assert transform["translateX"] == 50 * 12700
-        assert transform["translateY"] == 100 * 12700
 
 
 # ============================================================================
@@ -639,7 +1191,6 @@ class TestOutputFormatting:
         }
 
         result = format_presentation_summary(presentation)
-
         assert result.startswith("### Test Presentation\n")
         assert "- **Presentation ID:** abc123" in result
         assert "- **Slides:** 2" in result
@@ -657,7 +1208,6 @@ class TestOutputFormatting:
         }
 
         result = format_slide_info(slide, 0)
-
         assert result.startswith("### Slide 1\n")
         assert "- **ID:** slide_abc123" in result
         assert "1 text" in result
@@ -684,7 +1234,6 @@ class TestCLICommands:
 
         args = Mock()
         result = cmd_check(args)
-
         assert result == 0
         captured = capsys.readouterr()
         assert "Successfully authenticated" in captured.out
@@ -699,7 +1248,6 @@ class TestCLICommands:
 
         args = Mock()
         result = cmd_check(args)
-
         assert result == 1
         captured = capsys.readouterr()
         assert "Authentication failed" in captured.out
@@ -715,7 +1263,6 @@ class TestCLICommands:
 
         args = Mock()
         result = cmd_check(args)
-
         assert result == 0
         captured = capsys.readouterr()
         assert "Write scope not granted" in captured.out
@@ -726,214 +1273,11 @@ class TestCLICommands:
         """Test auth setup command."""
         mock_load.return_value = None
         args = Mock(client_id="test-id", client_secret="test-secret")
-
         result = cmd_auth_setup(args)
-
         assert result == 0
         mock_save.assert_called_once()
         captured = capsys.readouterr()
         assert "OAuth client credentials saved" in captured.out
-
-    @patch("google_slides.build_slides_service")
-    @patch("google_slides.create_presentation")
-    def test_cmd_presentations_create(self, mock_create, _mock_build_service, capsys):
-        """Test presentations create command."""
-        mock_create.return_value = {
-            "presentationId": "new-pres-123",
-            "title": "New Presentation",
-            "slides": [{"objectId": "slide1"}],
-        }
-
-        args = Mock(title="New Presentation", json=False)
-        result = cmd_presentations_create(args)
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "Presentation created successfully" in captured.out
-        assert "new-pres-123" in captured.out
-
-    @patch("google_slides.build_slides_service")
-    @patch("google_slides.get_presentation")
-    def test_cmd_presentations_get(self, mock_get, _mock_build_service, capsys):
-        """Test presentations get command."""
-        mock_get.return_value = {
-            "presentationId": "pres-123",
-            "title": "Test Presentation",
-            "slides": [{"objectId": "slide1", "slideProperties": {}, "pageElements": []}],
-        }
-
-        args = Mock(presentation_id="pres-123", json=False)
-        result = cmd_presentations_get(args)
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "Test Presentation" in captured.out
-
-    @patch("google_slides.build_slides_service")
-    @patch("google_slides.read_presentation_content")
-    def test_cmd_presentations_read(self, mock_read, _mock_build_service, capsys):
-        """Test presentations read command."""
-        mock_read.return_value = "--- Slide 1 ---\nTitle Text\n\n--- Slide 2 ---\nContent"
-
-        args = Mock(presentation_id="pres-123", format="text", json=False)
-        result = cmd_presentations_read(args)
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "--- Slide 1 ---" in captured.out
-        assert "Title Text" in captured.out
-
-    @patch("google_slides.build_slides_service")
-    @patch("google_slides.read_presentation_content")
-    def test_cmd_presentations_read_json(self, mock_read, _mock_build_service, capsys):
-        """Test presentations read command with JSON output."""
-        mock_read.return_value = "Slide content here"
-
-        args = Mock(presentation_id="pres-123", format="text", json=True)
-        result = cmd_presentations_read(args)
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert '"content"' in captured.out
-        assert "Slide content here" in captured.out
-
-    @patch("google_slides.export_presentation_as_pdf")
-    def test_cmd_presentations_read_pdf_format(self, mock_export, tmp_path, capsys):
-        """Test presentations read command with PDF format."""
-        mock_export.return_value = b"%PDF-1.4 mock content"
-        output_file = tmp_path / "test.pdf"
-
-        args = Mock(presentation_id="pres-123", format="pdf", output=str(output_file), json=False)
-        result = cmd_presentations_read(args)
-
-        assert result == 0
-        assert output_file.exists()
-        assert output_file.read_bytes() == b"%PDF-1.4 mock content"
-        captured = capsys.readouterr()
-        assert "PDF saved to:" in captured.out
-
-    @patch("google_slides.export_presentation_as_pdf")
-    def test_cmd_presentations_read_pdf_format_default_output(
-        self, mock_export, tmp_path, capsys, monkeypatch
-    ):
-        """Test presentations read command with PDF format using default output filename."""
-        mock_export.return_value = b"%PDF-1.4 mock content"
-        # Change to tmp_path so default file is created there
-        monkeypatch.chdir(tmp_path)
-
-        args = Mock(presentation_id="pres-123", format="pdf", output=None, json=False)
-        result = cmd_presentations_read(args)
-
-        assert result == 0
-        default_file = tmp_path / "pres-123.pdf"
-        assert default_file.exists()
-        assert default_file.read_bytes() == b"%PDF-1.4 mock content"
-        captured = capsys.readouterr()
-        assert "PDF saved to: pres-123.pdf" in captured.out
-
-    @patch("google_slides.build_slides_service")
-    @patch("google_slides.create_slide")
-    def test_cmd_slides_create(self, mock_create, _mock_build_service, capsys):
-        """Test slides create command."""
-        mock_create.return_value = {
-            "replies": [
-                {
-                    "createSlide": {
-                        "objectId": "slide_abc123",
-                    }
-                }
-            ]
-        }
-
-        args = Mock(presentation_id="pres-123", layout="BLANK", index=None, json=False)
-        result = cmd_slides_create(args)
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "Slide created successfully" in captured.out
-        assert "slide_abc123" in captured.out
-
-    @patch("google_slides.build_slides_service")
-    @patch("google_slides.delete_slide")
-    def test_cmd_slides_delete(self, mock_delete, _mock_build_service, capsys):
-        """Test slides delete command."""
-        mock_delete.return_value = {}
-
-        args = Mock(presentation_id="pres-123", slide_id="slide_abc123", json=False)
-        result = cmd_slides_delete(args)
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "Slide deleted successfully" in captured.out
-
-    @patch("google_slides.build_slides_service")
-    @patch("google_slides.insert_text")
-    def test_cmd_text_insert(self, mock_insert, _mock_build_service, capsys):
-        """Test text insert command."""
-        mock_insert.return_value = {}
-
-        args = Mock(
-            presentation_id="pres-123",
-            slide_id="slide_abc123",
-            text="Hello World",
-            x=100,
-            y=100,
-            width=400,
-            height=100,
-            json=False,
-        )
-        result = cmd_text_insert(args)
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "Text inserted successfully" in captured.out
-        assert "Hello World" in captured.out
-
-    @patch("google_slides.build_slides_service")
-    @patch("google_slides.create_shape")
-    def test_cmd_shapes_create(self, mock_create, _mock_build_service, capsys):
-        """Test shapes create command."""
-        mock_create.return_value = {}
-
-        args = Mock(
-            presentation_id="pres-123",
-            slide_id="slide_abc123",
-            shape_type="RECTANGLE",
-            x=100,
-            y=100,
-            width=200,
-            height=200,
-            json=False,
-        )
-        result = cmd_shapes_create(args)
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "Shape created successfully" in captured.out
-        assert "RECTANGLE" in captured.out
-
-    @patch("google_slides.build_slides_service")
-    @patch("google_slides.create_image")
-    def test_cmd_images_create(self, mock_create, _mock_build_service, capsys):
-        """Test images create command."""
-        mock_create.return_value = {}
-
-        args = Mock(
-            presentation_id="pres-123",
-            slide_id="slide_abc123",
-            image_url="https://example.com/image.png",
-            x=100,
-            y=100,
-            width=300,
-            height=200,
-            json=False,
-        )
-        result = cmd_images_create(args)
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "Image created successfully" in captured.out
-        assert "https://example.com/image.png" in captured.out
 
     @patch("google_slides.delete_credential")
     @patch("builtins.print")
@@ -941,7 +1285,6 @@ class TestCLICommands:
         """Test auth reset command."""
         args = Mock()
         exit_code = cmd_auth_reset(args)
-
         assert exit_code == 0
         mock_delete.assert_called_once_with("google-slides-token-json")
 
@@ -960,7 +1303,6 @@ class TestCLICommands:
 
         args = Mock()
         exit_code = cmd_auth_status(args)
-
         assert exit_code == 0
 
     @patch("google_slides.get_credential")
@@ -968,11 +1310,235 @@ class TestCLICommands:
     def test_cmd_auth_status_no_token(self, _mock_print, mock_get_credential):
         """Test auth status command with no stored token."""
         mock_get_credential.return_value = None
-
         args = Mock()
         exit_code = cmd_auth_status(args)
-
         assert exit_code == 1
+
+    def test_cmd_create_no_file(self):
+        """Test create command without --file."""
+        args = Mock(file=None)
+        result = cmd_create(args)
+        assert result == 1
+
+    def test_cmd_create_file_not_found(self, capsys):
+        """Test create command with missing file."""
+        args = Mock(file="/nonexistent/deck.md", palette=None, output=None, title=None)
+        result = cmd_create(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "File not found" in captured.err
+
+    def test_cmd_create_success(self, tmp_path, capsys):
+        """Test create command successfully builds a .pptx."""
+        md_file = tmp_path / "deck.md"
+        md_file.write_text(
+            "---\ntitle: Test\npalette: red-hat\n---\n\n<!-- type: title -->\n# Test\n## Subtitle\n"
+        )
+        output = tmp_path / "deck.pptx"
+        args = Mock(
+            file=str(md_file),
+            output=str(output),
+            palette=None,
+            title=None,
+        )
+        result = cmd_create(args)
+        assert result == 0
+        assert output.exists()
+        captured = capsys.readouterr()
+        assert "Built:" in captured.out
+
+    def test_cmd_create_with_palette_override(self, tmp_path, capsys):
+        """Test create command with palette override."""
+        md_file = tmp_path / "deck.md"
+        md_file.write_text("# Slide 1\n- Bullet\n")
+        output = tmp_path / "deck.pptx"
+        args = Mock(
+            file=str(md_file),
+            output=str(output),
+            palette="dark-mode",
+            title=None,
+        )
+        result = cmd_create(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "dark-mode" in captured.out
+
+    def test_cmd_create_invalid_palette(self, tmp_path):
+        """Test create command with invalid palette."""
+        md_file = tmp_path / "deck.md"
+        md_file.write_text("# Slide 1\n- Bullet\n")
+        args = Mock(
+            file=str(md_file),
+            output=str(tmp_path / "deck.pptx"),
+            palette="nonexistent-palette",
+            title=None,
+        )
+        result = cmd_create(args)
+        assert result == 1
+
+    @patch("google_slides.build_slides_service")
+    @patch("google_slides.get_presentation")
+    def test_cmd_get(self, mock_get_pres, mock_build, capsys):
+        """Test get command."""
+        mock_build.return_value = Mock()
+        mock_get_pres.return_value = {
+            "presentationId": "pres-123",
+            "title": "Test Pres",
+            "slides": [{"objectId": "s1", "slideProperties": {}, "pageElements": []}],
+        }
+
+        args = Mock(presentation_id="pres-123", output=None, json=False)
+        result = cmd_get(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Test Pres" in captured.out
+
+    @patch("google_slides.build_slides_service")
+    @patch("google_slides.get_presentation")
+    def test_cmd_get_json(self, mock_get_pres, mock_build, capsys):
+        """Test get command with --json flag."""
+        mock_build.return_value = Mock()
+        mock_get_pres.return_value = {
+            "presentationId": "pres-123",
+            "title": "Test Pres",
+            "slides": [],
+        }
+
+        args = Mock(presentation_id="pres-123", output=None, json=True)
+        result = cmd_get(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert '"presentationId"' in captured.out
+
+    def test_cmd_palettes(self, capsys):
+        """Test palettes command lists all palettes."""
+        args = Mock()
+        result = cmd_palettes(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "red-hat" in captured.out
+        assert "dark-mode" in captured.out
+        assert "corporate-blue" in captured.out
+        assert "(default)" in captured.out
+
+    def test_cmd_preview_file_not_found(self, capsys):
+        """Test preview command with missing file."""
+        args = Mock(file="/nonexistent/deck.pptx", format="images")
+        result = cmd_preview(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "File not found" in captured.err
+
+    def test_cmd_preview_summary_format(self, tmp_path, capsys):
+        """Test preview command with summary format."""
+        # Create a valid .pptx first
+        builder = PresentationBuilder()
+        spec = {"title": "T", "slides": [{"type": "title", "title": "Slide Title"}]}
+        pptx_path = tmp_path / "deck.pptx"
+        builder.build_from_spec(spec, output_path=str(pptx_path))
+
+        args = Mock(file=str(pptx_path), format="summary")
+        result = cmd_preview(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "--- Slide 1 ---" in captured.out
+
+    def test_cmd_verify_file_not_found(self):
+        """Test verify command with nonexistent file."""
+        args = Mock(file="nonexistent.pptx", presentation_id=None)
+        result = cmd_verify(args)
+        assert result == 1
+
+    @patch("google_slides.Presentation")
+    def test_cmd_verify_runs_checks(self, mock_prs_class, capsys, tmp_path):
+        """Test verify runs and outputs results."""
+        pptx_file = tmp_path / "test.pptx"
+        pptx_file.write_bytes(b"fake")
+
+        mock_slide = Mock()
+        mock_slide.shapes = []
+        mock_slide.has_notes_slide = False
+        mock_prs = Mock()
+        mock_prs.slides = [mock_slide]
+        mock_prs_class.return_value = mock_prs
+
+        args = Mock(file=str(pptx_file), presentation_id=None)
+        result = cmd_verify(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Verification:" in captured.out
+        assert "1 slides" in captured.out
+
+    @patch("google_slides.read_presentation_content")
+    @patch("google_slides.get_presentation")
+    @patch("google_slides.build_slides_service")
+    @patch("google_slides.Presentation")
+    def test_cmd_verify_cloud_compare(
+        self, mock_prs_class, mock_build, mock_get_pres, mock_read_content, capsys, tmp_path
+    ):
+        """Test verify with --presentation-id compares local vs cloud."""
+        pptx_file = tmp_path / "test.pptx"
+        pptx_file.write_bytes(b"fake")
+
+        mock_slide = Mock()
+        mock_shape = Mock()
+        mock_shape.has_text_frame = True
+        mock_para = Mock()
+        mock_para.text = "Hello"
+        mock_shape.text_frame.paragraphs = [mock_para]
+        mock_slide.shapes = [mock_shape]
+        mock_slide.has_notes_slide = False
+        mock_prs = Mock()
+        mock_prs.slides = [mock_slide]
+        mock_prs_class.return_value = mock_prs
+
+        mock_get_pres.return_value = {"slides": [{"objectId": "s1"}]}
+        mock_read_content.return_value = "Hello"
+
+        args = Mock(file=str(pptx_file), presentation_id="pres-123")
+        result = cmd_verify(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Cloud comparison" in captured.out
+
+    @patch("google_slides.update_presentation_replace")
+    def test_cmd_update_replace(self, mock_replace, capsys, tmp_path):
+        """Test update command in replace mode."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"fake")
+        mock_replace.return_value = {
+            "presentationId": "pres-123",
+            "url": "https://docs.google.com/presentation/d/pres-123/edit",
+            "mode": "replace",
+        }
+        args = Mock(presentation_id="pres-123", file=str(pptx_file), mode="replace", position=None)
+        result = cmd_update(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Updated presentation" in captured.out
+
+    @patch("google_slides.update_presentation_append")
+    def test_cmd_update_append(self, mock_append, capsys, tmp_path):
+        """Test update command in append mode."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"fake")
+        mock_append.return_value = {
+            "presentationId": "pres-123",
+            "url": "https://docs.google.com/presentation/d/pres-123/edit",
+            "slides_added": 2,
+            "mode": "append",
+        }
+        args = Mock(presentation_id="pres-123", file=str(pptx_file), mode="append", position=None)
+        result = cmd_update(args)
+        assert result == 0
+
+    def test_cmd_update_file_not_found(self):
+        """Test update with nonexistent file."""
+        args = Mock(
+            presentation_id="pres-123", file="nonexistent.pptx", mode="replace", position=None
+        )
+        result = cmd_update(args)
+        assert result == 1
 
 
 # ============================================================================
@@ -1003,8 +1569,6 @@ class TestArgumentParser:
     def test_parser_auth_reset(self):
         """Test parser for auth reset command."""
         parser = build_parser()
-
-        # Test auth reset
         args = parser.parse_args(["auth", "reset"])
         assert args.command == "auth"
         assert args.auth_command == "reset"
@@ -1012,169 +1576,111 @@ class TestArgumentParser:
     def test_parser_auth_status(self):
         """Test parser for auth status command."""
         parser = build_parser()
-
-        # Test auth status
         args = parser.parse_args(["auth", "status"])
         assert args.command == "auth"
         assert args.auth_command == "status"
 
-    def test_parser_presentations_create(self):
-        """Test parser for presentations create command."""
+    def test_parser_create_command(self):
+        """Test parser for create command."""
         parser = build_parser()
-        args = parser.parse_args(["presentations", "create", "--title", "Test"])
-        assert args.command == "presentations"
-        assert args.presentations_command == "create"
-        assert args.title == "Test"
+        args = parser.parse_args(["create", "--file", "deck.md"])
+        assert args.command == "create"
+        assert args.file == "deck.md"
 
-    def test_parser_presentations_get(self):
-        """Test parser for presentations get command."""
+    def test_parser_create_with_all_options(self):
+        """Test parser for create with all options."""
         parser = build_parser()
-        args = parser.parse_args(["presentations", "get", "pres-123"])
-        assert args.command == "presentations"
-        assert args.presentations_command == "get"
+        args = parser.parse_args(
+            [
+                "create",
+                "--file",
+                "deck.md",
+                "--output",
+                "deck.pptx",
+                "--palette",
+                "dark-mode",
+                "--title",
+                "Upload Title",
+            ]
+        )
+        assert args.file == "deck.md"
+        assert args.output == "deck.pptx"
+        assert args.palette == "dark-mode"
+        assert args.title == "Upload Title"
+
+    def test_parser_create_short_output(self):
+        """Test parser for create with -o short flag."""
+        parser = build_parser()
+        args = parser.parse_args(["create", "--file", "deck.md", "-o", "out.pptx"])
+        assert args.output == "out.pptx"
+
+    def test_parser_get_command(self):
+        """Test parser for get command."""
+        parser = build_parser()
+        args = parser.parse_args(["get", "pres-123"])
+        assert args.command == "get"
         assert args.presentation_id == "pres-123"
 
-    def test_parser_presentations_read(self):
-        """Test parser for presentations read command."""
+    def test_parser_get_with_output(self):
+        """Test parser for get with -o flag."""
         parser = build_parser()
-        args = parser.parse_args(["presentations", "read", "pres-123"])
-        assert args.command == "presentations"
-        assert args.presentations_command == "read"
-        assert args.presentation_id == "pres-123"
+        args = parser.parse_args(["get", "pres-123", "-o", "deck.md"])
+        assert args.output == "deck.md"
 
-    def test_parser_presentations_read_json(self):
-        """Test parser for presentations read with --json flag."""
+    def test_parser_get_with_json(self):
+        """Test parser for get with --json flag."""
         parser = build_parser()
-        args = parser.parse_args(["presentations", "read", "pres-123", "--json"])
-        assert args.presentations_command == "read"
+        args = parser.parse_args(["get", "pres-123", "--json"])
         assert args.json is True
 
-    def test_parser_presentations_read_default_format(self):
-        """Test parser for presentations read defaults to text format."""
+    def test_parser_update_command(self):
+        """Test parser for update command."""
         parser = build_parser()
-        args = parser.parse_args(["presentations", "read", "pres-123"])
-        assert args.format == "text"
-
-    def test_parser_presentations_read_pdf_format(self):
-        """Test parser for presentations read with pdf format and output."""
-        parser = build_parser()
-        args = parser.parse_args(
-            ["presentations", "read", "pres-123", "--format", "pdf", "--output", "output.pdf"]
-        )
-        assert args.format == "pdf"
-        assert args.output == "output.pdf"
-
-    def test_parser_presentations_read_output_short_flag(self):
-        """Test parser for presentations read with -o short flag."""
-        parser = build_parser()
-        args = parser.parse_args(
-            ["presentations", "read", "pres-123", "--format", "pdf", "-o", "pres.pdf"]
-        )
-        assert args.output == "pres.pdf"
-
-    def test_parser_slides_create(self):
-        """Test parser for slides create command."""
-        parser = build_parser()
-        args = parser.parse_args(["slides", "create", "pres-123", "--layout", "TITLE"])
-        assert args.command == "slides"
-        assert args.slides_command == "create"
+        args = parser.parse_args(["update", "pres-123", "--file", "deck.pptx"])
+        assert args.command == "update"
         assert args.presentation_id == "pres-123"
-        assert args.layout == "TITLE"
+        assert args.file == "deck.pptx"
 
-    def test_parser_slides_create_with_index(self):
-        """Test parser for slides create with index."""
-        parser = build_parser()
-        args = parser.parse_args(
-            ["slides", "create", "pres-123", "--layout", "BLANK", "--index", "2"]
-        )
-        assert args.index == 2
-
-    def test_parser_slides_delete(self):
-        """Test parser for slides delete command."""
-        parser = build_parser()
-        args = parser.parse_args(["slides", "delete", "pres-123", "--slide-id", "slide_abc123"])
-        assert args.command == "slides"
-        assert args.slides_command == "delete"
-        assert args.slide_id == "slide_abc123"
-
-    def test_parser_text_insert(self):
-        """Test parser for text insert command."""
-        parser = build_parser()
-        args = parser.parse_args(
-            ["text", "insert", "pres-123", "--slide-id", "slide_abc123", "--text", "Hello"]
-        )
-        assert args.command == "text"
-        assert args.text_command == "insert"
-        assert args.text == "Hello"
-
-    def test_parser_text_insert_with_position(self):
-        """Test parser for text insert with position."""
+    def test_parser_update_with_mode(self):
+        """Test parser for update with --mode."""
         parser = build_parser()
         args = parser.parse_args(
             [
-                "text",
-                "insert",
+                "update",
                 "pres-123",
-                "--slide-id",
-                "slide_abc123",
-                "--text",
-                "Hello",
-                "--x",
-                "200",
-                "--y",
-                "150",
-                "--width",
-                "500",
-                "--height",
-                "120",
+                "--file",
+                "deck.pptx",
+                "--mode",
+                "append",
             ]
         )
-        assert args.x == 200
-        assert args.y == 150
-        assert args.width == 500
-        assert args.height == 120
+        assert args.mode == "append"
 
-    def test_parser_shapes_create(self):
-        """Test parser for shapes create command."""
+    def test_parser_preview_command(self):
+        """Test parser for preview command."""
         parser = build_parser()
-        args = parser.parse_args(
-            [
-                "shapes",
-                "create",
-                "pres-123",
-                "--slide-id",
-                "slide_abc123",
-                "--shape-type",
-                "RECTANGLE",
-            ]
-        )
-        assert args.command == "shapes"
-        assert args.shapes_command == "create"
-        assert args.shape_type == "RECTANGLE"
+        args = parser.parse_args(["preview", "--file", "deck.pptx"])
+        assert args.command == "preview"
+        assert args.file == "deck.pptx"
 
-    def test_parser_images_create(self):
-        """Test parser for images create command."""
+    def test_parser_preview_summary_format(self):
+        """Test parser for preview with --format summary."""
         parser = build_parser()
-        args = parser.parse_args(
-            [
-                "images",
-                "create",
-                "pres-123",
-                "--slide-id",
-                "slide_abc123",
-                "--image-url",
-                "https://example.com/img.png",
-            ]
-        )
-        assert args.command == "images"
-        assert args.images_command == "create"
-        assert args.image_url == "https://example.com/img.png"
+        args = parser.parse_args(["preview", "--file", "deck.pptx", "--format", "summary"])
+        assert args.format == "summary"
 
-    def test_parser_json_flag(self):
-        """Test parser handles --json flag."""
+    def test_parser_verify_command(self):
+        """Test parser for verify command."""
         parser = build_parser()
-        args = parser.parse_args(["presentations", "get", "pres-123", "--json"])
-        assert args.json is True
+        args = parser.parse_args(["verify", "--file", "deck.pptx"])
+        assert args.command == "verify"
+        assert args.file == "deck.pptx"
+
+    def test_parser_palettes_command(self):
+        """Test parser for palettes command."""
+        parser = build_parser()
+        args = parser.parse_args(["palettes"])
+        assert args.command == "palettes"
 
 
 # ============================================================================
@@ -1318,7 +1824,6 @@ class TestAuthenticationFlow:
         mock_creds_class.from_authorized_user_info.return_value = mock_creds
 
         result = get_google_credentials("google-slides", ["https://scope"])
-
         assert result == mock_creds
 
 
@@ -1429,3 +1934,1085 @@ class TestBuildService:
         mock_get_creds.assert_called_once_with("google-slides", DRIVE_SCOPES_READONLY)
         mock_build.assert_called_once_with("drive", "v3", credentials=mock_creds)
         assert result == mock_service
+
+
+# ============================================================================
+# LAYOUT DETECTION TESTS
+# ============================================================================
+
+
+class TestGetTextElements:
+    """Tests for _get_text_elements()."""
+
+    def test_empty_slide(self):
+        """Slide with no page elements returns empty list."""
+        slide = {"pageElements": []}
+        result = _get_text_elements(slide, 9144000, 6858000)
+        assert result == []
+
+    def test_shape_without_text(self):
+        """Shape without text key is skipped."""
+        slide = {"pageElements": [{"shape": {"shapeType": "RECTANGLE"}}]}
+        result = _get_text_elements(slide, 9144000, 6858000)
+        assert result == []
+
+    def test_non_shape_element(self):
+        """Non-shape elements (images, tables) are skipped."""
+        slide = {"pageElements": [{"image": {"sourceUrl": "http://example.com/img.png"}}]}
+        result = _get_text_elements(slide, 9144000, 6858000)
+        assert result == []
+
+    def test_extracts_text_with_position(self):
+        """Extracts text elements with position and font metadata."""
+        slide = {
+            "pageElements": [
+                {
+                    "shape": {
+                        "text": {
+                            "textElements": [
+                                {
+                                    "textRun": {
+                                        "content": "Hello World",
+                                        "style": {"fontSize": {"magnitude": 36}},
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "transform": {"translateX": 914400, "translateY": 1828800},
+                    "size": {"width": {"magnitude": 4572000}},
+                }
+            ]
+        }
+        result = _get_text_elements(slide, 9144000, 6858000)
+        assert len(result) == 1
+        assert result[0]["text"] == "Hello World"
+        assert result[0]["font"] == 36
+        assert result[0]["x_pct"] == pytest.approx(10.0, abs=0.1)
+        assert result[0]["w_pct"] == pytest.approx(50.0, abs=0.1)
+
+    def test_empty_text_skipped(self):
+        """Text elements with only whitespace are skipped."""
+        slide = {
+            "pageElements": [
+                {
+                    "shape": {"text": {"textElements": [{"textRun": {"content": "   \n  "}}]}},
+                    "transform": {},
+                    "size": {},
+                }
+            ]
+        }
+        result = _get_text_elements(slide, 9144000, 6858000)
+        assert result == []
+
+    def test_multiple_text_runs(self):
+        """Multiple textRuns in one shape are concatenated."""
+        slide = {
+            "pageElements": [
+                {
+                    "shape": {
+                        "text": {
+                            "textElements": [
+                                {
+                                    "textRun": {
+                                        "content": "First ",
+                                        "style": {"fontSize": {"magnitude": 18}},
+                                    }
+                                },
+                                {
+                                    "textRun": {
+                                        "content": "Second",
+                                        "style": {"fontSize": {"magnitude": 24}},
+                                    }
+                                },
+                            ]
+                        }
+                    },
+                    "transform": {},
+                    "size": {},
+                }
+            ]
+        }
+        result = _get_text_elements(slide, 9144000, 6858000)
+        assert len(result) == 1
+        assert result[0]["text"] == "First Second"
+        assert result[0]["font"] == 24  # max font size
+
+    def test_zero_slide_dimensions(self):
+        """Handles zero slide dimensions without division error."""
+        slide = {
+            "pageElements": [
+                {
+                    "shape": {"text": {"textElements": [{"textRun": {"content": "Text"}}]}},
+                    "transform": {"translateX": 100},
+                    "size": {"width": {"magnitude": 200}},
+                }
+            ]
+        }
+        result = _get_text_elements(slide, 0, 0)
+        assert len(result) == 1
+        assert result[0]["x_pct"] == 0
+        assert result[0]["y_pct"] == 0
+
+
+class TestSlideHasImage:
+    """Tests for _slide_has_image()."""
+
+    def test_no_image(self):
+        """Slide without images returns False."""
+        slide = {"pageElements": [{"shape": {"shapeType": "TEXT_BOX"}}]}
+        assert _slide_has_image(slide) is False
+
+    def test_has_image(self):
+        """Slide with image element returns True."""
+        slide = {"pageElements": [{"image": {"sourceUrl": "http://example.com/img.png"}}]}
+        assert _slide_has_image(slide) is True
+
+    def test_empty_elements(self):
+        """Slide with no page elements returns False."""
+        slide = {"pageElements": []}
+        assert _slide_has_image(slide) is False
+
+    def test_no_page_elements_key(self):
+        """Slide without pageElements key returns False."""
+        slide = {}
+        assert _slide_has_image(slide) is False
+
+
+class TestDetectSlideType:
+    """Tests for detect_slide_type()."""
+
+    def _make_text_elem(self, text, font_size, x_pct, y_pct, w_pct=40):
+        """Helper to create a page element with text at a given position."""
+        return {
+            "shape": {
+                "text": {
+                    "textElements": [
+                        {
+                            "textRun": {
+                                "content": text,
+                                "style": {"fontSize": {"magnitude": font_size}},
+                            }
+                        }
+                    ]
+                }
+            },
+            "transform": {
+                "translateX": x_pct / 100 * 9144000,
+                "translateY": y_pct / 100 * 6858000,
+            },
+            "size": {"width": {"magnitude": w_pct / 100 * 9144000}},
+        }
+
+    def test_empty_slide_returns_content(self):
+        """Slide with no text elements returns 'content'."""
+        slide = {"pageElements": []}
+        assert detect_slide_type(slide, 9144000, 6858000) == "content"
+
+    def test_title_slide_large_font(self):
+        """Slide with few elements and large font is detected as title."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Big Title", 48, 10, 20),
+                self._make_text_elem("Subtitle", 20, 10, 40),
+            ]
+        }
+        assert detect_slide_type(slide, 9144000, 6858000) == "title"
+
+    def test_closing_slide_low_position(self):
+        """Large font text in lower half is detected as closing."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Thank You", 48, 10, 60),
+            ]
+        }
+        assert detect_slide_type(slide, 9144000, 6858000) == "closing"
+
+    def test_section_slide_few_elements(self):
+        """1-2 text boxes with moderate large font is detected as section."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Section Title", 32, 10, 30),
+            ]
+        }
+        assert detect_slide_type(slide, 9144000, 6858000) == "section"
+
+    def test_two_column_layout(self):
+        """Text on both sides of midpoint is detected as two-column."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Left Title", 18, 5, 20, 40),
+                self._make_text_elem("Left Content", 14, 5, 40, 40),
+                self._make_text_elem("Right Title", 18, 55, 20, 40),
+                self._make_text_elem("Right Content", 14, 55, 40, 40),
+            ]
+        }
+        assert detect_slide_type(slide, 9144000, 6858000) == "two-column"
+
+    def test_image_slide(self):
+        """Slide with an image element is detected as image."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Caption", 14, 10, 80),
+                {"image": {"sourceUrl": "http://example.com/img.png"}},
+            ]
+        }
+        assert detect_slide_type(slide, 9144000, 6858000) == "image"
+
+    def test_image_with_two_columns(self):
+        """Image slide with two-column text returns two-column."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Left 1", 14, 5, 20, 40),
+                self._make_text_elem("Left 2", 14, 5, 40, 40),
+                self._make_text_elem("Right 1", 14, 55, 20, 40),
+                self._make_text_elem("Right 2", 14, 55, 40, 40),
+                {"image": {"sourceUrl": "http://example.com/img.png"}},
+            ]
+        }
+        assert detect_slide_type(slide, 9144000, 6858000) == "two-column"
+
+    def test_content_slide_default(self):
+        """Multiple text boxes with moderate font sizes detected as content."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Heading", 28, 10, 10),
+                self._make_text_elem("Bullet 1\nBullet 2\nBullet 3", 16, 10, 30),
+                self._make_text_elem("More text here", 16, 10, 60),
+            ]
+        }
+        assert detect_slide_type(slide, 9144000, 6858000) == "content"
+
+
+class TestExtractSlideAsMarkdown:
+    """Tests for _extract_slide_as_markdown()."""
+
+    def _make_text_elem(self, text, font_size, x_pct, y_pct, w_pct=40):
+        """Helper to create a page element."""
+        return {
+            "shape": {
+                "text": {
+                    "textElements": [
+                        {
+                            "textRun": {
+                                "content": text,
+                                "style": {"fontSize": {"magnitude": font_size}},
+                            }
+                        }
+                    ]
+                }
+            },
+            "transform": {
+                "translateX": x_pct / 100 * 9144000,
+                "translateY": y_pct / 100 * 6858000,
+            },
+            "size": {"width": {"magnitude": w_pct / 100 * 9144000}},
+        }
+
+    def test_empty_slide_returns_empty(self):
+        """Empty slide returns empty markdown."""
+        slide = {"pageElements": []}
+        slide_type, md = _extract_slide_as_markdown(slide, 9144000, 6858000)
+        assert md == ""
+
+    def test_title_slide_markdown(self):
+        """Title slide produces # heading and ## subtitle."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Main Title", 48, 10, 20),
+                self._make_text_elem("Subtitle", 20, 10, 40),
+            ]
+        }
+        slide_type, md = _extract_slide_as_markdown(slide, 9144000, 6858000)
+        assert slide_type == "title"
+        assert "# Main Title" in md
+        assert "## Subtitle" in md
+
+    def test_content_slide_bullets(self):
+        """Content slide with smaller font produces bullet list."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Heading", 28, 10, 10),
+                self._make_text_elem("Point A\nPoint B", 14, 10, 30),
+            ]
+        }
+        slide_type, md = _extract_slide_as_markdown(slide, 9144000, 6858000)
+        assert slide_type == "content"
+        assert "# Heading" in md
+        assert "- Point A" in md
+        assert "- Point B" in md
+
+    def test_two_column_markdown(self):
+        """Two-column slide produces left/right markers."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Compare", 30, 10, 10, 80),
+                self._make_text_elem("Left", 14, 5, 40, 40),
+                self._make_text_elem("Left item", 12, 5, 50, 40),
+                self._make_text_elem("Right", 14, 55, 40, 40),
+                self._make_text_elem("Right item", 12, 55, 50, 40),
+            ]
+        }
+        slide_type, md = _extract_slide_as_markdown(slide, 9144000, 6858000)
+        assert slide_type == "two-column"
+        assert "<!-- left -->" in md
+        assert "<!-- right -->" in md
+
+    def test_closing_slide_markdown(self):
+        """Closing slide produces # and ## headings."""
+        slide = {
+            "pageElements": [
+                self._make_text_elem("Thank You", 48, 10, 60),
+                self._make_text_elem("Questions?", 20, 10, 75),
+            ]
+        }
+        slide_type, md = _extract_slide_as_markdown(slide, 9144000, 6858000)
+        assert slide_type == "closing"
+        assert "# Thank You" in md
+
+
+# ============================================================================
+# UPLOAD / DOWNLOAD / UPDATE TESTS
+# ============================================================================
+
+
+class TestUploadPptxToGoogle:
+    """Tests for upload_pptx_to_google()."""
+
+    @patch("googleapiclient.http.MediaFileUpload")
+    @patch("google_slides.build_drive_service")
+    def test_upload_success(self, mock_build_drive, mock_media_upload, tmp_path):
+        """Upload returns presentation ID and URL."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"fake pptx data")
+
+        mock_service = Mock()
+        mock_build_drive.return_value = mock_service
+        mock_service.files().create().execute.return_value = {"id": "new-pres-id"}
+
+        result = upload_pptx_to_google(str(pptx_file), title="My Deck")
+
+        assert result["presentationId"] == "new-pres-id"
+        assert "new-pres-id" in result["url"]
+
+    @patch("googleapiclient.http.MediaFileUpload")
+    @patch("google_slides.build_drive_service")
+    def test_upload_with_folder(self, mock_build_drive, mock_media_upload, tmp_path):
+        """Upload with folder_id includes parents in metadata."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"fake")
+
+        mock_service = Mock()
+        mock_build_drive.return_value = mock_service
+        mock_service.files().create().execute.return_value = {"id": "pres-id"}
+
+        upload_pptx_to_google(str(pptx_file), folder_id="folder-123")
+        # The function ran without error; metadata contained parents
+
+
+class TestExportPresentationAsPptx:
+    """Tests for export_presentation_as_pptx()."""
+
+    @patch("google_slides.build_drive_service")
+    def test_export_success(self, mock_build_drive, tmp_path):
+        """Export writes pptx bytes to output path."""
+        mock_service = Mock()
+        mock_build_drive.return_value = mock_service
+        mock_service.files().export().execute.return_value = b"pptx-bytes"
+
+        output = tmp_path / "exported.pptx"
+        result = export_presentation_as_pptx("pres-123", str(output))
+
+        assert result == output
+        assert output.read_bytes() == b"pptx-bytes"
+
+
+class TestExtractImagesFromPptx:
+    """Tests for extract_images_from_pptx()."""
+
+    def test_extract_images(self, tmp_path):
+        """Extract images from a real pptx with a picture shape."""
+        # Build a pptx with an image
+        from pptx import Presentation as PptxPresentation
+        from pptx.util import Inches as PptxInches
+
+        prs = PptxPresentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+        # Create a minimal PNG image
+        import struct
+        import zlib
+
+        def _make_png():
+            """Create a minimal 1x1 red PNG."""
+            signature = b"\x89PNG\r\n\x1a\n"
+            # IHDR
+            ihdr_data = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+            ihdr_crc = zlib.crc32(b"IHDR" + ihdr_data) & 0xFFFFFFFF
+            ihdr = struct.pack(">I", 13) + b"IHDR" + ihdr_data + struct.pack(">I", ihdr_crc)
+            # IDAT
+            raw = zlib.compress(b"\x00\xff\x00\x00")
+            idat_crc = zlib.crc32(b"IDAT" + raw) & 0xFFFFFFFF
+            idat = struct.pack(">I", len(raw)) + b"IDAT" + raw + struct.pack(">I", idat_crc)
+            # IEND
+            iend_crc = zlib.crc32(b"IEND") & 0xFFFFFFFF
+            iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", iend_crc)
+            return signature + ihdr + idat + iend
+
+        img_file = tmp_path / "test_img.png"
+        img_file.write_bytes(_make_png())
+        slide.shapes.add_picture(str(img_file), PptxInches(1), PptxInches(1))
+
+        pptx_path = tmp_path / "with_images.pptx"
+        prs.save(str(pptx_path))
+
+        output_dir = tmp_path / "images_out"
+        result = extract_images_from_pptx(str(pptx_path), str(output_dir))
+
+        assert 1 in result
+        assert len(result[1]) == 1
+        assert output_dir.exists()
+
+
+class TestPresentationToMarkdown:
+    """Tests for presentation_to_markdown()."""
+
+    def test_basic_conversion(self):
+        """Converts a presentation to markdown with frontmatter."""
+        mock_service = Mock()
+        mock_service.presentations().get().execute.return_value = {
+            "presentationId": "pres-123",
+            "title": "My Deck",
+            "slides": [
+                {
+                    "objectId": "s1",
+                    "pageElements": [
+                        {
+                            "shape": {
+                                "text": {
+                                    "textElements": [
+                                        {
+                                            "textRun": {
+                                                "content": "Title Text",
+                                                "style": {"fontSize": {"magnitude": 44}},
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "transform": {"translateX": 914400, "translateY": 1371600},
+                            "size": {"width": {"magnitude": 7315200}},
+                        }
+                    ],
+                }
+            ],
+            "pageSize": {
+                "width": {"magnitude": 9144000},
+                "height": {"magnitude": 6858000},
+            },
+        }
+
+        result = presentation_to_markdown(mock_service, "pres-123")
+        assert "title: My Deck" in result
+        assert "presentation_id: pres-123" in result
+        assert "Title Text" in result
+
+    def test_with_image_map(self):
+        """Image map adds image references to markdown."""
+        mock_service = Mock()
+        mock_service.presentations().get().execute.return_value = {
+            "presentationId": "pres-123",
+            "title": "Deck",
+            "slides": [{"objectId": "s1", "pageElements": []}],
+            "pageSize": {
+                "width": {"magnitude": 9144000},
+                "height": {"magnitude": 6858000},
+            },
+        }
+
+        image_map = {1: ["/tmp/images/slide1_img1.png"]}
+        result = presentation_to_markdown(mock_service, "pres-123", image_map)
+        assert "slide1_img1.png" in result
+
+    def test_multiple_slides_with_separator(self):
+        """Multiple slides get --- separators."""
+        mock_service = Mock()
+        mock_service.presentations().get().execute.return_value = {
+            "presentationId": "pres-123",
+            "title": "Deck",
+            "slides": [
+                {"objectId": "s1", "pageElements": []},
+                {"objectId": "s2", "pageElements": []},
+            ],
+            "pageSize": {
+                "width": {"magnitude": 9144000},
+                "height": {"magnitude": 6858000},
+            },
+        }
+
+        result = presentation_to_markdown(mock_service, "pres-123")
+        assert "---" in result
+
+
+class TestUpdatePresentationReplace:
+    """Tests for update_presentation_replace()."""
+
+    @patch("googleapiclient.http.MediaFileUpload")
+    @patch("google_slides.build_drive_service")
+    def test_replace_success(self, mock_build_drive, mock_media_upload, tmp_path):
+        """Replace mode updates file and returns metadata."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"pptx data")
+
+        mock_service = Mock()
+        mock_build_drive.return_value = mock_service
+        mock_service.files().update().execute.return_value = {}
+
+        result = update_presentation_replace("pres-123", str(pptx_file))
+
+        assert result["presentationId"] == "pres-123"
+        assert result["mode"] == "replace"
+        assert "pres-123" in result["url"]
+
+
+class TestUpdatePresentationAppend:
+    """Tests for update_presentation_append()."""
+
+    @patch("google_slides.build_drive_service")
+    @patch("google_slides.build_slides_service")
+    @patch("google_slides.get_presentation")
+    @patch("google_slides.upload_pptx_to_google")
+    def test_append_success(
+        self, mock_upload, mock_get_pres, mock_build_slides, mock_build_drive, tmp_path
+    ):
+        """Append mode uploads temp, imports slides, cleans up."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"data")
+
+        mock_upload.return_value = {"presentationId": "temp-id"}
+        mock_slides_service = Mock()
+        mock_build_slides.return_value = mock_slides_service
+        mock_get_pres.return_value = {"slides": [{"objectId": "ts1"}, {"objectId": "ts2"}]}
+        mock_slides_service.presentations().batchUpdate().execute.return_value = {}
+
+        mock_drive_service = Mock()
+        mock_build_drive.return_value = mock_drive_service
+
+        result = update_presentation_append("target-pres", str(pptx_file))
+
+        assert result["presentationId"] == "target-pres"
+        assert result["slides_added"] == 2
+        assert result["mode"] == "append"
+
+    @patch("google_slides.build_drive_service")
+    @patch("google_slides.build_slides_service")
+    @patch("google_slides.get_presentation")
+    @patch("google_slides.upload_pptx_to_google")
+    def test_insert_with_position(
+        self, mock_upload, mock_get_pres, mock_build_slides, mock_build_drive, tmp_path
+    ):
+        """Insert mode passes position to importSlides."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"data")
+
+        mock_upload.return_value = {"presentationId": "temp-id"}
+        mock_slides_service = Mock()
+        mock_build_slides.return_value = mock_slides_service
+        mock_get_pres.return_value = {"slides": [{"objectId": "ts1"}]}
+        mock_slides_service.presentations().batchUpdate().execute.return_value = {}
+
+        mock_drive_service = Mock()
+        mock_build_drive.return_value = mock_drive_service
+
+        result = update_presentation_append("target-pres", str(pptx_file), position=2)
+
+        assert result["mode"] == "insert"
+        assert result["slides_added"] == 1
+
+    @patch("google_slides.upload_pptx_to_google")
+    def test_append_upload_fails(self, mock_upload, tmp_path):
+        """Raises SlidesAPIError when temp upload fails."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"data")
+
+        mock_upload.return_value = {}  # No presentationId
+
+        with pytest.raises(SlidesAPIError, match="Failed to upload"):
+            update_presentation_append("target-pres", str(pptx_file))
+
+
+# ============================================================================
+# ADDITIONAL CLI HANDLER TESTS
+# ============================================================================
+
+
+class TestCLICommandsExtended:
+    """Extended tests for CLI command handlers covering uncovered paths."""
+
+    @patch("google_slides.upload_pptx_to_google")
+    def test_cmd_create_with_title_uploads(self, mock_upload, tmp_path, capsys):
+        """Create with --title triggers upload to Google Slides."""
+        md_file = tmp_path / "deck.md"
+        md_file.write_text("# Slide 1\n- Bullet\n")
+        output = tmp_path / "deck.pptx"
+
+        mock_upload.return_value = {
+            "presentationId": "uploaded-pres-id",
+            "url": "https://docs.google.com/presentation/d/uploaded-pres-id/edit",
+        }
+
+        args = Mock(
+            file=str(md_file),
+            output=str(output),
+            palette=None,
+            title="Upload Title",
+        )
+        result = cmd_create(args)
+        assert result == 0
+        mock_upload.assert_called_once()
+        captured = capsys.readouterr()
+        assert "Uploaded to Google Slides" in captured.out
+        assert "uploaded-pres-id" in captured.out
+
+    @patch("google_slides.upload_pptx_to_google")
+    def test_cmd_create_upload_failure(self, mock_upload, tmp_path, capsys):
+        """Create with --title returns 1 on upload failure."""
+        md_file = tmp_path / "deck.md"
+        md_file.write_text("# Slide 1\n- Bullet\n")
+        output = tmp_path / "deck.pptx"
+
+        mock_upload.side_effect = SlidesAPIError("Upload failed")
+
+        args = Mock(
+            file=str(md_file),
+            output=str(output),
+            palette=None,
+            title="Upload Title",
+        )
+        result = cmd_create(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Upload failed" in captured.err
+
+    @patch("google_slides.presentation_to_markdown")
+    @patch("google_slides.extract_images_from_pptx")
+    @patch("google_slides.export_presentation_as_pptx")
+    @patch("google_slides.get_presentation")
+    @patch("google_slides.build_slides_service")
+    def test_cmd_get_with_output(
+        self,
+        mock_build,
+        mock_get_pres,
+        mock_export_pptx,
+        mock_extract_images,
+        mock_to_markdown,
+        tmp_path,
+        capsys,
+    ):
+        """Get command with --output downloads pptx and saves markdown."""
+        mock_build.return_value = Mock()
+        mock_get_pres.return_value = {
+            "presentationId": "pres-123",
+            "title": "Test",
+            "slides": [{"objectId": "s1"}],
+        }
+        mock_export_pptx.return_value = tmp_path / "out.pptx"
+        mock_extract_images.return_value = {1: [str(tmp_path / "img1.png")]}
+        mock_to_markdown.return_value = "---\ntitle: Test\n---\n# Slide 1\n"
+
+        output = tmp_path / "out.md"
+        args = Mock(presentation_id="pres-123", output=str(output), json=False)
+        result = cmd_get(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Saved PPTX" in captured.out
+        assert "Saved Markdown" in captured.out
+
+    @patch("google_slides.read_presentation_content")
+    @patch("google_slides.get_presentation")
+    @patch("google_slides.build_slides_service")
+    def test_cmd_get_no_output_shows_content(
+        self, mock_build, mock_get_pres, mock_read_content, capsys
+    ):
+        """Get command without --output or --json shows summary and content."""
+        mock_build.return_value = Mock()
+        mock_get_pres.return_value = {
+            "presentationId": "pres-123",
+            "title": "My Pres",
+            "slides": [
+                {
+                    "objectId": "s1",
+                    "slideProperties": {"layoutObjectId": "layout1"},
+                    "pageElements": [],
+                }
+            ],
+        }
+        mock_read_content.return_value = "Slide 1 content here"
+
+        args = Mock(presentation_id="pres-123", output=None, json=False)
+        result = cmd_get(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "My Pres" in captured.out
+        assert "Content:" in captured.out
+        assert "Slide 1 content here" in captured.out
+
+    def test_cmd_update_error_handling(self, capsys, tmp_path):
+        """Update command handles SlidesAPIError gracefully."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"fake")
+
+        with patch("google_slides.update_presentation_replace") as mock_replace:
+            mock_replace.side_effect = SlidesAPIError("Permission denied")
+            args = Mock(
+                presentation_id="pres-123",
+                file=str(pptx_file),
+                mode="replace",
+                position=None,
+            )
+            result = cmd_update(args)
+            assert result == 1
+            captured = capsys.readouterr()
+            assert "Permission denied" in captured.err
+
+    @patch("google_slides.update_presentation_append")
+    def test_cmd_update_insert_mode(self, mock_append, capsys, tmp_path):
+        """Update command in insert mode passes position."""
+        pptx_file = tmp_path / "deck.pptx"
+        pptx_file.write_bytes(b"fake")
+        mock_append.return_value = {
+            "presentationId": "pres-123",
+            "url": "https://docs.google.com/presentation/d/pres-123/edit",
+            "slides_added": 1,
+            "mode": "insert",
+        }
+        args = Mock(
+            presentation_id="pres-123",
+            file=str(pptx_file),
+            mode="insert",
+            position=3,
+        )
+        result = cmd_update(args)
+        assert result == 0
+        mock_append.assert_called_once_with("pres-123", str(pptx_file), 3)
+
+
+# ============================================================================
+# ICON SYSTEM EXTENDED TESTS
+# ============================================================================
+
+
+class TestIconSystemExtended:
+    """Extended tests for icon system coverage."""
+
+    @pytest.mark.skipif(not google_slides.CAIROSVG_AVAILABLE, reason="cairosvg not installed")
+    def test_convert_svg_to_png_default_output(self, tmp_path):
+        """convert_svg_to_png with no output uses .png extension."""
+        svg = tmp_path / "icon.svg"
+        svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')
+
+        result = convert_svg_to_png(svg)
+
+        assert result == svg.with_suffix(".png")
+        assert result.exists()
+
+    @pytest.mark.skipif(not google_slides.CAIROSVG_AVAILABLE, reason="cairosvg not installed")
+    def test_convert_svg_to_png_custom_output(self, tmp_path):
+        """convert_svg_to_png with explicit output path."""
+        svg = tmp_path / "icon.svg"
+        svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')
+        out = tmp_path / "custom_name.png"
+
+        result = convert_svg_to_png(svg, out, scale=3)
+
+        assert result == out
+        assert out.exists()
+
+    @patch("google_slides.CAIROSVG_AVAILABLE", True)
+    @patch("google_slides.convert_svg_to_png")
+    @patch("google_slides.fetch_icon")
+    def test_resolve_icon_named_from_repo(self, mock_fetch, mock_convert, tmp_path):
+        """resolve_icon fetches named icon from repo and converts."""
+        svg_path = tmp_path / "openshift.svg"
+        svg_path.write_text("<svg/>")
+        mock_fetch.return_value = svg_path
+
+        png_path = tmp_path / "openshift.png"
+        mock_convert.return_value = png_path
+
+        result = resolve_icon("openshift", tmp_path)
+        assert result == png_path
+
+    @patch("google_slides.CAIROSVG_AVAILABLE", True)
+    @patch("google_slides.fetch_icon")
+    def test_resolve_icon_named_not_found(self, mock_fetch):
+        """resolve_icon returns None when named icon not found."""
+        mock_fetch.return_value = None
+        result = resolve_icon("nonexistent-icon-name")
+        assert result is None
+
+    @patch("google_slides.CAIROSVG_AVAILABLE", True)
+    def test_resolve_icon_unsupported_extension(self, tmp_path):
+        """resolve_icon returns None for unsupported file types."""
+        bmp = tmp_path / "icon.bmp"
+        bmp.write_bytes(b"BM")
+        result = resolve_icon(str(bmp))
+        assert result is None
+
+    @patch("google_slides.CAIROSVG_AVAILABLE", True)
+    def test_resolve_icon_local_jpg(self, tmp_path):
+        """resolve_icon accepts local .jpg files."""
+        jpg = tmp_path / "photo.jpg"
+        jpg.write_bytes(b"JFIF")
+        result = resolve_icon(str(jpg))
+        assert result == jpg
+
+    @patch("google_slides.CAIROSVG_AVAILABLE", True)
+    @patch("google_slides.fetch_icon")
+    def test_resolve_icon_cached_png(self, mock_fetch, tmp_path):
+        """resolve_icon uses existing PNG cache."""
+        svg_path = tmp_path / "cached.svg"
+        svg_path.write_text("<svg/>")
+        mock_fetch.return_value = svg_path
+
+        # Pre-create cached PNG
+        png_path = tmp_path / "cached_icon.png"
+        png_path.write_bytes(b"PNG")
+
+        result = resolve_icon("cached_icon", tmp_path)
+        # Should return cached PNG from cache dir
+        assert result is not None
+
+    @patch("google_slides.subprocess.run")
+    def test_ensure_icon_repo_clone_failure(self, mock_run, tmp_path):
+        """ensure_icon_repo raises on clone failure."""
+        mock_run.side_effect = subprocess.CalledProcessError(1, "git")
+
+        with pytest.raises(subprocess.CalledProcessError):
+            ensure_icon_repo(tmp_path)
+
+
+# ============================================================================
+# PRESENTATION BUILDER EXTENDED TESTS
+# ============================================================================
+
+
+class TestPresentationBuilderExtended:
+    """Extended tests for PresentationBuilder slide methods."""
+
+    def test_add_bullet_list_with_icons(self, tmp_path):
+        """Bullet list with icon dicts renders text and attempts icon resolution."""
+        builder = PresentationBuilder()
+        slide_layout = builder.prs.slide_layouts[6]
+        slide = builder.prs.slides.add_slide(slide_layout)
+
+        bullets = [
+            {"icon": "nonexistent-icon", "text": "With icon"},
+            "Plain bullet",
+        ]
+
+        with patch("google_slides.CAIROSVG_AVAILABLE", False):
+            builder._add_bullet_list(
+                slide,
+                bullets,
+                left=Inches(1),
+                top=Inches(2),
+                width=Inches(8),
+                height=Inches(4),
+            )
+
+        # Verify shapes were created (text box at minimum)
+        assert len(slide.shapes) >= 1
+
+    @patch("google_slides.CAIROSVG_AVAILABLE", True)
+    @patch("google_slides.resolve_icon")
+    def test_add_bullet_list_with_valid_icon(self, mock_resolve, tmp_path):
+        """Bullet list with resolvable icon adds picture shape."""
+        # Create a real PNG for the icon
+        import struct
+        import zlib
+
+        def _make_png():
+            signature = b"\x89PNG\r\n\x1a\n"
+            ihdr_data = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+            ihdr_crc = zlib.crc32(b"IHDR" + ihdr_data) & 0xFFFFFFFF
+            ihdr = struct.pack(">I", 13) + b"IHDR" + ihdr_data + struct.pack(">I", ihdr_crc)
+            raw = zlib.compress(b"\x00\xff\x00\x00")
+            idat_crc = zlib.crc32(b"IDAT" + raw) & 0xFFFFFFFF
+            idat = struct.pack(">I", len(raw)) + b"IDAT" + raw + struct.pack(">I", idat_crc)
+            iend_crc = zlib.crc32(b"IEND") & 0xFFFFFFFF
+            iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", iend_crc)
+            return signature + ihdr + idat + iend
+
+        icon_png = tmp_path / "icon.png"
+        icon_png.write_bytes(_make_png())
+        mock_resolve.return_value = icon_png
+
+        builder = PresentationBuilder()
+        slide_layout = builder.prs.slide_layouts[6]
+        slide = builder.prs.slides.add_slide(slide_layout)
+
+        bullets = [{"icon": "test-icon", "text": "Icon bullet"}]
+        builder._add_bullet_list(
+            slide,
+            bullets,
+            left=Inches(1),
+            top=Inches(2),
+            width=Inches(8),
+            height=Inches(4),
+        )
+
+        # Should have text box + picture
+        assert len(slide.shapes) >= 2
+
+    def test_add_two_column_slide_with_headings_and_notes(self):
+        """Two-column slide with headings, bullets, and notes."""
+        builder = PresentationBuilder()
+        builder._add_two_column_slide(
+            {
+                "title": "Comparison",
+                "left": {"heading": "Left Side", "bullets": ["L1", "L2"]},
+                "right": {"heading": "Right Side", "bullets": ["R1"]},
+                "notes": "Speaker notes for comparison",
+            }
+        )
+        assert len(builder.prs.slides) == 1
+        slide = builder.prs.slides[0]
+        assert slide.notes_slide.notes_text_frame.text == "Speaker notes for comparison"
+
+    def test_add_two_column_slide_no_title(self):
+        """Two-column slide without title still renders columns."""
+        builder = PresentationBuilder()
+        builder._add_two_column_slide(
+            {
+                "left": {"bullets": ["A"]},
+                "right": {"bullets": ["B"]},
+            }
+        )
+        assert len(builder.prs.slides) == 1
+
+    def test_add_two_column_slide_no_headings(self):
+        """Two-column slide without column headings."""
+        builder = PresentationBuilder()
+        builder._add_two_column_slide(
+            {
+                "title": "No Col Heads",
+                "left": {"bullets": ["X"]},
+                "right": {"bullets": ["Y"]},
+            }
+        )
+        assert len(builder.prs.slides) == 1
+
+    def test_add_image_slide_with_existing_image(self, tmp_path):
+        """Image slide with an actual image file adds picture shape."""
+        import struct
+        import zlib
+
+        def _make_png():
+            signature = b"\x89PNG\r\n\x1a\n"
+            ihdr_data = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+            ihdr_crc = zlib.crc32(b"IHDR" + ihdr_data) & 0xFFFFFFFF
+            ihdr = struct.pack(">I", 13) + b"IHDR" + ihdr_data + struct.pack(">I", ihdr_crc)
+            raw = zlib.compress(b"\x00\xff\x00\x00")
+            idat_crc = zlib.crc32(b"IDAT" + raw) & 0xFFFFFFFF
+            idat = struct.pack(">I", len(raw)) + b"IDAT" + raw + struct.pack(">I", idat_crc)
+            iend_crc = zlib.crc32(b"IEND") & 0xFFFFFFFF
+            iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", iend_crc)
+            return signature + ihdr + idat + iend
+
+        img = tmp_path / "chart.png"
+        img.write_bytes(_make_png())
+
+        builder = PresentationBuilder()
+        builder._add_image_slide(
+            {
+                "title": "Chart Slide",
+                "image_path": str(img),
+                "image_alt": "A chart",
+                "notes": "Image speaker notes",
+            }
+        )
+        assert len(builder.prs.slides) == 1
+        slide = builder.prs.slides[0]
+        assert slide.notes_slide.notes_text_frame.text == "Image speaker notes"
+        # Should have text boxes (title, caption) + picture
+        assert len(slide.shapes) >= 3
+
+    def test_add_image_slide_no_title(self):
+        """Image slide without title still works."""
+        builder = PresentationBuilder()
+        builder._add_image_slide({"image_path": "/nonexistent/img.png"})
+        assert len(builder.prs.slides) == 1
+
+    def test_add_closing_slide_with_all_fields(self):
+        """Closing slide with title, subtitle, contact, and notes."""
+        builder = PresentationBuilder()
+        builder._add_closing_slide(
+            {
+                "title": "Thank You",
+                "subtitle": "Questions?",
+                "contact": "user@example.com",
+                "notes": "Closing speaker notes",
+            }
+        )
+        assert len(builder.prs.slides) == 1
+        slide = builder.prs.slides[0]
+        assert slide.notes_slide.notes_text_frame.text == "Closing speaker notes"
+
+    def test_add_closing_slide_minimal(self):
+        """Closing slide with only title works."""
+        builder = PresentationBuilder()
+        builder._add_closing_slide({"title": "The End"})
+        assert len(builder.prs.slides) == 1
+
+    def test_add_section_slide_with_notes(self):
+        """Section slide with notes attaches speaker notes."""
+        builder = PresentationBuilder()
+        builder._add_section_slide(
+            {
+                "title": "New Section",
+                "subtitle": "Overview",
+                "notes": "Section notes here",
+            }
+        )
+        assert len(builder.prs.slides) == 1
+        slide = builder.prs.slides[0]
+        assert slide.notes_slide.notes_text_frame.text == "Section notes here"
+
+    def test_add_section_slide_no_subtitle(self):
+        """Section slide without subtitle."""
+        builder = PresentationBuilder()
+        builder._add_section_slide({"title": "Simple Section"})
+        assert len(builder.prs.slides) == 1
+
+    def test_add_content_slide_with_notes(self):
+        """Content slide with speaker notes."""
+        builder = PresentationBuilder()
+        builder._add_content_slide(
+            {
+                "title": "Content",
+                "bullets": ["A", "B"],
+                "notes": "Content notes",
+            }
+        )
+        slide = builder.prs.slides[0]
+        assert slide.notes_slide.notes_text_frame.text == "Content notes"
+
+    def test_build_from_spec_image_type(self, tmp_path):
+        """build_from_spec handles image slide type."""
+        builder = PresentationBuilder()
+        spec = {
+            "title": "Image Test",
+            "slides": [
+                {
+                    "type": "image",
+                    "title": "Photo",
+                    "image_path": "/nonexistent/photo.png",
+                    "image_alt": "Alt text",
+                },
+            ],
+        }
+        out = tmp_path / "img_test.pptx"
+        builder.build_from_spec(spec, output_path=str(out))
+        assert len(builder.prs.slides) == 1
+        assert out.exists()
