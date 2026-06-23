@@ -808,6 +808,7 @@ class TestCommandHandlers:
             no_body=False,
             frontmatter=False,
             expand=None,
+            output=None,
         )
 
         result = cmd_page(args)
@@ -834,6 +835,7 @@ class TestCommandHandlers:
             no_body=False,
             frontmatter=False,
             expand="body.storage,version",
+            output=None,
         )
 
         result = cmd_page(args)
@@ -1169,6 +1171,7 @@ class TestCommandHandlers:
             raw=False,
             no_body=False,
             expand=None,
+            output=None,
         )
 
         result = cmd_page(args)
@@ -1504,7 +1507,7 @@ class TestFormatPageVariations:
             "space": {"key": "DEMO"},
             "version": {"number": 1},
             "body": {
-                "editor": {
+                "atlas_doc_format": {
                     "value": {
                         "version": 1,
                         "type": "doc",
@@ -1536,7 +1539,7 @@ class TestFormatPageVariations:
             "space": {"key": "DEMO"},
             "version": {"number": 1},
             "body": {
-                "editor": {
+                "atlas_doc_format": {
                     "value": json.dumps(
                         {
                             "version": 1,
@@ -2029,6 +2032,35 @@ class TestInternalLinksAndToc:
         assert result["content"][0]["type"] == "extension"
         assert result["content"][0]["attrs"]["extensionKey"] == "toc"
 
+    def test_adf_has_toc_true(self):
+        from skills.confluence.scripts.confluence import _adf_has_toc
+
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "extension",
+                    "attrs": {
+                        "extensionType": "com.atlassian.confluence.macro.core",
+                        "extensionKey": "toc",
+                    },
+                },
+                {"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]},
+            ],
+        }
+        assert _adf_has_toc(adf) is True
+
+    def test_adf_has_toc_false(self):
+        from skills.confluence.scripts.confluence import _adf_has_toc
+
+        adf = {
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]},
+            ],
+        }
+        assert _adf_has_toc(adf) is False
+
 
 class TestFrontmatter:
     """Tests for frontmatter extraction and round-tripping."""
@@ -2082,7 +2114,7 @@ class TestFrontmatter:
                 }
             },
             "body": {
-                "editor": {
+                "atlas_doc_format": {
                     "value": json.dumps(
                         {
                             "version": 1,
@@ -2126,6 +2158,82 @@ class TestFrontmatter:
         assert "parent:" not in result
         assert "labels:" not in result
 
+    def test_format_page_with_frontmatter_toc(self):
+        import json
+
+        from skills.confluence.scripts.confluence import format_page_with_frontmatter
+
+        page = {
+            "id": "789",
+            "title": "TOC Page",
+            "space": {"key": "DEMO"},
+            "version": {"number": 2},
+            "ancestors": [],
+            "metadata": {"labels": {"results": []}},
+            "body": {
+                "atlas_doc_format": {
+                    "value": json.dumps(
+                        {
+                            "version": 1,
+                            "type": "doc",
+                            "content": [
+                                {
+                                    "type": "extension",
+                                    "attrs": {
+                                        "extensionType": "com.atlassian.confluence.macro.core",
+                                        "extensionKey": "toc",
+                                        "parameters": {"macroParams": {"maxLevel": {"value": "3"}}},
+                                    },
+                                },
+                                {
+                                    "type": "heading",
+                                    "attrs": {"level": 1},
+                                    "content": [{"type": "text", "text": "Intro"}],
+                                },
+                            ],
+                        }
+                    )
+                }
+            },
+        }
+
+        result = format_page_with_frontmatter(page)
+        assert "toc: true" in result
+        assert result.startswith("---")
+
+    def test_format_page_with_frontmatter_no_toc(self):
+        import json
+
+        from skills.confluence.scripts.confluence import format_page_with_frontmatter
+
+        page = {
+            "id": "790",
+            "title": "No TOC Page",
+            "space": {"key": "DEMO"},
+            "version": {"number": 1},
+            "ancestors": [],
+            "metadata": {"labels": {"results": []}},
+            "body": {
+                "atlas_doc_format": {
+                    "value": json.dumps(
+                        {
+                            "version": 1,
+                            "type": "doc",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "No TOC here"}],
+                                },
+                            ],
+                        }
+                    )
+                }
+            },
+        }
+
+        result = format_page_with_frontmatter(page)
+        assert "toc:" not in result
+
     @patch("skills.confluence.scripts.confluence.get_page")
     def test_cmd_page_get_frontmatter(self, mock_get):
         import argparse
@@ -2151,10 +2259,86 @@ class TestFrontmatter:
             no_body=False,
             frontmatter=True,
             expand=None,
+            output=None,
         )
 
         result = cmd_page(args)
         assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.download_attachment")
+    @patch("skills.confluence.scripts.confluence.list_attachments")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    def test_cmd_page_get_output_file(self, mock_get, mock_list_att, mock_dl, tmp_path):
+        """Test page get with --output writes file and downloads images."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_page
+
+        mock_get.return_value = {
+            "id": "123",
+            "title": "Test Page",
+            "space": {"key": "DEMO"},
+            "version": {"number": 1},
+            "body": {"storage": {"value": "<p>Hello</p>"}},
+        }
+        mock_list_att.return_value = {
+            "att-1": {
+                "title": "photo.png",
+                "download": "/dl/photo.png",
+                "mediaType": "image/png",
+            }
+        }
+        mock_dl.return_value = tmp_path / "test-page" / "photo.png"
+
+        output_file = tmp_path / "test-page.md"
+        args = argparse.Namespace(
+            page_command="get",
+            page_identifier="123",
+            json=False,
+            markdown=True,
+            raw=False,
+            no_body=False,
+            frontmatter=False,
+            expand=None,
+            output=str(output_file),
+        )
+
+        result = cmd_page(args)
+        assert result == 0
+        assert output_file.exists()
+        mock_dl.assert_called_once_with("/dl/photo.png", "photo.png", tmp_path / "test-page")
+
+    @patch("skills.confluence.scripts.confluence.list_attachments")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    def test_cmd_page_get_no_output_skips_images(self, mock_get, mock_list_att):
+        """Test page get without --output does not download images."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_page
+
+        mock_get.return_value = {
+            "id": "123",
+            "title": "Test Page",
+            "space": {"key": "DEMO"},
+            "version": {"number": 1},
+            "body": {"storage": {"value": "<p>Hello</p>"}},
+        }
+
+        args = argparse.Namespace(
+            page_command="get",
+            page_identifier="123",
+            json=False,
+            markdown=True,
+            raw=False,
+            no_body=False,
+            frontmatter=False,
+            expand=None,
+            output=None,
+        )
+
+        result = cmd_page(args)
+        assert result == 0
+        mock_list_att.assert_not_called()
 
 
 class TestExtractLocalImages:
@@ -2328,3 +2512,653 @@ class TestMakeRequestMultipart:
         call_kwargs = mock_request.call_args
         headers = call_kwargs[1].get("headers", call_kwargs.kwargs.get("headers", {}))
         assert headers.get("Content-Type") != "application/json"
+
+
+# ============================================================================
+# ADF IMAGE NODE CONVERSION TESTS
+# ============================================================================
+
+
+class TestMediaNodeToMarkdown:
+    """Tests for _media_node_to_markdown and adf_to_markdown with images."""
+
+    def test_media_single_with_attachments(self):
+        """Test mediaSingle node converts to markdown image."""
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "mediaSingle",
+                    "attrs": {"layout": "center"},
+                    "content": [
+                        {
+                            "type": "media",
+                            "attrs": {
+                                "type": "file",
+                                "id": "att-123",
+                                "collection": "contentId-456",
+                                "alt": "diagram",
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+        attachments = {
+            "att-123": {
+                "title": "diagram.png",
+                "download": "/wiki/download/attachments/456/diagram.png",
+                "mediaType": "image/png",
+            }
+        }
+        result = adf_to_markdown(adf, attachments=attachments)
+        assert "![diagram](/wiki/download/attachments/456/diagram.png)" in result
+
+    def test_media_single_with_image_dir(self):
+        """Test mediaSingle uses relative path when image_dir is set."""
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "mediaSingle",
+                    "content": [
+                        {
+                            "type": "media",
+                            "attrs": {"type": "file", "id": "att-1", "alt": "photo"},
+                        }
+                    ],
+                }
+            ],
+        }
+        attachments = {
+            "att-1": {"title": "photo.jpg", "download": "/dl", "mediaType": "image/jpeg"}
+        }
+        result = adf_to_markdown(adf, attachments=attachments, image_dir=Path("images"))
+        assert "![photo](images/photo.jpg)" in result
+
+    def test_media_single_no_attachments(self):
+        """Test fallback when no attachment metadata available."""
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "mediaSingle",
+                    "content": [
+                        {
+                            "type": "media",
+                            "attrs": {"type": "file", "id": "att-unknown", "alt": "img"},
+                        }
+                    ],
+                }
+            ],
+        }
+        result = adf_to_markdown(adf)
+        assert "![img](attachment:att-unknown)" in result
+
+    def test_media_group_multiple_images(self):
+        """Test mediaGroup with multiple images."""
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "mediaGroup",
+                    "content": [
+                        {"type": "media", "attrs": {"type": "file", "id": "a1", "alt": "one"}},
+                        {"type": "media", "attrs": {"type": "file", "id": "a2", "alt": "two"}},
+                    ],
+                }
+            ],
+        }
+        attachments = {
+            "a1": {"title": "one.png", "download": "/dl/one.png", "mediaType": "image/png"},
+            "a2": {"title": "two.png", "download": "/dl/two.png", "mediaType": "image/png"},
+        }
+        result = adf_to_markdown(adf, attachments=attachments)
+        assert "![one](/dl/one.png)" in result
+        assert "![two](/dl/two.png)" in result
+
+    def test_inline_media_in_paragraph(self):
+        """Test inline media node within a paragraph."""
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "See "},
+                        {
+                            "type": "mediaInline",
+                            "attrs": {"type": "file", "id": "att-x", "alt": "icon"},
+                        },
+                        {"type": "text", "text": " for details."},
+                    ],
+                }
+            ],
+        }
+        attachments = {
+            "att-x": {"title": "icon.png", "download": "/dl/icon.png", "mediaType": "image/png"}
+        }
+        result = adf_to_markdown(adf, attachments=attachments)
+        assert "See ![icon](/dl/icon.png) for details." in result
+
+    def test_mixed_content_with_images(self):
+        """Test ADF with text and images together."""
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "heading",
+                    "attrs": {"level": 1},
+                    "content": [{"type": "text", "text": "Title"}],
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Some text."}],
+                },
+                {
+                    "type": "mediaSingle",
+                    "content": [
+                        {"type": "media", "attrs": {"type": "file", "id": "img1", "alt": "chart"}},
+                    ],
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "More text."}],
+                },
+            ],
+        }
+        attachments = {
+            "img1": {"title": "chart.png", "download": "/dl/chart.png", "mediaType": "image/png"}
+        }
+        result = adf_to_markdown(adf, attachments=attachments)
+        assert "# Title" in result
+        assert "Some text." in result
+        assert "![chart](/dl/chart.png)" in result
+        assert "More text." in result
+
+
+# ============================================================================
+# LIST_ATTACHMENTS TESTS
+# ============================================================================
+
+
+class TestListAttachments:
+    """Tests for list_attachments function."""
+
+    @patch("skills.confluence.scripts.confluence.get")
+    def test_list_attachments(self, mock_get):
+        """Test fetching and mapping attachments."""
+        mock_get.return_value = {
+            "results": [
+                {
+                    "id": "att-100",
+                    "title": "photo.png",
+                    "extensions": {
+                        "fileId": "file-abc",
+                        "mediaType": "image/png",
+                    },
+                    "_links": {"download": "/wiki/download/attachments/1/photo.png"},
+                },
+                {
+                    "id": "att-101",
+                    "title": "doc.pdf",
+                    "extensions": {
+                        "fileId": "file-def",
+                        "mediaType": "application/pdf",
+                    },
+                    "_links": {"download": "/wiki/download/attachments/1/doc.pdf"},
+                },
+            ]
+        }
+        result = confluence.list_attachments("12345")
+        assert "file-abc" in result
+        assert result["file-abc"]["title"] == "photo.png"
+        assert result["file-abc"]["mediaType"] == "image/png"
+        assert "file-def" in result
+
+
+# ============================================================================
+# DOWNLOAD_ATTACHMENT TESTS
+# ============================================================================
+
+
+class TestDownloadAttachment:
+    """Tests for download_attachment function."""
+
+    @patch("skills.confluence.scripts.confluence.requests.get")
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_download_attachment(self, mock_creds, mock_requests_get, tmp_path):
+        """Test downloading an attachment to local directory."""
+        mock_creds.return_value = Credentials(
+            url="https://example.atlassian.net",
+            token="test123",
+            email="test@example.com",
+        )
+        mock_response = Mock()
+        mock_response.content = MINIMAL_PNG
+        mock_response.raise_for_status = Mock()
+        mock_requests_get.return_value = mock_response
+
+        output_dir = tmp_path / "images"
+        result = confluence.download_attachment(
+            "/rest/api/content/456/child/attachment/att789/download",
+            "photo.png",
+            output_dir,
+        )
+
+        assert result == output_dir / "photo.png"
+        assert result.read_bytes() == MINIMAL_PNG
+        mock_requests_get.assert_called_once()
+
+    @patch("skills.confluence.scripts.confluence.requests.get")
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_download_creates_directory(self, mock_creds, mock_requests_get, tmp_path):
+        """Test that download creates the output directory if needed."""
+        mock_creds.return_value = Credentials(
+            url="https://example.atlassian.net",
+            token="test123",
+            email="test@example.com",
+        )
+        mock_response = Mock()
+        mock_response.content = b"data"
+        mock_response.raise_for_status = Mock()
+        mock_requests_get.return_value = mock_response
+
+        output_dir = tmp_path / "nested" / "dir"
+        confluence.download_attachment(
+            "/rest/api/content/789/child/attachment/att999/download",
+            "file.png",
+            output_dir,
+        )
+
+        assert (output_dir / "file.png").exists()
+
+
+class TestMediaNodeExternalImages:
+    """Tests for _media_node_to_markdown with external media type."""
+
+    def test_external_media_with_image_dir(self):
+        """External media uses image_dir relative path when available."""
+        from skills.confluence.scripts.confluence import _media_node_to_markdown
+
+        node = {
+            "type": "media",
+            "attrs": {
+                "type": "external",
+                "url": "https://cdn.example.com/images/photo.png",
+                "alt": "photo",
+            },
+        }
+        result = _media_node_to_markdown(node, image_dir=Path("imgs"))
+        assert result == "![photo](imgs/photo.png)"
+
+    def test_external_media_without_image_dir(self):
+        """External media returns URL directly without image_dir."""
+        from skills.confluence.scripts.confluence import _media_node_to_markdown
+
+        node = {
+            "type": "media",
+            "attrs": {
+                "type": "external",
+                "url": "https://cdn.example.com/photo.png",
+                "alt": "pic",
+            },
+        }
+        result = _media_node_to_markdown(node)
+        assert result == "![pic](https://cdn.example.com/photo.png)"
+
+    def test_external_media_empty_url(self):
+        """External media with empty URL returns empty string."""
+        from skills.confluence.scripts.confluence import _media_node_to_markdown
+
+        node = {"type": "media", "attrs": {"type": "external", "url": "", "alt": "x"}}
+        result = _media_node_to_markdown(node)
+        assert result == ""
+
+    def test_non_media_node_returns_empty(self):
+        """Non-media node type returns empty string."""
+        from skills.confluence.scripts.confluence import _media_node_to_markdown
+
+        node = {"type": "paragraph"}
+        assert _media_node_to_markdown(node) == ""
+
+    def test_file_media_with_title_no_download(self):
+        """File media with title but no download path uses filename."""
+        from skills.confluence.scripts.confluence import _media_node_to_markdown
+
+        node = {"type": "media", "attrs": {"type": "file", "id": "att-1", "alt": "img"}}
+        attachments = {"att-1": {"title": "diagram.png", "download": "", "mediaType": "image/png"}}
+        result = _media_node_to_markdown(node, attachments=attachments)
+        assert result == "![img](diagram.png)"
+
+    def test_bullet_list_with_attachments(self):
+        """Bullet list items pass attachments through to _adf_content_to_text."""
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "bulletList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "item text"}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        result = adf_to_markdown(adf, attachments={}, image_dir=Path("imgs"))
+        assert "- item text" in result
+
+
+class TestDownloadExternalImages:
+    """Tests for _download_external_images function."""
+
+    @patch("skills.confluence.scripts.confluence.download_attachment")
+    def test_downloads_matching_attachment(self, mock_dl):
+        """External image matching an attachment is downloaded."""
+        adf = {
+            "content": [
+                {
+                    "type": "mediaSingle",
+                    "content": [
+                        {
+                            "type": "media",
+                            "attrs": {
+                                "type": "external",
+                                "url": "https://cdn.example.com/photo.png",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        att_map = {
+            "a1": {"title": "photo.png", "download": "/dl/photo.png", "mediaType": "image/png"}
+        }
+        confluence._download_external_images(adf, Path("/tmp/imgs"), att_map=att_map)
+        mock_dl.assert_called_once_with("/dl/photo.png", "photo.png", Path("/tmp/imgs"))
+
+    @patch("skills.confluence.scripts.confluence.download_attachment")
+    def test_warns_on_no_match(self, mock_dl, capsys):
+        """External image with no attachment match produces warning."""
+        adf = {
+            "content": [
+                {
+                    "type": "mediaSingle",
+                    "content": [
+                        {
+                            "type": "media",
+                            "attrs": {
+                                "type": "external",
+                                "url": "https://cdn.example.com/unknown.png",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        confluence._download_external_images(adf, Path("/tmp/imgs"), att_map={})
+        mock_dl.assert_not_called()
+        assert "no attachment match" in capsys.readouterr().err
+
+    @patch("skills.confluence.scripts.confluence.download_attachment")
+    def test_warns_on_download_failure(self, mock_dl, capsys):
+        """Download failure produces warning but does not raise."""
+        mock_dl.side_effect = Exception("network error")
+        adf = {
+            "content": [
+                {
+                    "type": "mediaSingle",
+                    "content": [
+                        {
+                            "type": "media",
+                            "attrs": {
+                                "type": "external",
+                                "url": "https://cdn.example.com/fail.png",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        att_map = {
+            "a1": {"title": "fail.png", "download": "/dl/fail.png", "mediaType": "image/png"}
+        }
+        confluence._download_external_images(adf, Path("/tmp/imgs"), att_map=att_map)
+        assert "failed to download" in capsys.readouterr().err
+
+    @patch("skills.confluence.scripts.confluence.download_attachment")
+    def test_skips_non_external(self, mock_dl):
+        """Non-external media nodes are skipped."""
+        adf = {
+            "content": [
+                {
+                    "type": "mediaSingle",
+                    "content": [
+                        {
+                            "type": "media",
+                            "attrs": {"type": "file", "id": "att-1"},
+                        }
+                    ],
+                }
+            ]
+        }
+        confluence._download_external_images(adf, Path("/tmp/imgs"), att_map={})
+        mock_dl.assert_not_called()
+
+    @patch("skills.confluence.scripts.confluence.download_attachment")
+    def test_skips_non_media_nodes(self, mock_dl):
+        """Non-mediaSingle/mediaGroup nodes are skipped."""
+        adf = {
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "hello"}]},
+            ]
+        }
+        confluence._download_external_images(adf, Path("/tmp/imgs"), att_map={})
+        mock_dl.assert_not_called()
+
+    @patch("skills.confluence.scripts.confluence.download_attachment")
+    def test_skips_empty_url(self, mock_dl):
+        """External media with empty URL is skipped."""
+        adf = {
+            "content": [
+                {
+                    "type": "mediaSingle",
+                    "content": [
+                        {"type": "media", "attrs": {"type": "external", "url": ""}},
+                    ],
+                }
+            ]
+        }
+        confluence._download_external_images(adf, Path("/tmp/imgs"), att_map={})
+        mock_dl.assert_not_called()
+
+    @patch("skills.confluence.scripts.confluence.download_attachment")
+    def test_skips_url_without_filename(self, mock_dl):
+        """External media with URL that has no path component is skipped."""
+        adf = {
+            "content": [
+                {
+                    "type": "mediaSingle",
+                    "content": [
+                        {"type": "media", "attrs": {"type": "external", "url": "nopath"}},
+                    ],
+                }
+            ]
+        }
+        confluence._download_external_images(adf, Path("/tmp/imgs"), att_map={})
+        mock_dl.assert_not_called()
+
+
+class TestDownloadAttachmentAuthBranches:
+    """Tests for download_attachment auth fallback branches."""
+
+    @patch("skills.confluence.scripts.confluence.requests.get")
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_username_password_auth(self, mock_creds, mock_get, tmp_path):
+        """Username/password creds use basic auth."""
+        mock_creds.return_value = Credentials(
+            url="https://example.atlassian.net",
+            username="user",
+            password="pass",
+        )
+        mock_response = Mock()
+        mock_response.content = MINIMAL_PNG
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        confluence.download_attachment("/dl/img.png", "img.png", tmp_path)
+
+        call_kwargs = mock_get.call_args
+        assert call_kwargs[1]["auth"] == ("user", "pass")
+
+    @patch("skills.confluence.scripts.confluence.requests.get")
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_bearer_token_auth(self, mock_creds, mock_get, tmp_path):
+        """Token-only creds (no email/username) use bearer auth header."""
+        mock_creds.return_value = Credentials(
+            url="https://example.atlassian.net",
+            token="bearer-token-123",
+        )
+        mock_response = Mock()
+        mock_response.content = MINIMAL_PNG
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        confluence.download_attachment("/dl/img.png", "img.png", tmp_path)
+
+        call_kwargs = mock_get.call_args
+        assert call_kwargs[1]["headers"]["Authorization"] == "Bearer bearer-token-123"
+        assert call_kwargs[1]["auth"] is None
+
+
+class TestCmdPageGetErrorBranches:
+    """Tests for error handling branches in cmd_page get with --output."""
+
+    @patch("skills.confluence.scripts.confluence.list_attachments")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    def test_attachment_fetch_error(self, mock_get, mock_list_att, tmp_path):
+        """APIError fetching attachments logs warning and continues."""
+        import argparse
+
+        mock_get.return_value = {
+            "id": "123",
+            "title": "Test",
+            "space": {"key": "DEMO"},
+            "version": {"number": 1},
+            "body": {"storage": {"value": "<p>Hi</p>"}},
+        }
+        mock_list_att.side_effect = APIError("connection failed")
+
+        output_file = tmp_path / "page.md"
+        args = argparse.Namespace(
+            page_command="get",
+            page_identifier="123",
+            json=False,
+            markdown=True,
+            raw=False,
+            no_body=False,
+            frontmatter=False,
+            expand=None,
+            output=str(output_file),
+        )
+
+        result = confluence.cmd_page(args)
+        assert result == 0
+        assert output_file.exists()
+
+    @patch("skills.confluence.scripts.confluence.download_attachment")
+    @patch("skills.confluence.scripts.confluence.list_attachments")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    def test_image_download_error(self, mock_get, mock_list_att, mock_dl, tmp_path):
+        """Failed image download logs warning and continues."""
+        import argparse
+
+        mock_get.return_value = {
+            "id": "123",
+            "title": "Test",
+            "space": {"key": "DEMO"},
+            "version": {"number": 1},
+            "body": {"storage": {"value": "<p>Hi</p>"}},
+        }
+        mock_list_att.return_value = {
+            "att-1": {"title": "img.png", "download": "/dl/img.png", "mediaType": "image/png"}
+        }
+        mock_dl.side_effect = Exception("timeout")
+
+        output_file = tmp_path / "page.md"
+        args = argparse.Namespace(
+            page_command="get",
+            page_identifier="123",
+            json=False,
+            markdown=True,
+            raw=False,
+            no_body=False,
+            frontmatter=False,
+            expand=None,
+            output=str(output_file),
+        )
+
+        result = confluence.cmd_page(args)
+        assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.list_attachments")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    def test_external_images_with_adf_body(self, mock_get, mock_list_att, tmp_path):
+        """External image download path is exercised when ADF body present."""
+        import argparse
+        import json
+
+        mock_get.return_value = {
+            "id": "123",
+            "title": "Test",
+            "space": {"key": "DEMO"},
+            "version": {"number": 1},
+            "body": {
+                "atlas_doc_format": {
+                    "value": json.dumps(
+                        {
+                            "version": 1,
+                            "type": "doc",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "hello"}],
+                                }
+                            ],
+                        }
+                    )
+                }
+            },
+        }
+        mock_list_att.return_value = {}
+
+        output_file = tmp_path / "page.md"
+        args = argparse.Namespace(
+            page_command="get",
+            page_identifier="123",
+            json=False,
+            markdown=True,
+            raw=False,
+            no_body=False,
+            frontmatter=False,
+            expand=None,
+            output=str(output_file),
+        )
+
+        result = confluence.cmd_page(args)
+        assert result == 0
+        assert output_file.exists()

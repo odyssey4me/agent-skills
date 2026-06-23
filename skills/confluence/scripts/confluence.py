@@ -394,6 +394,14 @@ def _validate_page_exists(page_id: str) -> dict[str, Any] | None:
         return None
 
 
+def _adf_has_toc(adf: dict[str, Any]) -> bool:
+    """Check whether ADF content contains a TOC extension macro."""
+    for node in adf.get("content", []):
+        if node.get("type") == "extension" and node.get("attrs", {}).get("extensionKey") == "toc":
+            return True
+    return False
+
+
 def _prepend_toc_adf(adf: dict[str, Any]) -> dict[str, Any]:
     """Insert a TOC extension node at the start of ADF content."""
     adf["content"] = [_TOC_ADF_NODE, *adf["content"]]
@@ -446,11 +454,18 @@ def markdown_to_adf(markdown: str, *, include_toc: bool = False) -> dict[str, An
     return adf
 
 
-def adf_to_markdown(adf: dict[str, Any]) -> str:
+def adf_to_markdown(
+    adf: dict[str, Any],
+    *,
+    attachments: dict[str, dict[str, Any]] | None = None,
+    image_dir: Path | None = None,
+) -> str:
     """Convert ADF (Atlassian Document Format) to Markdown.
 
     Args:
         adf: ADF JSON structure.
+        attachments: Attachment ID → metadata mapping for resolving images.
+        image_dir: Local directory where images were downloaded (for relative paths).
 
     Returns:
         Markdown string.
@@ -465,13 +480,17 @@ def adf_to_markdown(adf: dict[str, Any]) -> str:
         node_type = node.get("type")
 
         if node_type == "paragraph":
-            para_text = _adf_content_to_text(node.get("content", []))
+            para_text = _adf_content_to_text(
+                node.get("content", []), attachments=attachments, image_dir=image_dir
+            )
             if para_text:
                 result.append(para_text)
 
         elif node_type == "heading":
             level = node.get("attrs", {}).get("level", 1)
-            heading_text = _adf_content_to_text(node.get("content", []))
+            heading_text = _adf_content_to_text(
+                node.get("content", []), attachments=attachments, image_dir=image_dir
+            )
             result.append(f"{'#' * level} {heading_text}")
 
         elif node_type == "codeBlock":
@@ -485,7 +504,11 @@ def adf_to_markdown(adf: dict[str, Any]) -> str:
                     item_text = ""
                     for item_content in item.get("content", []):
                         if item_content.get("type") == "paragraph":
-                            item_text = _adf_content_to_text(item_content.get("content", []))
+                            item_text = _adf_content_to_text(
+                                item_content.get("content", []),
+                                attachments=attachments,
+                                image_dir=image_dir,
+                            )
                     result.append(f"- {item_text}")
 
         elif node_type == "orderedList":
@@ -494,13 +517,65 @@ def adf_to_markdown(adf: dict[str, Any]) -> str:
                     item_text = ""
                     for item_content in item.get("content", []):
                         if item_content.get("type") == "paragraph":
-                            item_text = _adf_content_to_text(item_content.get("content", []))
+                            item_text = _adf_content_to_text(
+                                item_content.get("content", []),
+                                attachments=attachments,
+                                image_dir=image_dir,
+                            )
                     result.append(f"{idx}. {item_text}")
+
+        elif node_type in ("mediaSingle", "mediaGroup"):
+            for child in node.get("content", []):
+                img_md = _media_node_to_markdown(
+                    child, attachments=attachments, image_dir=image_dir
+                )
+                if img_md:
+                    result.append(img_md)
 
     return "\n\n".join(result)
 
 
-def _adf_content_to_text(content: list[dict[str, Any]]) -> str:
+def _media_node_to_markdown(
+    node: dict[str, Any],
+    *,
+    attachments: dict[str, dict[str, Any]] | None = None,
+    image_dir: Path | None = None,
+) -> str:
+    """Convert an ADF media node to markdown image syntax."""
+    if node.get("type") not in ("media", "mediaInline"):
+        return ""
+
+    attrs = node.get("attrs", {})
+    alt = attrs.get("alt", "")
+    media_type = attrs.get("type", "")
+
+    if media_type == "external":
+        url = attrs.get("url", "")
+        if image_dir and url:
+            filename = url.rsplit("/", 1)[-1] if "/" in url else ""
+            if filename:
+                return f"![{alt}]({image_dir / filename})"
+        return f"![{alt}]({url})" if url else ""
+
+    att_id = attrs.get("id", "")
+    att_meta = (attachments or {}).get(att_id, {})
+    filename = att_meta.get("title", "")
+
+    if image_dir and filename:
+        return f"![{alt}]({image_dir / filename})"
+    elif att_meta.get("download"):
+        return f"![{alt}]({att_meta['download']})"
+    elif filename:
+        return f"![{alt}]({filename})"
+    return f"![{alt}](attachment:{att_id})"
+
+
+def _adf_content_to_text(
+    content: list[dict[str, Any]],
+    *,
+    attachments: dict[str, dict[str, Any]] | None = None,
+    image_dir: Path | None = None,
+) -> str:
     """Convert ADF content nodes to text with Markdown formatting."""
     result = []
 
@@ -522,6 +597,11 @@ def _adf_content_to_text(content: list[dict[str, Any]]) -> str:
                     text = f"[{text}]({href})"
 
             result.append(text)
+
+        elif node.get("type") in ("media", "mediaInline"):
+            img_md = _media_node_to_markdown(node, attachments=attachments, image_dir=image_dir)
+            if img_md:
+                result.append(img_md)
 
     return "".join(result)
 
@@ -764,7 +844,12 @@ def _truncate(text: str, max_length: int) -> str:
 
 
 def format_page(
-    page: dict[str, Any], *, include_body: bool = False, as_markdown: bool = True
+    page: dict[str, Any],
+    *,
+    include_body: bool = False,
+    as_markdown: bool = True,
+    attachments: dict[str, dict[str, Any]] | None = None,
+    image_dir: Path | None = None,
 ) -> str:
     """Format a Confluence page for display.
 
@@ -772,6 +857,8 @@ def format_page(
         page: Confluence page dictionary.
         include_body: Whether to include page body.
         as_markdown: If True, convert body to Markdown.
+        attachments: Attachment ID → metadata mapping for resolving images.
+        image_dir: Local directory where images were downloaded.
 
     Returns:
         Formatted page string.
@@ -799,11 +886,13 @@ def format_page(
     if include_body:
         body = page.get("body", {})
         if as_markdown:
-            if "editor" in body:
-                editor_value = body["editor"].get("value", {})
+            if "atlas_doc_format" in body:
+                editor_value = body["atlas_doc_format"].get("value", {})
                 if isinstance(editor_value, str):
                     editor_value = json.loads(editor_value)
-                markdown_body = adf_to_markdown(editor_value)
+                markdown_body = adf_to_markdown(
+                    editor_value, attachments=attachments, image_dir=image_dir
+                )
             else:
                 markdown_body = "(No content available)"
 
@@ -815,7 +904,12 @@ def format_page(
     return result
 
 
-def format_page_with_frontmatter(page: dict[str, Any]) -> str:
+def format_page_with_frontmatter(
+    page: dict[str, Any],
+    *,
+    attachments: dict[str, dict[str, Any]] | None = None,
+    image_dir: Path | None = None,
+) -> str:
     """Format a page as markdown with YAML frontmatter for round-tripping."""
     page_id = page.get("id", "")
     title = page.get("title", "")
@@ -847,13 +941,15 @@ def format_page_with_frontmatter(page: dict[str, Any]) -> str:
         fm_lines.append(f"labels: {', '.join(labels_list)}")
     fm_lines.append("---")
 
-    # Extract body as markdown
+    # Extract body as markdown and detect TOC macro
     body = page.get("body", {})
-    if "editor" in body:
-        editor_value = body["editor"].get("value", {})
+    if "atlas_doc_format" in body:
+        editor_value = body["atlas_doc_format"].get("value", {})
         if isinstance(editor_value, str):
             editor_value = json.loads(editor_value)
-        md_body = adf_to_markdown(editor_value)
+        if _adf_has_toc(editor_value):
+            fm_lines.insert(-1, "toc: true")
+        md_body = adf_to_markdown(editor_value, attachments=attachments, image_dir=image_dir)
     else:
         md_body = ""
 
@@ -1108,6 +1204,107 @@ def _upload_images_and_build_urls(page_id: str, images: list[dict[str, Any]]) ->
             print(f"Warning: failed to upload {img['path'].name}: {e}", file=sys.stderr)
 
     return replacements
+
+
+_IMAGE_MIME_PREFIXES = ("image/",)
+
+
+def list_attachments(page_id: str) -> dict[str, dict[str, Any]]:
+    """Fetch attachments for a page, keyed by attachment ID.
+
+    Args:
+        page_id: Confluence page ID.
+
+    Returns:
+        Dict mapping attachment ID to metadata (title, download link, mediaType).
+    """
+    endpoint = api_path(f"content/{page_id}/child/attachment")
+    response = get("confluence", endpoint, params={"limit": 100})
+    results = response.get("results", []) if isinstance(response, dict) else response
+    attachments: dict[str, dict[str, Any]] = {}
+    for att in results:
+        att_id = att.get("extensions", {}).get("fileId", "") or att.get("id", "")
+        attachments[att_id] = {
+            "title": att.get("title", ""),
+            "download": att.get("_links", {}).get("download", ""),
+            "mediaType": att.get("extensions", {}).get("mediaType", ""),
+        }
+    return attachments
+
+
+def download_attachment(download_path: str, filename: str, output_dir: Path) -> Path:
+    """Download a page attachment to a local directory.
+
+    Args:
+        download_path: Relative download path from attachment metadata.
+        filename: Filename to save as.
+        output_dir: Directory to save the file.
+
+    Returns:
+        Path to the downloaded file.
+    """
+    creds = get_credentials("confluence")
+    base_url = creds.url.rstrip("/")
+    api_base = get_api_base()
+    prefix = api_base.rsplit("/rest/api", 1)[0]
+    download_url = f"{base_url}{prefix}{download_path}"
+
+    auth = None
+    if creds.email and creds.token:
+        auth = (creds.email, creds.token)
+    elif creds.username and creds.password:
+        auth = (creds.username, creds.password)
+
+    headers: dict[str, str] = {}
+    if creds.token and not (creds.email or creds.username):
+        headers["Authorization"] = f"Bearer {creds.token}"
+
+    response = requests.get(download_url, auth=auth, headers=headers, timeout=30)
+    response.raise_for_status()
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / filename
+    output_path.write_bytes(response.content)
+    return output_path
+
+
+def _download_external_images(
+    adf: dict[str, Any],
+    output_dir: Path,
+    att_map: dict[str, dict[str, Any]] | None = None,
+) -> None:
+    """Download external images referenced in ADF content.
+
+    Matches external URLs to attachments by filename and uses the
+    authenticated REST API download path.
+    """
+    att_by_name: dict[str, dict[str, Any]] = {}
+    for att in (att_map or {}).values():
+        att_by_name[att.get("title", "")] = att
+
+    for node in adf.get("content", []):
+        if node.get("type") not in ("mediaSingle", "mediaGroup"):
+            continue
+        for child in node.get("content", []):
+            attrs = child.get("attrs", {})
+            if attrs.get("type") != "external":
+                continue
+            url = attrs.get("url", "")
+            if not url:
+                continue
+            filename = url.rsplit("/", 1)[-1] if "/" in url else ""
+            if not filename:
+                continue
+            att = att_by_name.get(filename)
+            if att and att.get("download"):
+                try:
+                    download_attachment(att["download"], filename, output_dir)
+                except Exception as exc:
+                    print(f"Warning: failed to download {filename}: {exc}", file=sys.stderr)
+            else:
+                print(
+                    f"Warning: no attachment match for external image {filename}", file=sys.stderr
+                )
 
 
 def create_page(
@@ -1604,13 +1801,13 @@ def cmd_page(args: argparse.Namespace) -> int:
     try:
         if args.page_command == "get":
             # Determine what to expand
-            expand = ["body.editor", "version", "space"]
+            expand = ["body.atlas_doc_format", "version", "space"]
             if args.expand:
                 expand = args.expand.split(",")
 
             if args.frontmatter:
                 expand = [
-                    "body.editor",
+                    "body.atlas_doc_format",
                     "version",
                     "space",
                     "metadata.labels",
@@ -1618,16 +1815,68 @@ def cmd_page(args: argparse.Namespace) -> int:
                 ]
 
             page = get_page(args.page_identifier, expand=expand)
+            page_id = page.get("id", "")
+
+            att_map: dict[str, dict[str, Any]] | None = None
+            image_dir: Path | None = None
+            wants_markdown = not args.json and (args.frontmatter or args.markdown or not args.raw)
+
+            # Download images only when writing to a file
+            if page_id and wants_markdown and args.output:
+                output_path = Path(args.output)
+                image_dir = output_path.parent / output_path.stem
+                try:
+                    att_map = list_attachments(page_id)
+                    image_atts = {
+                        k: v
+                        for k, v in att_map.items()
+                        if v.get("mediaType", "").startswith("image/")
+                    }
+                    for att in image_atts.values():
+                        filename = att.get("title", "")
+                        dl_path = att.get("download", "")
+                        if filename and dl_path:
+                            try:
+                                download_attachment(dl_path, filename, image_dir)
+                            except Exception as exc:
+                                print(
+                                    f"Warning: failed to download {filename}: {exc}",
+                                    file=sys.stderr,
+                                )
+                except APIError as exc:
+                    print(f"Warning: failed to fetch attachments: {exc}", file=sys.stderr)
+
+                body = page.get("body", {})
+                adf_body = body.get("atlas_doc_format", {}).get("value", "")
+                if isinstance(adf_body, str) and adf_body:
+                    try:
+                        adf = json.loads(adf_body)
+                        _download_external_images(adf, image_dir, att_map=att_map)
+                    except (json.JSONDecodeError, Exception):
+                        pass
 
             if args.frontmatter:
-                print(format_page_with_frontmatter(page))
+                output = format_page_with_frontmatter(
+                    page, attachments=att_map, image_dir=image_dir
+                )
             elif args.json:
-                print(format_json(page))
+                output = format_json(page)
             else:
-                # Format with body as Markdown by default
                 include_body = not args.no_body
                 as_markdown = args.markdown or not args.raw
-                print(format_page(page, include_body=include_body, as_markdown=as_markdown))
+                output = format_page(
+                    page,
+                    include_body=include_body,
+                    as_markdown=as_markdown,
+                    attachments=att_map,
+                    image_dir=image_dir,
+                )
+
+            if args.output:
+                Path(args.output).write_text(output)
+                print(f"Saved to: {args.output}")
+            else:
+                print(output)
 
         elif args.page_command == "create":
             # Get body content
@@ -2019,6 +2268,9 @@ def main() -> int:
         help="Output as markdown with YAML frontmatter (for round-tripping)",
     )
     get_parser.add_argument("--expand", help="Fields to expand (comma-separated)")
+    get_parser.add_argument(
+        "--output", "-o", help="Write output to file (images downloaded to sibling directory)"
+    )
 
     # Create subcommand
     create_parser = page_subparsers.add_parser("create", help="Create new page")

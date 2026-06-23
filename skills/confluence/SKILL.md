@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "2.1.0"
+  version: "2.4.0"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -158,11 +158,14 @@ $SKILL_DIR/scripts/confluence.py page get "My Page" --no-body
 # Get in original format (not Markdown)
 $SKILL_DIR/scripts/confluence.py page get "My Page" --raw
 
+# Save to file with images downloaded to sibling directory
+$SKILL_DIR/scripts/confluence.py page get "My Page" -o my-page.md
+
 # Export with YAML frontmatter (for round-tripping)
-$SKILL_DIR/scripts/confluence.py page get 123456 --frontmatter > page.md
+$SKILL_DIR/scripts/confluence.py page get 123456 --frontmatter -o page.md
 ```
 
-**Output**: By default, displays page metadata and body content converted to Markdown for readability.
+**Output**: By default, displays page metadata and body content converted to Markdown for readability. When `--output`/`-o` is used, image attachments are automatically downloaded to a sibling directory named after the output file (e.g. `-o my-page.md` saves images to `my-page/`) and referenced as relative paths in the markdown output. Without `--output`, no images are downloaded.
 
 **Arguments:**
 - `page_identifier`: Page ID or title (required)
@@ -170,6 +173,7 @@ $SKILL_DIR/scripts/confluence.py page get 123456 --frontmatter > page.md
 - `--raw`: Output in original format
 - `--no-body`: Don't include body content
 - `--frontmatter`: Output as markdown with YAML frontmatter (title, space, labels, parent) for round-tripping with `page create`/`page update`
+- `--output`/`-o`: Write output to file; images are downloaded to a sibling directory named after the file stem
 
 #### Example Output
 
@@ -353,8 +357,8 @@ $SKILL_DIR/scripts/confluence.py page get "My Page Title"
 # View page metadata only
 $SKILL_DIR/scripts/confluence.py page get 123456 --no-body
 
-# Export to file
-$SKILL_DIR/scripts/confluence.py page get "My Page" > exported-page.md
+# Export to file with images
+$SKILL_DIR/scripts/confluence.py page get "My Page" -o exported-page.md
 ```
 
 ### List and Explore Spaces
