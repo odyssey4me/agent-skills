@@ -1871,6 +1871,22 @@ class TestCLICommands:
         captured = capsys.readouterr()
         assert '"presentationId"' in captured.out
 
+    @patch("google_slides.export_presentation_as_pptx")
+    @patch("google_slides.get_presentation")
+    @patch("google_slides.build_slides_service")
+    def test_cmd_get_pptx_download(self, mock_build, mock_get_pres, mock_export, tmp_path, capsys):
+        """Test get command with -o downloads .pptx."""
+        mock_build.return_value = Mock()
+        mock_get_pres.return_value = {"presentationId": "pres-123", "title": "Test"}
+
+        pptx_path = str(tmp_path / "deck.pptx")
+        args = Mock(presentation_id="pres-123", output=pptx_path, json=False)
+        result = cmd_get(args)
+        assert result == 0
+        mock_export.assert_called_once_with("pres-123", pptx_path)
+        captured = capsys.readouterr()
+        assert "PPTX" in captured.out
+
     def test_cmd_palettes(self, capsys):
         """Test palettes command lists all palettes."""
         args = Mock()
@@ -3242,40 +3258,6 @@ class TestCLICommandsExtended:
         captured = capsys.readouterr()
         assert "Upload failed" in captured.err
 
-    @patch("google_slides.presentation_to_markdown")
-    @patch("google_slides.extract_images_from_pptx")
-    @patch("google_slides.export_presentation_as_pptx")
-    @patch("google_slides.get_presentation")
-    @patch("google_slides.build_slides_service")
-    def test_cmd_get_with_output(
-        self,
-        mock_build,
-        mock_get_pres,
-        mock_export_pptx,
-        mock_extract_images,
-        mock_to_markdown,
-        tmp_path,
-        capsys,
-    ):
-        """Get command with --output downloads pptx and saves markdown."""
-        mock_build.return_value = Mock()
-        mock_get_pres.return_value = {
-            "presentationId": "pres-123",
-            "title": "Test",
-            "slides": [{"objectId": "s1"}],
-        }
-        mock_export_pptx.return_value = tmp_path / "out.pptx"
-        mock_extract_images.return_value = {1: [str(tmp_path / "img1.png")]}
-        mock_to_markdown.return_value = "---\ntitle: Test\n---\n# Slide 1\n"
-
-        output = tmp_path / "out.md"
-        args = Mock(presentation_id="pres-123", output=str(output), json=False)
-        result = cmd_get(args)
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "Saved PPTX" in captured.out
-        assert "Saved Markdown" in captured.out
-
     @patch("google_slides.read_presentation_content")
     @patch("google_slides.get_presentation")
     @patch("google_slides.build_slides_service")
@@ -3302,7 +3284,6 @@ class TestCLICommandsExtended:
         assert result == 0
         captured = capsys.readouterr()
         assert "My Pres" in captured.out
-        assert "Content:" in captured.out
         assert "Slide 1 content here" in captured.out
 
     def test_cmd_update_error_handling(self, capsys, tmp_path):

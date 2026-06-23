@@ -2687,36 +2687,16 @@ def cmd_create(args):
 
 
 def cmd_get(args):
-    """Handle 'get' command — get presentation content or download."""
+    """Handle 'get' command — get presentation content or download as .pptx."""
     service = build_slides_service(SLIDES_SCOPES_READONLY)
     presentation = get_presentation(service, args.presentation_id)
 
     if args.output:
-        output_path = Path(args.output)
-        md_path = output_path.with_suffix(".md") if output_path.suffix != ".md" else output_path
-
-        # Save .pptx first (needed for image extraction)
-        pptx_path = output_path.with_suffix(".pptx")
+        pptx_path = Path(args.output)
+        if pptx_path.suffix != ".pptx":
+            pptx_path = pptx_path.with_suffix(".pptx")
         export_presentation_as_pptx(args.presentation_id, str(pptx_path))
         print(f"✓ Saved PPTX: {pptx_path}")
-
-        # Extract images from .pptx into sibling directory
-        image_map: dict[int, list[str]] = {}
-        if PPTX_AVAILABLE:
-            img_dir = md_path.with_suffix("")  # e.g. deck/ alongside deck.md
-            image_map = extract_images_from_pptx(str(pptx_path), str(img_dir))
-            if image_map:
-                total = sum(len(v) for v in image_map.values())
-                print(f"✓ Extracted {total} image(s) to: {img_dir}/")
-
-        # Save Markdown with frontmatter and image references
-        md_content = presentation_to_markdown(service, args.presentation_id, image_map)
-        # Replace {img_dir} placeholder with relative path
-        img_dir_name = md_path.with_suffix("").name
-        md_content = md_content.replace("{img_dir}", img_dir_name)
-        md_path.write_text(md_content)
-        print(f"✓ Saved Markdown: {md_path}")
-
         return 0
 
     if args.json:
@@ -2724,15 +2704,8 @@ def cmd_get(args):
     else:
         print(format_presentation_summary(presentation))
         print()
-        slides = presentation.get("slides", [])
-        if slides:
-            print("Slides:")
-            for idx, slide in enumerate(slides):
-                print(format_slide_info(slide, idx))
-        print()
         content = read_presentation_content(service, args.presentation_id)
         if content:
-            print("Content:")
             print(content)
 
     return 0
@@ -3167,13 +3140,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     # get command
-    get_parser = subparsers.add_parser(
-        "get", help="Get presentation content or download as local files"
-    )
+    get_parser = subparsers.add_parser("get", help="Get presentation content or download as .pptx")
     get_parser.add_argument("presentation_id", help="Presentation ID")
-    get_parser.add_argument(
-        "--output", "-o", help="Download as Markdown + .pptx + images to this path"
-    )
+    get_parser.add_argument("--output", "-o", help="Download as .pptx to this path")
     get_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # update command
