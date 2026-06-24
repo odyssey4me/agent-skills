@@ -35,8 +35,11 @@ from skills.jira.scripts.jira import (
     cmd_check,
     cmd_collaboration,
     cmd_config,
+    cmd_dashboard,
     cmd_fields,
+    cmd_filter,
     cmd_issue,
+    cmd_richfilter,
     cmd_search,
     cmd_statuses,
     cmd_transitions,
@@ -55,6 +58,9 @@ from skills.jira.scripts.jira import (
     format_automation_summary,
     format_collaborative_epics,
     format_comments,
+    format_dashboard,
+    format_filter,
+    format_gadget,
     format_issue,
     format_issues_list,
     format_json,
@@ -66,15 +72,23 @@ from skills.jira.scripts.jira import (
     get_comments,
     get_credential,
     get_credentials,
+    get_dashboard,
+    get_dashboard_gadgets,
     get_epic_children,
+    get_filter,
     get_issue,
     get_jira_defaults,
     get_link_types,
     get_project_defaults,
+    get_richfilter,
     get_transitions,
     is_cloud,
     list_automation_rules,
+    list_dashboards,
     list_fields,
+    list_filters_favourite,
+    list_filters_my,
+    list_richfilters,
     list_status_categories,
     list_statuses,
     load_config,
@@ -5164,3 +5178,347 @@ class TestCmdAutomationsGet:
         assert result == 1
         captured = capsys.readouterr()
         assert "Not found" in captured.err
+
+
+# ============================================================================
+# DASHBOARD/FILTER API & FORMAT TESTS
+# ============================================================================
+
+
+class TestDashboardFilterApi:
+    """Tests for dashboard, filter, and richfilter API helpers."""
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/dashboard")
+    def test_list_dashboards(self, _mock_path, mock_get):
+        mock_get.return_value = {"dashboards": [{"id": "1"}]}
+        result = list_dashboards()
+        assert result == [{"id": "1"}]
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/dashboard/1")
+    def test_get_dashboard(self, _mock_path, mock_get):
+        mock_get.return_value = {"id": "1", "name": "Test"}
+        result = get_dashboard("1")
+        assert result["name"] == "Test"
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/dashboard/1/gadget")
+    def test_get_dashboard_gadgets_list(self, _mock_path, mock_get):
+        mock_get.return_value = [{"id": 1, "title": "G1"}]
+        result = get_dashboard_gadgets("1")
+        assert result == [{"id": 1, "title": "G1"}]
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/dashboard/1/gadget")
+    def test_get_dashboard_gadgets_dict(self, _mock_path, mock_get):
+        mock_get.return_value = {"gadgets": [{"id": 1}]}
+        result = get_dashboard_gadgets("1")
+        assert result == [{"id": 1}]
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/filter/100")
+    def test_get_filter(self, _mock_path, mock_get):
+        mock_get.return_value = {"id": "100", "jql": "project = X"}
+        result = get_filter("100")
+        assert result["jql"] == "project = X"
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/filter/favourite")
+    def test_list_filters_favourite(self, _mock_path, mock_get):
+        mock_get.return_value = [{"id": "1"}]
+        result = list_filters_favourite()
+        assert len(result) == 1
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/filter/my")
+    def test_list_filters_my(self, _mock_path, mock_get):
+        mock_get.return_value = [{"id": "1"}, {"id": "2"}]
+        result = list_filters_my()
+        assert len(result) == 2
+
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_richfilter(self, mock_get):
+        mock_get.return_value = {"id": "1", "name": "RF"}
+        result = get_richfilter("1")
+        assert result["name"] == "RF"
+
+    @patch("skills.jira.scripts.jira.get")
+    def test_list_richfilters(self, mock_get):
+        mock_get.return_value = [{"id": "1"}]
+        result = list_richfilters()
+        assert len(result) == 1
+
+
+class TestDashboardFilterFormatters:
+    """Tests for format_dashboard, format_filter, format_gadget."""
+
+    def test_format_dashboard(self):
+        d = {"id": "123", "name": "My Dash", "view": "/x", "owner": {"displayName": "A"}}
+        out = format_dashboard(d)
+        assert "My Dash" in out
+        assert "123" in out
+        assert "A" in out
+
+    def test_format_filter(self):
+        f = {"id": "100", "name": "F1", "jql": "status = Open", "owner": {"displayName": "B"}}
+        out = format_filter(f)
+        assert "F1" in out
+        assert "status = Open" in out
+
+    def test_format_filter_with_description_and_shares(self):
+        f = {
+            "id": "100",
+            "name": "F1",
+            "jql": "x",
+            "description": "desc",
+            "favourite": True,
+            "sharePermissions": [{"type": "project"}],
+        }
+        out = format_filter(f)
+        assert "desc" in out
+        assert "Favourite" in out
+        assert "project" in out
+
+    def test_format_gadget_simple(self):
+        g = {
+            "id": 1,
+            "title": "G1",
+            "moduleKey": "mod",
+            "color": "blue",
+            "position": {"row": 0, "column": 1},
+        }
+        out = format_gadget(g)
+        assert "G1" in out
+        assert "blue" in out
+        assert "row=0" in out
+
+    def test_format_gadget_with_uri(self):
+        g = {"id": 1, "title": "G1", "moduleKey": "mod", "uri": "http://x", "color": {"key": "red"}}
+        out = format_gadget(g)
+        assert "http://x" in out
+        assert "red" in out
+
+
+# ============================================================================
+# DASHBOARD COMMAND TESTS
+# ============================================================================
+
+
+class TestCmdDashboard:
+    """Tests for cmd_dashboard."""
+
+    @patch("skills.jira.scripts.jira.list_dashboards")
+    def test_list_dashboards(self, mock_list, capsys):
+        mock_list.return_value = [
+            {"id": "123", "name": "My Dashboard", "owner": {"displayName": "Alice"}},
+        ]
+        args = Mock(dashboard_command="list", max_results=50, json=False)
+        result = cmd_dashboard(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "My Dashboard" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_dashboards")
+    def test_list_dashboards_empty(self, mock_list, capsys):
+        mock_list.return_value = []
+        args = Mock(dashboard_command="list", max_results=50, json=False)
+        result = cmd_dashboard(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "No dashboards found" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_dashboard")
+    def test_get_dashboard(self, mock_get, capsys):
+        mock_get.return_value = {
+            "id": "123",
+            "name": "Test",
+            "view": "/jira/dashboards/123",
+            "owner": {"displayName": "Bob"},
+        }
+        args = Mock(dashboard_command="get", dashboard_id="123", json=False)
+        result = cmd_dashboard(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Test" in captured.out
+        assert "Bob" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_dashboard_gadgets")
+    def test_gadgets(self, mock_gadgets, capsys):
+        mock_gadgets.return_value = [
+            {
+                "id": 1,
+                "title": "Controller",
+                "moduleKey": "com.example.controller",
+                "color": "blue",
+                "position": {"row": 0, "column": 0},
+            },
+        ]
+        args = Mock(dashboard_command="gadgets", dashboard_id="123", json=False)
+        result = cmd_dashboard(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Controller" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_dashboard_gadgets")
+    def test_gadgets_json(self, mock_gadgets, capsys):
+        mock_gadgets.return_value = [{"id": 1, "title": "Test"}]
+        args = Mock(dashboard_command="gadgets", dashboard_id="123", json=True)
+        result = cmd_dashboard(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert '"title"' in captured.out
+
+    @patch("skills.jira.scripts.jira.list_dashboards")
+    def test_list_json(self, mock_list, capsys):
+        mock_list.return_value = [{"id": "1", "name": "D"}]
+        args = Mock(dashboard_command="list", max_results=50, json=True)
+        result = cmd_dashboard(args)
+        assert result == 0
+
+    @patch("skills.jira.scripts.jira.get_dashboard")
+    def test_get_json(self, mock_get, capsys):
+        mock_get.return_value = {"id": "1"}
+        args = Mock(dashboard_command="get", dashboard_id="1", json=True)
+        result = cmd_dashboard(args)
+        assert result == 0
+
+    @patch("skills.jira.scripts.jira.get_dashboard")
+    def test_get_error(self, mock_get, capsys):
+        mock_get.side_effect = APIError("Not found")
+        args = Mock(dashboard_command="get", dashboard_id="999", json=False)
+        result = cmd_dashboard(args)
+        assert result == 1
+
+
+# ============================================================================
+# FILTER COMMAND TESTS
+# ============================================================================
+
+
+class TestCmdFilter:
+    """Tests for cmd_filter."""
+
+    @patch("skills.jira.scripts.jira.get_filter")
+    def test_get_filter(self, mock_get, capsys):
+        mock_get.return_value = {
+            "id": "10000",
+            "name": "My Filter",
+            "jql": "project = DEMO",
+            "owner": {"displayName": "Alice"},
+        }
+        args = Mock(filter_command="get", filter_id="10000", json=False)
+        result = cmd_filter(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "My Filter" in captured.out
+        assert "project = DEMO" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_filters_favourite")
+    def test_list_filters(self, mock_list, capsys):
+        mock_list.return_value = [
+            {"id": "10000", "name": "Filter A", "jql": "status = Open"},
+        ]
+        args = Mock(filter_command="list", json=False)
+        result = cmd_filter(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Filter A" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_filters_favourite")
+    def test_list_filters_empty(self, mock_list, capsys):
+        mock_list.return_value = []
+        args = Mock(filter_command="list", json=False)
+        result = cmd_filter(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "No favourite filters" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_filter")
+    def test_get_filter_json(self, mock_get, capsys):
+        mock_get.return_value = {"id": "1", "jql": "x"}
+        args = Mock(filter_command="get", filter_id="1", json=True)
+        result = cmd_filter(args)
+        assert result == 0
+
+    @patch("skills.jira.scripts.jira.list_filters_favourite")
+    def test_list_filters_json(self, mock_list, capsys):
+        mock_list.return_value = [{"id": "1"}]
+        args = Mock(filter_command="list", json=True)
+        result = cmd_filter(args)
+        assert result == 0
+
+    @patch("skills.jira.scripts.jira.get_filter")
+    def test_get_filter_error(self, mock_get, capsys):
+        mock_get.side_effect = APIError("Not found")
+        args = Mock(filter_command="get", filter_id="999", json=False)
+        result = cmd_filter(args)
+        assert result == 1
+
+
+# ============================================================================
+# RICHFILTER COMMAND TESTS
+# ============================================================================
+
+
+class TestCmdRichFilter:
+    """Tests for cmd_richfilter."""
+
+    @patch("skills.jira.scripts.jira.get_richfilter")
+    def test_get_richfilter(self, mock_get, capsys):
+        mock_get.return_value = {"id": "1", "name": "My Rich Filter", "jql": "project = X"}
+        args = Mock(richfilter_command="get", filter_id="1", json=False)
+        result = cmd_richfilter(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "My Rich Filter" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_richfilter")
+    def test_get_richfilter_not_installed(self, mock_get, capsys):
+        mock_get.side_effect = APIError("404 Not Found")
+        args = Mock(richfilter_command="get", filter_id="1", json=False)
+        result = cmd_richfilter(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Rich Filters plugin not found" in captured.err
+
+    @patch("skills.jira.scripts.jira.list_richfilters")
+    def test_list_richfilters(self, mock_list, capsys):
+        mock_list.return_value = [{"id": "1", "name": "RF1"}, {"id": "2", "name": "RF2"}]
+        args = Mock(richfilter_command="list", json=False)
+        result = cmd_richfilter(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "RF1" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_richfilters")
+    def test_list_richfilters_empty(self, mock_list, capsys):
+        mock_list.return_value = []
+        args = Mock(richfilter_command="list", json=False)
+        result = cmd_richfilter(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "No rich filters" in captured.out
+
+    @patch("skills.jira.scripts.jira.list_richfilters")
+    def test_list_richfilters_json(self, mock_list, capsys):
+        mock_list.return_value = [{"id": "1"}]
+        args = Mock(richfilter_command="list", json=True)
+        result = cmd_richfilter(args)
+        assert result == 0
+
+    @patch("skills.jira.scripts.jira.get_richfilter")
+    def test_get_richfilter_json(self, mock_get, capsys):
+        mock_get.return_value = {"id": "1"}
+        args = Mock(richfilter_command="get", filter_id="1", json=True)
+        result = cmd_richfilter(args)
+        assert result == 0
+
+    @patch("skills.jira.scripts.jira.get_dashboard_gadgets")
+    def test_gadgets_empty(self, mock_gadgets, capsys):
+        mock_gadgets.return_value = []
+        args = Mock(dashboard_command="gadgets", dashboard_id="1", json=False)
+        result = cmd_dashboard(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "No gadgets" in captured.out

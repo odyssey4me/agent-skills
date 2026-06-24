@@ -3002,6 +3002,130 @@ def cmd_check() -> int:
 
 
 # ============================================================================
+# DASHBOARD, FILTER & RICH FILTER API
+# ============================================================================
+
+
+def list_dashboards(max_results: int = 50) -> list[dict[str, Any]]:
+    """List dashboards visible to the current user."""
+    service = "jira"
+    result = get(service, api_path(f"dashboard?maxResults={max_results}"))
+    return result.get("dashboards", []) if isinstance(result, dict) else []
+
+
+def get_dashboard(dashboard_id: str) -> dict[str, Any]:
+    """Get dashboard details."""
+    service = "jira"
+    result = get(service, api_path(f"dashboard/{dashboard_id}"))
+    return result if isinstance(result, dict) else {}
+
+
+def get_dashboard_gadgets(dashboard_id: str) -> list[dict[str, Any]]:
+    """Get gadgets on a dashboard."""
+    service = "jira"
+    result = get(service, api_path(f"dashboard/{dashboard_id}/gadget"))
+    if isinstance(result, list):
+        return result
+    if isinstance(result, dict):
+        return result.get("gadgets", [])
+    return []
+
+
+def get_filter(filter_id: str) -> dict[str, Any]:
+    """Get saved filter details including JQL."""
+    service = "jira"
+    result = get(service, api_path(f"filter/{filter_id}"))
+    return result if isinstance(result, dict) else {}
+
+
+def list_filters_favourite() -> list[dict[str, Any]]:
+    """List the current user's favourite filters."""
+    service = "jira"
+    result = get(service, api_path("filter/favourite"))
+    return result if isinstance(result, list) else []
+
+
+def list_filters_my() -> list[dict[str, Any]]:
+    """List filters owned by the current user."""
+    service = "jira"
+    result = get(service, api_path("filter/my"))
+    return result if isinstance(result, list) else []
+
+
+def get_richfilter(filter_id: str) -> dict[str, Any]:
+    """Get a Rich Filter configuration (Appfire plugin).
+
+    Returns the filter config or raises APIError if the plugin isn't installed.
+    """
+    service = "jira"
+    result = get(service, f"rest/richfilters/1.0/filter/{filter_id}")
+    return result if isinstance(result, dict) else {}
+
+
+def list_richfilters() -> list[dict[str, Any]]:
+    """List available Rich Filters (Appfire plugin)."""
+    service = "jira"
+    result = get(service, "rest/richfilters/1.0/filter")
+    return result if isinstance(result, list) else []
+
+
+def format_dashboard(dashboard: dict[str, Any]) -> str:
+    """Format a dashboard for display."""
+    lines = [
+        f"Dashboard: {dashboard.get('name', 'Unknown')}",
+        f"  ID: {dashboard.get('id', '?')}",
+        f"  View: {dashboard.get('view', 'N/A')}",
+    ]
+    owner = dashboard.get("owner", {})
+    if owner:
+        lines.append(f"  Owner: {owner.get('displayName', owner.get('name', '?'))}")
+    return "\n".join(lines)
+
+
+def format_gadget(gadget: dict[str, Any]) -> str:
+    """Format a dashboard gadget for display."""
+    lines = [
+        f"Gadget: {gadget.get('title', 'Untitled')}",
+        f"  ID: {gadget.get('id', '?')}",
+        f"  Module Key: {gadget.get('moduleKey', 'N/A')}",
+    ]
+    uri = gadget.get("uri")
+    if uri:
+        lines.append(f"  URI: {uri}")
+    color = gadget.get("color")
+    if color:
+        if isinstance(color, dict):
+            lines.append(f"  Color: {color.get('key', 'N/A')}")
+        else:
+            lines.append(f"  Color: {color}")
+    position = gadget.get("position", {})
+    if position:
+        lines.append(f"  Position: row={position.get('row')}, col={position.get('column')}")
+    return "\n".join(lines)
+
+
+def format_filter(filt: dict[str, Any]) -> str:
+    """Format a saved filter for display."""
+    lines = [
+        f"Filter: {filt.get('name', 'Unknown')}",
+        f"  ID: {filt.get('id', '?')}",
+        f"  JQL: {filt.get('jql', 'N/A')}",
+    ]
+    owner = filt.get("owner", {})
+    if owner:
+        lines.append(f"  Owner: {owner.get('displayName', owner.get('name', '?'))}")
+    if filt.get("description"):
+        lines.append(f"  Description: {filt['description']}")
+    if filt.get("favourite"):
+        lines.append("  Favourite: yes")
+    permissions = filt.get("sharePermissions", [])
+    if permissions:
+        shares = [p.get("type", "?") for p in permissions]
+        lines.append(f"  Shared with: {', '.join(shares)}")
+    return "\n".join(lines)
+
+
+# ============================================================================
 # COMMAND HANDLERS
 # ============================================================================
 
@@ -3691,6 +3815,125 @@ def cmd_automations(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    """Handle dashboard command."""
+    try:
+        if args.dashboard_command == "list":
+            dashboards = list_dashboards(max_results=getattr(args, "max_results", 50) or 50)
+            if not dashboards:
+                print("No dashboards found.")
+                return 0
+            if getattr(args, "json", False):
+                print(format_json(dashboards))
+            else:
+                print(f"Found {len(dashboards)} dashboard(s).\n")
+                for d in dashboards:
+                    print(format_dashboard(d))
+                    print()
+
+        elif args.dashboard_command == "get":
+            dashboard = get_dashboard(args.dashboard_id)
+            if getattr(args, "json", False):
+                print(format_json(dashboard))
+            else:
+                print(format_dashboard(dashboard))
+
+        elif args.dashboard_command == "gadgets":
+            gadgets = get_dashboard_gadgets(args.dashboard_id)
+            if not gadgets:
+                print("No gadgets found on this dashboard.")
+                return 0
+            if getattr(args, "json", False):
+                print(format_json(gadgets))
+            else:
+                print(f"Found {len(gadgets)} gadget(s).\n")
+                for g in gadgets:
+                    print(format_gadget(g))
+                    print()
+
+        return 0
+
+    except APIError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_filter(args: argparse.Namespace) -> int:
+    """Handle filter command."""
+    try:
+        if args.filter_command == "get":
+            filt = get_filter(args.filter_id)
+            if getattr(args, "json", False):
+                print(format_json(filt))
+            else:
+                print(format_filter(filt))
+
+        elif args.filter_command == "list":
+            filters = list_filters_favourite()
+            if not filters:
+                print("No favourite filters found.")
+                return 0
+            if getattr(args, "json", False):
+                print(format_json(filters))
+            else:
+                print(f"Found {len(filters)} favourite filter(s).\n")
+                for f in filters:
+                    print(format_filter(f))
+                    print()
+
+        return 0
+
+    except APIError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_richfilter(args: argparse.Namespace) -> int:
+    """Handle richfilter command (Appfire plugin)."""
+    try:
+        if args.richfilter_command == "get":
+            rf = get_richfilter(args.filter_id)
+            if getattr(args, "json", False):
+                print(format_json(rf))
+            else:
+                print(format_json(rf))
+
+        elif args.richfilter_command == "list":
+            filters = list_richfilters()
+            if not filters:
+                print("No rich filters found.")
+                return 0
+            if getattr(args, "json", False):
+                print(format_json(filters))
+            else:
+                for f in filters:
+                    name = f.get("name", f.get("title", "Unknown"))
+                    fid = f.get("id", "?")
+                    print(f"  [{fid}] {name}")
+
+        return 0
+
+    except APIError as e:
+        msg = str(e)
+        if "404" in msg or "not found" in msg.lower():
+            print(
+                "Error: Rich Filters plugin not found. Is the Appfire Rich Filters app installed?",
+                file=sys.stderr,
+            )
+        else:
+            print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
 # ============================================================================
 # MAIN CLI
 # ============================================================================
@@ -4019,6 +4262,41 @@ def main() -> int:
     auto_get_parser.add_argument("uuid", help="Automation rule UUID")
     auto_get_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    # dashboard commands
+    dashboard_parser = subparsers.add_parser("dashboard", help="Inspect dashboards and gadgets")
+    dashboard_subparsers = dashboard_parser.add_subparsers(dest="dashboard_command", required=True)
+    dash_list_parser = dashboard_subparsers.add_parser("list", help="List dashboards")
+    dash_list_parser.add_argument(
+        "--max-results", type=int, default=50, help="Max dashboards (default: 50)"
+    )
+    dash_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    dash_get_parser = dashboard_subparsers.add_parser("get", help="Get dashboard details")
+    dash_get_parser.add_argument("dashboard_id", help="Dashboard ID")
+    dash_get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    dash_gadgets_parser = dashboard_subparsers.add_parser(
+        "gadgets", help="List gadgets on a dashboard"
+    )
+    dash_gadgets_parser.add_argument("dashboard_id", help="Dashboard ID")
+    dash_gadgets_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # filter commands
+    filter_parser = subparsers.add_parser("filter", help="Inspect saved filters")
+    filter_subparsers = filter_parser.add_subparsers(dest="filter_command", required=True)
+    filter_get_parser = filter_subparsers.add_parser("get", help="Get filter details")
+    filter_get_parser.add_argument("filter_id", help="Filter ID")
+    filter_get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    filter_list_parser = filter_subparsers.add_parser("list", help="List favourite filters")
+    filter_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # richfilter commands (Appfire plugin)
+    rf_parser = subparsers.add_parser("richfilter", help="Inspect Rich Filters (Appfire plugin)")
+    rf_subparsers = rf_parser.add_subparsers(dest="richfilter_command", required=True)
+    rf_get_parser = rf_subparsers.add_parser("get", help="Get Rich Filter config")
+    rf_get_parser.add_argument("filter_id", help="Rich Filter ID")
+    rf_get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    rf_list_parser = rf_subparsers.add_parser("list", help="List Rich Filters")
+    rf_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # Parse and dispatch
     args = parser.parse_args()
 
@@ -4042,6 +4320,12 @@ def main() -> int:
         return cmd_collaboration(args)
     elif args.command == "automations":
         return cmd_automations(args)
+    elif args.command == "dashboard":
+        return cmd_dashboard(args)
+    elif args.command == "filter":
+        return cmd_filter(args)
+    elif args.command == "richfilter":
+        return cmd_richfilter(args)
 
     return 1
 
