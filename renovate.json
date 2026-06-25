@@ -9,7 +9,7 @@
     "before 5am every weekday"
   ],
   "enabledManagers": [
-    "uv",
+    "pep621",
     "github-actions",
     "pre-commit",
     "regex"
