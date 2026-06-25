@@ -84,7 +84,7 @@ defaults:
   jql_scope: "project = DEMO AND assignee = currentUser()"
   security_level: "Internal"
   max_results: 25
-  fields: ["summary", "status", "assignee", "priority", "created"]
+  fields: ["summary", "status", "resolution", "assignee", "priority", "created", "updated"]
   custom_fields:
     story_points: "customfield_10028"
     assigned_team: "customfield_12345"

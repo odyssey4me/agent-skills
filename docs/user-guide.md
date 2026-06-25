@@ -290,7 +290,7 @@ defaults:
   jql_scope: "project = DEMO AND assignee = currentUser()"
   security_level: "Red Hat Internal"
   max_results: 25
-  fields: ["summary", "status", "assignee", "priority", "created"]
+  fields: ["summary", "status", "resolution", "assignee", "priority", "created", "updated"]
 
 # Optional project-specific defaults
 projects:

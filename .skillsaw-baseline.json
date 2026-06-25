@@ -1,7 +1,7 @@
 {
   "version": "1",
   "generated_by": "skillsaw 0.14.0",
-  "generated_at": "2026-06-25T08:43:41.776660+00:00",
+  "generated_at": "2026-06-25T15:40:54.247326+00:00",
   "violations": [
     {
       "fingerprint": "ceafe9e6a62a3fbe",
@@ -16,40 +16,16 @@
       "fingerprint": "eb80cd8f76a31050",
       "rule_id": "context-budget",
       "file_path": "skills/jira/SKILL.md",
-      "message": "Estimated 4,278 tokens exceeds skill warn limit of 3,000",
+      "message": "Estimated 4,284 tokens exceeds skill warn limit of 3,000",
       "severity": "warning",
-      "value": 4278,
+      "value": 4284,
       "baseline_mode": "ceiling"
-    },
-    {
-      "fingerprint": "950fcafd3b364cf6",
-      "rule_id": "content-broken-internal-reference",
-      "file_path": "AGENTS.md",
-      "line": 59,
-      "message": "Broken internal link: [contributing.md](contributing.md) \u2014 target does not exist (did you mean 'skills/google/references/configuration.md'?)",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "55c7d72709ad95c6",
-      "rule_id": "content-placeholder-text",
-      "file_path": "AGENTS.md",
-      "line": 114,
-      "message": "Placeholder text (TODO marker): 'TODO'",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "44819a2becdaf1c0",
-      "rule_id": "content-placeholder-text",
-      "file_path": "AGENTS.md",
-      "line": 116,
-      "message": "Placeholder text (TODO marker): 'TODO'",
-      "severity": "warning"
     },
     {
       "fingerprint": "34f89167ca2aa6ce",
       "rule_id": "content-placeholder-text",
       "file_path": "CLAUDE.md",
-      "line": 49,
+      "line": 74,
       "message": "Placeholder text (TODO marker): 'TODO'",
       "severity": "warning"
     },
@@ -57,7 +33,7 @@
       "fingerprint": "1d359900e289dd3a",
       "rule_id": "content-placeholder-text",
       "file_path": "CLAUDE.md",
-      "line": 51,
+      "line": 76,
       "message": "Placeholder text (TODO marker): 'TODO'",
       "severity": "warning"
     },
@@ -65,7 +41,7 @@
       "fingerprint": "fa39b1eccd9943d2",
       "rule_id": "content-placeholder-text",
       "file_path": "CLAUDE.md",
-      "line": 53,
+      "line": 78,
       "message": "Placeholder text (TODO marker): 'TODO'",
       "severity": "warning"
     }
