@@ -11,10 +11,21 @@
   "enabledManagers": [
     "uv",
     "github-actions",
-    "pre-commit"
+    "pre-commit",
+    "regex"
   ],
   "minimumReleaseAge": "14 days",
   "osvVulnerabilityAlerts": true,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update gogcli version in dependencies.json",
+      "fileMatch": ["skills/google/dependencies\\.json$"],
+      "matchStrings": ["\"version\":\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\"repository\":\\s*\"(?<packageName>[^\"]+)\""],
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    }
+  ],
   "packageRules": [
     {
       "description": "Auto-merge patch and minor updates when CI passes",
@@ -34,15 +45,6 @@
       "groupName": "ruff"
     },
     {
-      "description": "Group Google packages",
-      "matchPackageNames": [
-        "google-auth",
-        "google-auth-oauthlib",
-        "google-api-python-client"
-      ],
-      "groupName": "google"
-    },
-    {
       "description": "Group pytest-related updates",
       "matchPackageNames": [
         "pytest",
@@ -56,6 +58,14 @@
         "github-actions"
       ],
       "groupName": "github-actions"
+    },
+    {
+      "description": "gogcli: require manual merge and security validation",
+      "matchPackageNames": [
+        "openclaw/gogcli"
+      ],
+      "automerge": false,
+      "minimumReleaseAge": "7 days"
     }
   ]
 }
