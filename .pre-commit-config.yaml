@@ -45,6 +45,14 @@ repos:
         args: [skills/*]
         stages: [pre-commit]
 
+      - id: uv-lock-check
+        name: uv lockfile current
+        entry: uv lock --check
+        language: system
+        files: ^pyproject\.toml$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: diff-cover
         name: coverage for changed lines
         entry: bash -c 'pytest tests/ -q --cov=skills --cov=scripts --cov-report=xml:coverage.xml && diff-cover coverage.xml --compare-branch=HEAD --fail-under=80'
