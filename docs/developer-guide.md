@@ -602,7 +602,7 @@ npx skills add odyssey4me/agent-skills --list
 # Install skill
 npx skills add odyssey4me/agent-skills --skill myskill
 
-# Verify installation
+# Verify installation (path varies by agent)
 ls ~/.claude/skills/myskill
 ```
 
@@ -652,8 +652,6 @@ pushed first, the workflow will fail with "release not found".
 ### Reference Implementations
 
 - **[Vercel agent-skills](https://github.com/vercel-labs/agent-skills)** - Reference implementation (Bash-based)
-  - See their AGENTS.md for implementation patterns
-  - Skills follow similar structure with Bash scripts
 
 - **[Anthropic skills](https://github.com/anthropics/skills)** - Claude-focused examples
   - [skill-creator](https://github.com/anthropics/skills/blob/main/skills/skill-creator/SKILL.md) - Python example

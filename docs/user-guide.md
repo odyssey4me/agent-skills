@@ -103,11 +103,9 @@ token: your-token
 ### Confluence Authentication
 
 Confluence requires:
-- **URL**: Your Confluence instance URL
-  - Cloud: `https://yourcompany.atlassian.net/wiki`
-  - Data Center/Server: `https://confluence.yourcompany.com`
-- **Email**: Your account email (Cloud) or username (DC/Server)
-- **API Token**: Same as Jira for Cloud; from Confluence profile for DC/Server
+- **URL**: Your Confluence Cloud URL (e.g., `https://yourcompany.atlassian.net`)
+- **Email**: Your Atlassian account email
+- **API Token**: Same as Jira — create at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 
 **Option 1: Environment Variables (Recommended)**
 
@@ -235,7 +233,7 @@ You can also invoke skills directly with specific commands. See individual skill
 1. Verify your API token is still valid
 2. For Jira Cloud: Check tokens at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 3. Ensure you're using your email (not username) for Cloud instances
-4. For Data Center/Server, verify your username and password/token
+4. Ensure you're using your email (not username) for Cloud instances
 
 ### Dependency Errors
 
