@@ -1,147 +1,32 @@
 {
   "version": "1",
   "generated_by": "skillsaw 0.14.0",
-  "generated_at": "2026-06-20T08:18:59.069476+00:00",
+  "generated_at": "2026-06-25T08:43:41.776660+00:00",
   "violations": [
     {
       "fingerprint": "ceafe9e6a62a3fbe",
       "rule_id": "context-budget",
       "file_path": "skills/confluence/SKILL.md",
-      "message": "Estimated 3,038 tokens exceeds skill warn limit of 3,000",
+      "message": "Estimated 3,171 tokens exceeds skill warn limit of 3,000",
       "severity": "warning",
-      "value": 3038,
-      "baseline_mode": "ceiling"
-    },
-    {
-      "fingerprint": "163fd77f1b89ac6a",
-      "rule_id": "context-budget",
-      "file_path": "skills/gmail/SKILL.md",
-      "message": "Estimated 3,025 tokens exceeds skill warn limit of 3,000",
-      "severity": "warning",
-      "value": 3025,
-      "baseline_mode": "ceiling"
-    },
-    {
-      "fingerprint": "f96751aa55ffbc8c",
-      "rule_id": "context-budget",
-      "file_path": "skills/google-docs/SKILL.md",
-      "message": "Estimated 3,841 tokens exceeds skill warn limit of 3,000",
-      "severity": "warning",
-      "value": 3841,
-      "baseline_mode": "ceiling"
-    },
-    {
-      "fingerprint": "ba623ff4685bbf5b",
-      "rule_id": "context-budget",
-      "file_path": "skills/google-sheets/SKILL.md",
-      "message": "Estimated 3,105 tokens exceeds skill warn limit of 3,000",
-      "severity": "warning",
-      "value": 3105,
+      "value": 3171,
       "baseline_mode": "ceiling"
     },
     {
       "fingerprint": "eb80cd8f76a31050",
       "rule_id": "context-budget",
       "file_path": "skills/jira/SKILL.md",
-      "message": "Estimated 4,271 tokens exceeds skill warn limit of 3,000",
+      "message": "Estimated 4,278 tokens exceeds skill warn limit of 3,000",
       "severity": "warning",
-      "value": 4271,
+      "value": 4278,
       "baseline_mode": "ceiling"
-    },
-    {
-      "fingerprint": "2a607156ec295942",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/confluence/SKILL.md",
-      "line": 26,
-      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "86721cfb99114a0d",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/gmail/SKILL.md",
-      "line": 24,
-      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "f568cc340a2012b4",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/google-calendar/SKILL.md",
-      "line": 24,
-      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "0be36a38ed974873",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/google-docs/SKILL.md",
-      "line": 24,
-      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "db0ac23a800bfb04",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/google-docs/SKILL.md",
-      "line": 326,
-      "message": "Weak language (vagueness): 'Be careful' \u2014 Replace 'be careful' with specific checks to perform",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "09208d8a60e530da",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/google-drive/SKILL.md",
-      "line": 24,
-      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "b97bc2629d0bcd55",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/google-sheets/SKILL.md",
-      "line": 24,
-      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "ba6f3cb97ec0c90d",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/google-slides/SKILL.md",
-      "line": 24,
-      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "5e2aa1e928a5dcab",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/jira/SKILL.md",
-      "line": 29,
-      "message": "Weak language (vagueness): 'properly' \u2014 Remove 'properly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "de385ecbb8958880",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/jira/SKILL.md",
-      "line": 119,
-      "message": "Weak language (vagueness): 'correctly' \u2014 Remove 'correctly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "79c4323995c22525",
-      "rule_id": "content-weak-language",
-      "file_path": "skills/jira/SKILL.md",
-      "line": 149,
-      "message": "Weak language (vagueness): 'correctly' \u2014 Remove 'correctly' \u2014 describe what correct behavior looks like",
-      "severity": "warning"
     },
     {
       "fingerprint": "950fcafd3b364cf6",
       "rule_id": "content-broken-internal-reference",
       "file_path": "AGENTS.md",
       "line": 59,
-      "message": "Broken internal link: [contributing.md](contributing.md) \u2014 target does not exist (did you mean 'skills/gerrit/references/troubleshooting.md'?)",
+      "message": "Broken internal link: [contributing.md](contributing.md) \u2014 target does not exist (did you mean 'skills/google/references/configuration.md'?)",
       "severity": "warning"
     },
     {
