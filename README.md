@@ -4,7 +4,7 @@ Portable skills for AI coding assistants providing integrations with Jira, Confl
 
 ## Features
 
-- **Self-Contained**: Each skill is a single Python script - no framework dependencies
+- **Self-Contained**: Each skill is independently installable with no framework dependencies
 - **Multi-Agent Compatible**: Works with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents) via the [Agent Skills specification](https://agentskills.io/specification)
 - **Simple Installation**: Just Python and a few pip packages
 - **Built-in Validation**: Each skill includes a `check` command for setup verification
