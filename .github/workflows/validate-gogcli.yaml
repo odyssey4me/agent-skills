@@ -76,7 +76,7 @@ jobs:
           fi
           echo "Checksum verified: ${actual}"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "stable"
 
