@@ -30,6 +30,7 @@ repos:
     rev: v0.14.0
     hooks:
       - id: skillsaw
+        args: [--strict]
         stages: [pre-commit]
 
   # Validate skill structure before commit
@@ -59,6 +60,7 @@ repos:
       - id: skillsaw
         alias: skillsaw-prepush
         name: skillsaw (pre-push)
+        args: [--strict]
         stages: [pre-push]
         always_run: true
 
