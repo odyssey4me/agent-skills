@@ -172,7 +172,7 @@ For complete setup instructions, see:
      client_id: your-client-id.apps.googleusercontent.com
      client_secret: your-client-secret
    ```
-3. Verify with `python ~/.claude/skills/gmail/scripts/gmail.py check`
+3. Verify with `python ~/.claude/skills/google/scripts/google.py check`
 
 On first run, your browser opens for OAuth authorization. After granting access, tokens are stored securely in your system keyring.
 
@@ -188,7 +188,7 @@ python ~/.claude/skills/jira/scripts/jira.py check
 python ~/.claude/skills/confluence/scripts/confluence.py check
 
 # Check Gmail configuration
-python ~/.claude/skills/gmail/scripts/gmail.py check
+python ~/.claude/skills/google/scripts/google.py check
 
 # Check Google Drive configuration
 python ~/.claude/skills/google-drive/scripts/google-drive.py check
@@ -226,13 +226,13 @@ Claude Code will automatically use the appropriate skill to fulfill your request
 
 ### Best Practices for Agent Behaviour
 
-Add these guidelines to your project's `AGENTS.md` (or equivalent agent instructions file) to ensure agents use skills correctly:
+Add these guidelines to your project's `CLAUDE.md` (or equivalent agent instructions file) to ensure agents use skills correctly:
 
 1. **Always invoke skills via the Skill tool** — don't bypass them with direct CLI calls to underlying scripts. The Skill tool loads the skill's SKILL.md which documents defaults, conventions, and correct usage.
 
 2. **Trust skill defaults** — don't add post-processing, format flags, or output transformations unless there's a specific reason. Skills default to markdown output; use it as-is.
 
-3. **Subagents follow the same rules** — when spawning agents via the Task tool, instruct them to use skills by name (e.g. "Use the gmail skill to search for..."). The agent will invoke the Skill tool, which loads the correct documentation and conventions. Agents should not construct raw API calls or CLI commands that replicate what a skill already provides.
+3. **Subagents follow the same rules** — when spawning agents via the Task tool, instruct them to use skills by name (e.g. "Use the google skill to search for..."). The agent will invoke the Skill tool, which loads the correct documentation and conventions. Agents should not construct raw API calls or CLI commands that replicate what a skill already provides.
 
 4. **Describe what, not how** — tell agents what information to gather, not which commands to run. The skills evolve independently; hardcoding their implementation details creates coupling that breaks when skills change.
 
@@ -257,7 +257,7 @@ You can also invoke skills directly with specific commands. See individual skill
 
 - [Jira Skill Documentation](../skills/jira/SKILL.md)
 - [Confluence Skill Documentation](../skills/confluence/SKILL.md)
-- [Gmail Skill Documentation](../skills/gmail/SKILL.md)
+- [Google Skill Documentation](../skills/google/SKILL.md)
 - [Google Drive Skill Documentation](../skills/google-drive/SKILL.md)
 
 ## Troubleshooting
@@ -388,7 +388,7 @@ python ~/.claude/skills/google-drive/scripts/google-drive.py files --help
 **Skill Documentation:**
 - **Jira**: See [skills/jira/SKILL.md](../skills/jira/SKILL.md)
 - **Confluence**: See [skills/confluence/SKILL.md](../skills/confluence/SKILL.md)
-- **Gmail**: See [skills/gmail/SKILL.md](../skills/gmail/SKILL.md)
+- **Google**: See [skills/google/SKILL.md](../skills/google/SKILL.md)
 - **Google Drive**: See [skills/google-drive/SKILL.md](../skills/google-drive/SKILL.md)
 - **Google Calendar**: See [skills/google-calendar/SKILL.md](../skills/google-calendar/SKILL.md)
 
@@ -399,7 +399,7 @@ python ~/.claude/skills/google-drive/scripts/google-drive.py files --help
 **Reference Guides:**
 - **ScriptRunner (Jira)**: See [skills/jira/references/scriptrunner.md](../skills/jira/references/scriptrunner.md)
 - **Content Creation (Confluence)**: See [skills/confluence/references/creating-content.md](../skills/confluence/references/creating-content.md)
-- **Gmail Search Queries**: See [skills/gmail/references/gmail-queries.md](../skills/gmail/references/gmail-queries.md)
+- **Gmail Search Queries**: See [skills/google/references/gmail.md](../skills/google/references/gmail.md)
 - **Google Drive Search Queries**: See [skills/google-drive/references/drive-queries.md](../skills/google-drive/references/drive-queries.md)
 
 ### Reporting Issues

@@ -109,7 +109,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this pr
 ### For Developers
 - **[Developer Guide](docs/developer-guide.md)** - Architecture, creating skills, testing, and contributing
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and code standards
-- [AGENTS.md](AGENTS.md) - Instructions for AI coding assistants working with this repo
+- [CLAUDE.md](CLAUDE.md) - Instructions for AI coding assistants working with this repo
 
 ## License
 

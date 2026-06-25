@@ -118,7 +118,7 @@ Start a new Claude Code conversation after linking to pick up local changes. Run
 
 ## Creating a New Skill
 
-**Important**: Before creating a new skill, check if an official CLI tool exists for the service. See [AGENTS.md - Development Principles](AGENTS.md#development-principles) for guidance on preferring official CLIs over custom scripts.
+**Important**: Before creating a new skill, check if an official CLI tool exists for the service. See [CLAUDE.md - Development Principles](CLAUDE.md#development-principles) for guidance on preferring official CLIs over custom scripts.
 
 See the [Developer Guide - Creating New Skills](docs/developer-guide.md#creating-new-skills) for complete instructions, structure requirements, and design guidelines.
 
@@ -154,4 +154,4 @@ By contributing, you agree that your contributions will be licensed under the Ap
 - **[Developer Guide](docs/developer-guide.md)** - Comprehensive development documentation
 - **[User Guide](docs/user-guide.md)** - Installation and usage
 - **[Agent Skills Specification](https://agentskills.io/specification)** - Standard we implement
-- **[AGENTS.md](AGENTS.md)** - Instructions for AI coding assistants
+- **[CLAUDE.md](CLAUDE.md)** - Instructions for AI coding assistants

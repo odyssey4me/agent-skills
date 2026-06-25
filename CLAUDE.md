@@ -1,17 +1,42 @@
 # Claude Code Instructions
 
-Refer to [AGENTS.md](./AGENTS.md) for skill usage instructions.
-
 Refer to [CONTRIBUTING.md](./CONTRIBUTING.md) for development guidelines.
 
 ## Repository Layout
 
-- `skills/` — Self-contained agent skills (jira, github, gmail, etc.)
+- `skills/` — Self-contained agent skills (jira, confluence, google, etc.)
 - `scripts/` — Development utilities (validation, versioning, pre-commit)
 - `templates/` — Starter templates for new skills (api, cli, workflow)
 - `tests/` — Pytest suite (one file per skill, 80% coverage required)
 - `docs/` — User guide, developer guide, OAuth setup
 - `.github/workflows/` — CI (lint/test/validate) and release pipelines
+
+## Standards Compliance
+
+This repository implements the [Agent Skills specification](https://agentskills.io/specification). All skills follow the standard structure with YAML frontmatter in SKILL.md, scripts in `scripts/`, and additional docs in `references/`.
+
+We use Python scripts because the specification supports multiple languages, and Python is better suited for complex API integrations. See [docs/developer-guide.md](docs/developer-guide.md#why-python) for rationale.
+
+## Development Principles
+
+1. **Keep documentation DRY** — reference comprehensive guides rather than duplicating content. Link to the specification rather than restating it.
+
+2. **Use lowercase for markdown files** unless they're a de facto standard (README.md, CONTRIBUTING.md) or required by the Agent Skills specification (SKILL.md).
+
+3. **Follow the Agent Skills specification** — all implementation decisions should reference the [specification](https://agentskills.io/specification).
+
+4. **Prefer official CLIs over custom scripts** — when an official CLI exists, use it instead of a custom API wrapper. Skills can be documentation-only when the CLI covers all use cases (e.g. `gh` for GitHub, `glab` for GitLab, `gog` for Google).
+
+5. **Default to markdown output format** — all skill scripts must output markdown by default. Use `### {title}` for item headings, `- **Label:** value` for metadata, `## {Section}` for top-level grouping. Preserve `--json` as an alternative. Reference `skills/jira/scripts/jira.py` as the canonical example.
+
+## Error Handling in Skills
+
+Skills should include an **Error Handling** section in their SKILL.md that tells agents which errors are retryable and which require user intervention:
+
+- **Authentication/permission errors are never retryable** — they require user action.
+- **Rate limiting (429) and server errors (5xx) are retryable** after a brief wait.
+- **All other errors should be reported to the user** rather than retried.
+- Skills that use OAuth should document the `auth reset` → `check` workflow for recovering from scope/token errors.
 
 ## Before Committing
 

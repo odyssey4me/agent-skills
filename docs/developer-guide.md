@@ -103,7 +103,7 @@ While many examples use Bash (see [Vercel's agent-skills](https://github.com/ver
 - OAuth/authentication flows
 - Multi-step workflows
 
-Our skills (Jira, Confluence, Gmail) are API-heavy, making Python the right choice.
+Our API-based skills (Jira, Confluence) are complex enough to justify Python over Bash.
 
 ## Repository Structure
 
@@ -122,13 +122,12 @@ agent-skills/
 │   │   │   └── confluence.py
 │   │   └── references/
 │   │       └── creating-content.md
-│   └── gmail/
+│   └── google/
 │       ├── SKILL.md
 │       ├── scripts/
-│       │   └── gmail.py
+│       │   └── google.py
 │       └── references/
-│           ├── oauth-setup.md
-│           └── gmail-queries.md
+│           └── gmail.md
 ├── templates/                 # Templates for new skills
 │   └── api-skill/
 │       ├── SKILL.md.template
@@ -141,11 +140,11 @@ agent-skills/
 ├── tests/                     # Test suite
 │   ├── test_jira.py
 │   ├── test_confluence.py
-│   └── test_gmail.py
+│   └── test_google.py
 ├── docs/                      # Documentation
 │   ├── user-guide.md          # User installation and setup guide
 │   └── developer-guide.md (this file)
-├── AGENTS.md                  # Instructions for AI coding assistants
+├── CLAUDE.md                  # Instructions for AI coding assistants
 ├── CONTRIBUTING.md            # Contribution guidelines
 └── README.md                  # Project overview
 ```
@@ -481,7 +480,7 @@ def format_document_summary(doc: dict[str, Any]) -> str:
     return f"### {title}\n- **Document ID:** {doc_id}\n- **Characters:** {char_count}"
 ```
 
-**Canonical reference**: `skills/gmail/scripts/gmail.py` — see `format_message_summary()` and `format_label()`.
+**Canonical reference**: `skills/jira/scripts/jira.py` — see `format_issue_summary()` and `format_issue_detail()`.
 
 ### Error Handling
 
@@ -684,7 +683,7 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for:
 ## Next Steps
 
 - Read the [Agent Skills specification](https://agentskills.io/specification)
-- Review existing skills ([Jira](../skills/jira/SKILL.md), [Confluence](../skills/confluence/SKILL.md), [Gmail](../skills/gmail/SKILL.md))
+- Review existing skills ([Jira](../skills/jira/SKILL.md), [Confluence](../skills/confluence/SKILL.md), [Google](../skills/google/SKILL.md))
 - Copy the template and start building
 - Test with `npx skills add` for compatibility
 - Submit a pull request
