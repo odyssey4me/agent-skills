@@ -4,15 +4,42 @@
 
 To report a security vulnerability, please open a [GitHub issue](https://github.com/odyssey4me/agent-skills/issues) with the label `security`. For sensitive disclosures, contact the maintainer directly.
 
+## Security principles
+
+### Supply chain hardening
+
+- **SHA-pinned GitHub Actions** — all actions are pinned to commit digests, not mutable version tags. [Renovate](https://docs.renovatebot.com/) maintains the pins via the `helpers:pinGitHubActionDigests` preset.
+- **Minimum release age** — dependency updates are held for 14 days (`minimumReleaseAge`) before Renovate proposes them, reducing exposure to compromised releases.
+- **Automated updates with gated merge** — patch and minor updates auto-merge when CI passes. Major updates and security-sensitive dependencies (e.g. gogcli) require manual review.
+- **External binary verification** — the gogcli dependency is pinned by version with SHA-256 checksums in `skills/google/dependencies.json`. See [External CLI tools](#external-cli-tools) below for the full validation process.
+
+### Least-privilege CI
+
+- Each workflow declares explicit `permissions`, defaulting to `contents: read`. Only workflows that need write access (release, gogcli validation) request it.
+- See `.github/workflows/` for the specific permissions granted to each workflow.
+
+### Branch protection
+
+- The `main` branch requires all CI status checks to pass before merge.
+- Force pushes to `main` are blocked.
+
+### Secret scanning
+
+- **Push protection** — prevents accidental credential commits.
+
+### Vulnerability scanning
+
+- **[CodeQL](https://codeql.github.com/)** — scans Python code for security vulnerabilities on push to `main`.
+- **[Dependabot security alerts](https://docs.github.com/en/code-security/dependabot)** — monitors dependencies for known CVEs.
+- **[Renovate OSV vulnerability alerts](https://docs.renovatebot.com/configuration-options/#osvvulnerabilityalerts)** — additional scanning via the [OSV database](https://osv.dev/).
+
 ## Dependency management
 
-### Python dependencies
-
-Python dependencies are managed by [uv](https://docs.astral.sh/uv/) with a lockfile (`uv.lock`). [Renovate](https://docs.renovatebot.com/) monitors for updates and opens PRs automatically. Patch and minor updates auto-merge when CI passes. [Dependabot security alerts](https://docs.github.com/en/code-security/dependabot/dependabot-alerts) are enabled for CVE notifications.
+Python dependencies are managed by [uv](https://docs.astral.sh/uv/) with a lockfile (`uv.lock`). See the [supply chain hardening](#supply-chain-hardening) section for how updates are gated.
 
 ### External CLI tools
 
-Some skills depend on external CLI tools (e.g., `gog` for Google Workspace, `gh` for GitHub). These are not installed by the skill — users install them separately.
+Some skills depend on external CLI tools (e.g. `gog` for Google Workspace, `gh` for GitHub). These are not installed by the skill — users install them separately.
 
 #### gogcli (gog)
 
@@ -33,13 +60,5 @@ The `check` command (`skills/google/scripts/google.py check`) reports whether th
 
 #### Limitations
 
-- **No SLSA provenance** — gogcli does not publish signed build provenance attestations, so we cannot cryptographically verify that release binaries were built from the claimed source
-- **No code audit** — govulncheck covers known CVEs in dependencies but does not audit gogcli's own application code; gosec and go vet are covered by [gogcli's own CI](https://github.com/openclaw/gogcli/blob/main/.github/workflows/ci.yml)
-
-## CI security checks
-
-- **[CodeQL](https://codeql.github.com/)** — enabled on push to `main`, scans Python code for security vulnerabilities
-- **[Dependabot security alerts](https://docs.github.com/en/code-security/dependabot)** — monitors Python dependencies for known CVEs
-- **[Renovate OSV vulnerability alerts](https://docs.renovatebot.com/configuration-options/#osvvulnerabilityalerts)** — additional vulnerability scanning via the OSV database
-- **[skillsaw](https://github.com/stbenjam/skillsaw)** — lints agent skill structure and content (run in strict mode locally and in CI)
-- **Secret scanning** — enabled with push protection to prevent accidental credential commits
+- **No SLSA provenance** — gogcli does not publish signed build provenance attestations, so we cannot cryptographically verify that release binaries were built from the claimed source.
+- **No code audit** — govulncheck covers known CVEs in dependencies but does not audit gogcli's own application code; gosec and go vet are covered by [gogcli's own CI](https://github.com/openclaw/gogcli/blob/main/.github/workflows/ci.yml).
