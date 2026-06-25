@@ -14,7 +14,7 @@ npx skills add odyssey4me/agent-skills
 npx skills add odyssey4me/agent-skills --skill google --skill jira
 ```
 
-After installation, configure authentication and verify setup — see the [User Guide](docs/user-guide.md) for details.
+For manual installation or other AI agents (Cursor, OpenCode, etc.), see the [User Guide](docs/user-guide.md#installation).
 
 ## Available Skills
 

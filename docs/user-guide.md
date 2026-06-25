@@ -18,80 +18,52 @@ Learn more: [Progressive Disclosure in the Agent Skills Spec](https://agentskill
 
 ### Multi-Agent Compatibility
 
-Agent skills work with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents) through the [Agent Skills specification](https://agentskills.io/specification). When you install skills using `npx skills add`, they're automatically configured for your AI agent:
-
-**Supported AI Agents:**
-- Claude Code, Cursor, Continue.dev, GitHub Copilot, OpenCode, Gemini CLI, Command Code, and [more](https://github.com/vercel-labs/skills#supported-agents)
-
-**Agent-Specific Installation:**
-```bash
-# Install for specific agent (optional, auto-detects by default)
-npx skills add odyssey4me/agent-skills --skill gitlab -a cursor
-
-# Install for multiple agents
-npx skills add odyssey4me/agent-skills --skill gitlab -a claude-code -a cursor
-```
-
-The examples in this guide use Claude Code, but the same natural language patterns and commands work across all supported AI agents.
+Skills work with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents) through the [Agent Skills specification](https://agentskills.io/specification). The `npx skills add` command auto-detects your installed agents, or you can target specific ones with the `-a` flag.
 
 ## Installation
 
-### Option 1: Using npx skills (Recommended)
+### Option 1: Using the skills CLI (Recommended)
 
-The fastest way to install skills is using the official `skills` CLI tool:
+The [`skills` CLI](https://github.com/vercel-labs/skills) handles installation for all supported agents:
 
 ```bash
-# Install a specific skill
+# Install a specific skill (auto-detects your agent)
 npx skills add odyssey4me/agent-skills --skill jira
 
 # Install multiple skills
-npx skills add odyssey4me/agent-skills --skill google-docs --skill google-sheets
+npx skills add odyssey4me/agent-skills --skill google --skill confluence
+
+# Target a specific agent
+npx skills add odyssey4me/agent-skills --skill jira -a cursor
+
+# Install globally (available across all projects)
+npx skills add odyssey4me/agent-skills --skill jira -g
 ```
 
-This will:
-- Download the skills from GitHub
-- Install them to `~/.claude/skills/`
-- Make them available to your AI coding assistant automatically
-
-#### Updating Skills
-
-To update previously installed skills to the latest versions:
+To update previously installed skills:
 
 ```bash
-# Update all installed skills
 npx skills update
-
-# Update specific skills
-npx skills update jira confluence
-
-# Update only global or project-scoped skills
-npx skills update --global
-npx skills update --project
 ```
-
-Learn more: [skills CLI documentation](https://github.com/vercel-labs/skills)
 
 ### Option 2: Manual Installation
 
-If you prefer manual installation or need to customize the setup:
+Download a skill from [Releases](https://github.com/odyssey4me/agent-skills/releases) and extract it to your agent's skills directory:
 
-1. **Install Python dependencies**:
-   ```bash
-   pip install --user requests keyring pyyaml
-   ```
+| Agent | Global path |
+|-------|------------|
+| Claude Code | `~/.claude/skills/` |
+| Cursor | `~/.cursor/skills/` |
+| OpenCode | `~/.config/opencode/skills/` |
+| Continue.dev | `~/.continue/skills/` |
 
-2. **Download a skill** from [Releases](https://github.com/odyssey4me/agent-skills/releases):
-   ```bash
-   mkdir -p ~/.claude/skills
-   cd ~/.claude/skills
-   curl -L https://github.com/odyssey4me/agent-skills/releases/latest/download/jira.tar.gz | tar xz
-   ```
+```bash
+mkdir -p ~/.claude/skills  # or your agent's path
+cd ~/.claude/skills
+curl -L https://github.com/odyssey4me/agent-skills/releases/latest/download/jira.tar.gz | tar xz
+```
 
-3. **Verify the installation**:
-   ```bash
-   ls ~/.claude/skills/jira
-   # Should show: SKILL.md  scripts/  references/
-   ```
+Python-based skills (jira, confluence) also need: `pip install --user requests keyring pyyaml`
 
 ### Option 3: Development Installation
 
@@ -178,27 +150,15 @@ On first run, your browser opens for OAuth authorization. After granting access,
 
 ### Verify Authentication
 
-Each skill includes a `check` command to verify setup:
+Each skill includes a `check` command to verify setup. Run it from your agent's skills directory:
 
 ```bash
-# Check Jira configuration
 python ~/.claude/skills/jira/scripts/jira.py check
-
-# Check Confluence configuration
 python ~/.claude/skills/confluence/scripts/confluence.py check
-
-# Check Gmail configuration
 python ~/.claude/skills/google/scripts/google.py check
-
-# Check Google Drive configuration
-python ~/.claude/skills/google-drive/scripts/google-drive.py check
 ```
 
-The check command will:
-- Verify Python dependencies are installed
-- Check authentication is configured
-- Test connectivity to the service
-- Provide specific instructions if anything is missing
+The check command verifies dependencies, authentication, and service connectivity.
 
 ## Using Skills
 
@@ -253,12 +213,7 @@ behind user confirmation.
 
 ### Skill-Specific Commands
 
-You can also invoke skills directly with specific commands. See individual skill documentation:
-
-- [Jira Skill Documentation](../skills/jira/SKILL.md)
-- [Confluence Skill Documentation](../skills/confluence/SKILL.md)
-- [Google Skill Documentation](../skills/google/SKILL.md)
-- [Google Drive Skill Documentation](../skills/google-drive/SKILL.md)
+You can also invoke skills directly with specific commands. See individual skill documentation in the [Available Skills](../README.md#available-skills) table.
 
 ## Troubleshooting
 
@@ -313,18 +268,15 @@ pip install --user requests keyring pyyaml
 
 ### Skills Not Appearing
 
-1. Verify skills are in the correct location (or your agent's skill directory if using a different AI assistant):
+1. Verify skills are in the correct location for your agent (see [Installation](#installation) for paths):
    ```bash
-   ls ~/.claude/skills/
+   ls ~/.claude/skills/  # Claude Code
+   ls ~/.cursor/skills/  # Cursor
    ```
 
-2. Check that SKILL.md has YAML frontmatter:
-   ```bash
-   head ~/.claude/skills/jira/SKILL.md
-   ```
-   Should start with `---` and include `name` and `description` fields
+2. Check that SKILL.md has YAML frontmatter (starts with `---` and includes `name` and `description`)
 
-3. Restart Claude Code after installing new skills
+3. Restart your AI agent after installing new skills
 
 ## Configuration Defaults
 
@@ -367,40 +319,18 @@ CLI arguments always override config defaults.
 
 ### Skill-Specific Help
 
-Each skill provides comprehensive help:
+Python-based skills provide built-in help:
 
 ```bash
-# Jira help
 python ~/.claude/skills/jira/scripts/jira.py --help
 python ~/.claude/skills/jira/scripts/jira.py search --help
-
-# Confluence help
-python ~/.claude/skills/confluence/scripts/confluence.py --help
-python ~/.claude/skills/confluence/scripts/confluence.py search --help
-
-# Google Drive help
-python ~/.claude/skills/google-drive/scripts/google-drive.py --help
-python ~/.claude/skills/google-drive/scripts/google-drive.py files --help
 ```
 
 ### Documentation
 
-**Skill Documentation:**
-- **Jira**: See [skills/jira/SKILL.md](../skills/jira/SKILL.md)
-- **Confluence**: See [skills/confluence/SKILL.md](../skills/confluence/SKILL.md)
-- **Google**: See [skills/google/SKILL.md](../skills/google/SKILL.md)
-- **Google Drive**: See [skills/google-drive/SKILL.md](../skills/google-drive/SKILL.md)
-- **Google Calendar**: See [skills/google-calendar/SKILL.md](../skills/google-calendar/SKILL.md)
-
-**Setup Guides:**
-- **GCP Project Setup**: See [gcp-project-setup.md](gcp-project-setup.md) - Create GCP project for Google skills
-- **Google OAuth Setup**: See [google-oauth-setup.md](google-oauth-setup.md) - Configure OAuth for all Google skills
-
-**Reference Guides:**
-- **ScriptRunner (Jira)**: See [skills/jira/references/scriptrunner.md](../skills/jira/references/scriptrunner.md)
-- **Content Creation (Confluence)**: See [skills/confluence/references/creating-content.md](../skills/confluence/references/creating-content.md)
-- **Gmail Search Queries**: See [skills/google/references/gmail.md](../skills/google/references/gmail.md)
-- **Google Drive Search Queries**: See [skills/google-drive/references/drive-queries.md](../skills/google-drive/references/drive-queries.md)
+- **Skill documentation**: See [Available Skills](../README.md#available-skills) for links to each skill's SKILL.md
+- **GCP Project Setup**: See [gcp-project-setup.md](gcp-project-setup.md)
+- **Google OAuth Setup**: See [google-oauth-setup.md](google-oauth-setup.md)
 
 ### Reporting Issues
 
