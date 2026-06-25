@@ -2,21 +2,6 @@
 
 This document tracks planned features for the agent-skills repository. Only pending work belongs here — remove items as they are delivered.
 
-## Google Drive Enhancements
-
-- [ ] **google-drive** - Add missing Drive API operations
-  - [ ] Rename files (`files.update` with name)
-  - [ ] Delete files permanently (`files.delete`)
-  - [ ] Trash / untrash files (`files.update` with trashed)
-  - [ ] Copy files (`files.copy`)
-  - [ ] Export Google Docs/Sheets/Slides (`files.export`)
-  - [ ] Update existing permissions / change role (`permissions.update`)
-  - [ ] Empty trash (`files.emptyTrash`)
-  - [ ] File version history (`revisions.*`)
-  - [ ] Comments and replies (`comments.*`, `replies.*`)
-  - [ ] Watch for file changes (`files.watch`, `changes.*`)
-  - [ ] Shared drive management (`drives.*`)
-
 ## Infrastructure Improvements
 
 - [ ] Add a debug mode (`--debug` flag or `DEBUG` env var) to Python-based skills
@@ -42,7 +27,7 @@ contributor search, collaborative discovery).
 ### GitHub Skill
 
 **Files:** `skills/github/scripts/github.py`, `skills/github/SKILL.md`, `tests/test_github.py`
-**Version bump:** 0.2.0 → 0.3.0
+**Version bump:** 0.2.1 → 0.3.0
 
 - [ ] **Comments retrieval** — Add `issues comments` and `prs comments`
   subcommands to fetch and format comments on issues and pull requests.
@@ -94,7 +79,7 @@ contributor search, collaborative discovery).
 ### GitLab Skill
 
 **Files:** `skills/gitlab/scripts/gitlab.py`, `skills/gitlab/SKILL.md`, `tests/test_gitlab.py`
-**Version bump:** 0.2.0 → 0.3.0
+**Version bump:** 0.2.1 → 0.3.0
 
 - [ ] **Notes retrieval** — Add `issues notes` and `mrs notes` subcommands
   to fetch and format notes (GitLab's term for comments).
@@ -145,7 +130,7 @@ contributor search, collaborative discovery).
 ### Gerrit Skill
 
 **Files:** `skills/gerrit/scripts/gerrit.py`, `skills/gerrit/SKILL.md`, `tests/test_gerrit.py`
-**Version bump:** 0.2.0 → 0.3.0
+**Version bump:** 0.2.3 → 0.3.0
 
 - [ ] **Full comments retrieval** — Add `changes comments` subcommand.
   Expand existing comment display (currently limited to last 5 in
