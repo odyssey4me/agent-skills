@@ -12,7 +12,7 @@
     "pep621",
     "github-actions",
     "pre-commit",
-    "regex"
+    "custom.regex"
   ],
   "minimumReleaseAge": "14 days",
   "osvVulnerabilityAlerts": true,
@@ -20,7 +20,9 @@
     {
       "customType": "regex",
       "description": "Update gogcli version in dependencies.json",
-      "fileMatch": ["skills/google/dependencies\\.json$"],
+      "managerFilePatterns": [
+        "/skills/google/dependencies\\.json$/"
+      ],
       "matchStrings": ["\"version\":\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\"repository\":\\s*\"(?<packageName>[^\"]+)\""],
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.*)$"
