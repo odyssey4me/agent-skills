@@ -2,17 +2,9 @@
 
 Portable skills for AI coding assistants providing integrations with Jira, Confluence, Google Workspace, GitHub, GitLab, Gerrit, and other development tools.
 
-## Features
-
-- **Self-Contained**: Each skill is independently installable with no framework dependencies
-- **Multi-Agent Compatible**: Works with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents) via the [Agent Skills specification](https://agentskills.io/specification)
-- **Simple Installation**: Just Python and a few pip packages
-- **Built-in Validation**: Each skill includes a `check` command for setup verification
-- **Secure Authentication**: Supports system keyring, environment variables, and config files
-
 ## Quick Start
 
-Install skills using the official [`skills` CLI](https://github.com/vercel-labs/skills):
+Install using the [`skills` CLI](https://github.com/vercel-labs/skills):
 
 ```bash
 # Install all skills
