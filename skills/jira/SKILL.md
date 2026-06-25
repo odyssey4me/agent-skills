@@ -26,7 +26,7 @@ Interact with Jira for issue tracking, search, and workflow management.
 
 ## Setup Verification
 
-After installation, verify the skill is properly configured:
+After installation, verify the skill configuration by running:
 
 ```bash
 $SKILL_DIR/scripts/jira.py check
@@ -115,8 +115,8 @@ projects:
   Use `--set-field NAME=VALUE` on `issue create` and `issue update` to set
   custom field values using the friendly name.
 - **Custom field schemas** store the Jira schema type for each custom field
-  (e.g. `number`, `option`, `securitylevel`). This lets `--set-field` wrap
-  values correctly (e.g. `{"value": "..."}` for options) without extra API
+  (e.g. `number`, `option`, `securitylevel`). This lets `--set-field` format
+  values with the appropriate structure (e.g. `{"value": "..."}` for options) without extra API
   calls. Schemas are saved automatically during discovery. If missing, run
   `config discover <field_name>` to populate them.
 
@@ -146,7 +146,7 @@ This validates:
 - Python dependencies are installed
 - Authentication is configured
 - Can connect to Jira
-- API version is detected correctly
+- API version is detected and compatible
 
 ### search
 

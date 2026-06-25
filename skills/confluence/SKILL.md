@@ -23,7 +23,7 @@ Interact with Confluence for content search, viewing pages, and space management
 
 ## Setup Verification
 
-After installation, verify the skill is properly configured:
+After installation, verify the skill configuration by running:
 
 ```bash
 $SKILL_DIR/scripts/confluence.py check

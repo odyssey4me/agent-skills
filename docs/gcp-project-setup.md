@@ -213,55 +213,42 @@ gcloud alpha iap oauth-clients create \
 5. Click **Create**
 6. **Copy the Client ID and Client Secret** - you'll need these
 
-## Step 6: Configure Skills with Credentials
+## Step 6: Configure gog with Credentials
 
-Store your OAuth credentials for use with all Google skills:
+Import your OAuth credentials into `gog` ([gogcli](https://github.com/openclaw/gogcli)):
 
-### Option A: Shared Config File (Recommended)
+### Option A: Import credentials.json (Recommended)
 
-Create `~/.config/agent-skills/google.yaml`:
-
-```yaml
-oauth_client:
-  client_id: YOUR_CLIENT_ID.apps.googleusercontent.com
-  client_secret: YOUR_CLIENT_SECRET
-```
-
-Set secure permissions:
-```bash
-chmod 600 ~/.config/agent-skills/google.yaml
-```
-
-### Option B: Environment Variables
-
-Add to your `~/.bashrc` or `~/.zshrc`:
+Download the `credentials.json` from the Google Cloud Console credentials page, then:
 
 ```bash
-export GOOGLE_CLIENT_ID="YOUR_CLIENT_ID.apps.googleusercontent.com"
-export GOOGLE_CLIENT_SECRET="YOUR_CLIENT_SECRET"
+gog auth credentials set credentials.json
+gog auth add your@email.com
 ```
 
-Then reload:
+### Option B: Interactive Setup
+
 ```bash
-source ~/.bashrc  # or source ~/.zshrc
+gog auth setup
 ```
+
+This walks you through credential configuration interactively.
 
 ## Step 7: Verify Setup
 
-Test authentication with each skill:
+Test authentication:
 
 ```bash
-# Verify Gmail
-python ~/.claude/skills/gmail/scripts/gmail.py check
+# Run diagnostics
+gog auth doctor
 
-# Verify Google Drive
-python ~/.claude/skills/google-drive/scripts/google-drive.py check
-
-# Verify Google Calendar
-python ~/.claude/skills/google-calendar/scripts/google-calendar.py check
+# Test API connectivity
+gog gmail labels list
+gog calendar calendars
+gog drive ls
 ```
 
-On first run, your browser will open for OAuth authorization. After granting access, tokens are stored securely in your system keyring.
+On first run with `gog auth add`, your browser will open for OAuth authorization. After granting access, tokens are stored securely in gog's keyring.
 
 ## Billing Options
 

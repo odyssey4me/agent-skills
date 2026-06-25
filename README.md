@@ -24,7 +24,7 @@ npx skills add odyssey4me/agent-skills
 npx skills add odyssey4me/agent-skills --skill confluence
 
 # Or install multiple specific skills
-npx skills add odyssey4me/agent-skills --skill gmail --skill google-calendar
+npx skills add odyssey4me/agent-skills --skill google --skill jira
 ```
 
 This automatically:
@@ -66,12 +66,7 @@ Want to contribute or modify skills? See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 | [Gerrit](skills/gerrit/SKILL.md) | Code review, submit changes, download patches via `git-review` CLI |
 | [GitHub](skills/github/SKILL.md) | Issues, pull requests, workflows, and repositories via `gh` CLI |
 | [GitLab](skills/gitlab/SKILL.md) | Issues, merge requests, pipelines, and repositories via `glab` CLI |
-| [Gmail](skills/gmail/SKILL.md) | Email management, send/receive messages, drafts, labels |
-| [Google Calendar](skills/google-calendar/SKILL.md) | Calendar management, event CRUD, availability checking, scheduling |
-| [Google Docs](skills/google-docs/SKILL.md) | Document creation and editing, content management, formatting |
-| [Google Drive](skills/google-drive/SKILL.md) | File management, list/search/upload/download files, folder management, sharing |
-| [Google Sheets](skills/google-sheets/SKILL.md) | Spreadsheet management, cell values, formulas, sheets |
-| [Google Slides](skills/google-slides/SKILL.md) | Presentation creation, slides, shapes, images, layouts |
+| [Google](skills/google/SKILL.md) | Google Workspace — Gmail, Calendar, Drive, Docs, Sheets, Slides via `gog` CLI |
 | [Jira](skills/jira/SKILL.md) | Issue tracking, search, create/update, transitions |
 
 Browse install counts and popularity on [skills.sh](https://skills.sh/odyssey4me/agent-skills). See [TODO.md](TODO.md) for planned skills.

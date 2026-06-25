@@ -1,0 +1,86 @@
+name: Validate gogcli
+
+on:
+  pull_request:
+    paths:
+      - skills/google/dependencies.json
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read pinned version
+        id: deps
+        run: |
+          version=$(jq -r '.gogcli.version' skills/google/dependencies.json)
+          repo=$(jq -r '.gogcli.repository' skills/google/dependencies.json)
+          expected_checksum=$(jq -r '.gogcli.checksums["gogcli_'"${version}"'_linux_amd64.tar.gz"]' skills/google/dependencies.json)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "repo=${repo}" >> "$GITHUB_OUTPUT"
+          echo "expected_checksum=${expected_checksum}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release tarball
+        run: |
+          curl -fsSL \
+            "https://github.com/${{ steps.deps.outputs.repo }}/releases/download/v${{ steps.deps.outputs.version }}/gogcli_${{ steps.deps.outputs.version }}_linux_amd64.tar.gz" \
+            -o /tmp/gogcli.tar.gz
+
+      - name: Verify checksum
+        run: |
+          actual=$(sha256sum /tmp/gogcli.tar.gz | awk '{print $1}')
+          expected="${{ steps.deps.outputs.expected_checksum }}"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Checksum mismatch! Expected: ${expected}, Got: ${actual}"
+            exit 1
+          fi
+          echo "Checksum verified: ${actual}"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: Clone gogcli source
+        run: |
+          git clone --depth=1 --branch "v${{ steps.deps.outputs.version }}" \
+            "https://github.com/${{ steps.deps.outputs.repo }}.git" /tmp/gogcli-src
+
+      - name: Run govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          cd /tmp/gogcli-src
+          govulncheck ./...
+
+      - name: Run gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          cd /tmp/gogcli-src
+          gosec -severity medium -confidence medium -exclude-generated ./... || true
+
+      - name: Run go vet
+        run: |
+          cd /tmp/gogcli-src
+          go vet ./...
+
+      - name: Update validation timestamp
+        if: success()
+        run: |
+          timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          jq --arg ts "$timestamp" '.gogcli.validated = $ts' \
+            skills/google/dependencies.json > /tmp/deps.json
+          mv /tmp/deps.json skills/google/dependencies.json
+          echo "Validated gogcli v${{ steps.deps.outputs.version }} at ${timestamp}"
+
+      - name: Commit validation timestamp
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add skills/google/dependencies.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore(google): validate gogcli v${{ steps.deps.outputs.version }}"
+            git push
+          fi

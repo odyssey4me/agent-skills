@@ -42,7 +42,7 @@ When working on this repository:
      - ✅ GitHub skill uses `gh` CLI with documentation
      - ❌ Don't create custom GitHub API wrapper when `gh` exists
      - ✅ Jira skill uses custom script (no official CLI with full API coverage)
-     - ✅ Google skills use custom scripts (gcloud is infrastructure-focused, not API-focused)
+     - ✅ Google skill uses `gog` CLI (gogcli) — documentation-only, agent calls gog directly
 
 5. **Default to markdown output format**:
    - All skill scripts must output markdown by default for immediate agent consumability

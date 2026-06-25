@@ -7,8 +7,9 @@ set -euo pipefail
 
 cd "${CLAUDE_PROJECT_DIR:-.}"
 
-# Check if any skills have staged changes
-staged_skills=$(git diff --cached --name-only -- 'skills/' 2>/dev/null | grep -v 'tile\.json' || true)
+# Check if any skills have staged changes (exclude deletions — deleted skills
+# don't need a version bump)
+staged_skills=$(git diff --cached --diff-filter=d --name-only -- 'skills/' 2>/dev/null | grep -v 'tile\.json' || true)
 if [ -z "$staged_skills" ]; then
   exit 0
 fi
