@@ -1,7 +1,7 @@
 {
   "version": "1",
   "generated_by": "skillsaw 0.14.0",
-  "generated_at": "2026-06-25T15:40:54.247326+00:00",
+  "generated_at": "2026-06-29T10:47:12.065897+00:00",
   "violations": [
     {
       "fingerprint": "ceafe9e6a62a3fbe",
@@ -16,9 +16,9 @@
       "fingerprint": "eb80cd8f76a31050",
       "rule_id": "context-budget",
       "file_path": "skills/jira/SKILL.md",
-      "message": "Estimated 4,284 tokens exceeds skill warn limit of 3,000",
+      "message": "Estimated 4,285 tokens exceeds skill warn limit of 3,000",
       "severity": "warning",
-      "value": 4284,
+      "value": 4285,
       "baseline_mode": "ceiling"
     },
     {
