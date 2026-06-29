@@ -6,7 +6,7 @@ description: >-
   files, edit documents, update spreadsheets, or create presentations.
 metadata:
   author: odyssey4me
-  version: "1.0.0"
+  version: "1.1.0"
   category: productivity
   tags: "gmail, calendar, drive, docs, sheets, slides"
   complexity: lightweight
@@ -178,6 +178,19 @@ gog docs cell-update <docId> --row 1 --col 1 --body "Header"
 ```
 
 See [docs.md](references/docs.md) for the full command reference.
+
+#### Docs Workflows
+
+For importing markdown with formatting, table styling, and round-trip editing, see [docs-workflows.md](references/docs-workflows.md).
+
+```bash
+# Import markdown as a new document with standard formatting
+gog docs create "Document Title" --file document.md --pageless
+
+# Update an existing document from markdown with formatting
+gog docs write <docId> --file document.md --markdown --replace \
+  --pageless --line-spacing 115 --space-below 8pt
+```
 
 ### Google Sheets
 

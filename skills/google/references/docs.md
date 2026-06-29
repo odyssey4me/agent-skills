@@ -12,7 +12,7 @@ Full command reference for `gog docs`. All commands support `--json` and `--plai
 | `structure <docId>` | Show document structure with numbered paragraphs |
 | `headings list <docId>` | List document headings |
 | `paragraphs list <docId>` | List document paragraphs |
-| `tables list <docId>` | List native tables |
+| `tables list <docId>` | List native tables (use `--json` to get row/column counts) |
 | `images list <docId>` | List document images |
 | `raw <docId>` | Dump raw API response as JSON |
 
@@ -32,6 +32,9 @@ Full command reference for `gog docs`. All commands support `--json` and `--plai
 
 - `--folder <folderId>` — create in specific folder
 - `--body "Initial content"` — set initial content
+- `--file <path.md>` — import from markdown file (supports inline HTTPS images)
+- `--pageless` — set document to pageless mode
+- `--parent <folderId>` — destination folder ID
 
 ## Write Content
 
@@ -50,8 +53,17 @@ Full command reference for `gog docs`. All commands support `--json` and `--plai
 
 - `--body "Content"` — text to write
 - `--body-file path.md` — read content from file
+- `--file <path.md>` — text file path (`-` for stdin)
+- `--markdown` — convert markdown to Google Docs formatting (requires `--replace` or `--append`)
+- `--replace` — replace all content
+- `--append` — append instead of replacing
 - `--at <index>` — insertion index
 - `--at-end` — append at end
+- `--pageless` — set document to pageless mode
+- `--line-spacing <N>` — paragraph line spacing percentage (e.g. 115)
+- `--space-above <Npt>` — space above paragraphs in points
+- `--space-below <Npt>` — space below paragraphs in points
+- `--check-orphans` — block markdown replacement when open comment quotes would disappear
 
 ## Formatting
 
@@ -105,6 +117,10 @@ Full command reference for `gog docs`. All commands support `--json` and `--plai
 | `add-tab <docId>` | Add a tab |
 | `rename-tab <docId>` | Rename a tab |
 | `delete-tab <docId>` | Delete a tab |
+
+## Workflows
+
+See [docs-workflows.md](docs-workflows.md) for round-trip import/export recipes, frontmatter handling, and table formatting.
 
 ## Other
 
