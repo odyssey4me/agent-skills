@@ -119,6 +119,26 @@ gog docs table-row style <docId> --table 1 --min-height 0
 
 Use `--table "*"` to apply to all tables at once if supported by the installed version.
 
+### Step 5: Add space after tables
+
+The first paragraph after each table needs extra space above for readability. Use `gog docs structure <docId> --json` to identify the text of the paragraph immediately following each table, then apply spacing using `--match`:
+
+```bash
+gog docs format <docId> --match "Text of paragraph after table" --space-above 16
+```
+
+Repeat for the paragraph after each table.
+
+## Bullet List Spacing
+
+After markdown import, bullet list items default to `spacingMode: COLLAPSE_LISTS`, which causes Google Docs to collapse spacing between consecutive list items regardless of `spaceBelow` settings. The fix is to set `spacingMode: NEVER_COLLAPSE` on bullet paragraphs, but `gog docs format` does not yet support a `--spacing-mode` flag.
+
+Tracked in [openclaw/gogcli#885](https://github.com/openclaw/gogcli/issues/885). Once resolved:
+
+```bash
+gog docs format <docId> --spacing-mode NEVER_COLLAPSE
+```
+
 ## Local Image Handling
 
 `gog docs create --file` supports images via HTTPS URLs in `![alt](url)` syntax but not local file paths. For local images:
