@@ -2427,16 +2427,21 @@ class TestUploadAttachment:
 class TestUploadImagesAndBuildUrls:
     """Tests for _upload_images_and_build_urls function."""
 
+    @patch("skills.confluence.scripts.confluence.get_api_base", return_value="/wiki/rest/api")
+    @patch("skills.confluence.scripts.confluence.list_attachments")
     @patch("skills.confluence.scripts.confluence.get_credentials")
     @patch("skills.confluence.scripts.confluence.upload_attachment")
-    def test_uploads_images_and_builds_urls(self, mock_upload, mock_creds):
-        """Verify function uploads images and builds replacement URLs."""
+    def test_uploads_images_and_builds_urls(
+        self, mock_upload, mock_creds, mock_list_att, mock_api_base
+    ):
+        """Verify function uploads new images and builds replacement URLs."""
         mock_creds.return_value = Credentials(
             url="https://confluence.example.com",
             token="test123",
             email="test@example.com",
         )
         mock_upload.return_value = None
+        mock_list_att.return_value = {}
 
         images = [
             {
@@ -2457,16 +2462,56 @@ class TestUploadImagesAndBuildUrls:
         }
         assert mock_upload.call_count == 2
 
+    @patch("skills.confluence.scripts.confluence.get_api_base", return_value="/wiki/rest/api")
+    @patch("skills.confluence.scripts.confluence.list_attachments")
     @patch("skills.confluence.scripts.confluence.get_credentials")
     @patch("skills.confluence.scripts.confluence.upload_attachment")
-    def test_handles_upload_failures(self, mock_upload, mock_creds):
-        """Verify function handles upload failures gracefully."""
+    def test_reuses_existing_attachments(
+        self, mock_upload, mock_creds, mock_list_att, mock_api_base
+    ):
+        """Verify function reuses existing attachments without re-uploading."""
         mock_creds.return_value = Credentials(
             url="https://confluence.example.com",
             token="test123",
             email="test@example.com",
         )
-        mock_upload.side_effect = [None, APIError("Upload failed")]
+        mock_list_att.return_value = {
+            "att1": {
+                "title": "image1.png",
+                "download": "/download/attachments/12345/image1.png",
+                "mediaType": "image/png",
+            },
+        }
+
+        images = [
+            {"path": Path("image1.png"), "original_ref": "imgs/image1.png"},
+            {"path": Path("image2.jpg"), "original_ref": "imgs/image2.jpg"},
+        ]
+
+        result = _upload_images_and_build_urls("12345", images)
+
+        assert result == {
+            "imgs/image1.png": "https://confluence.example.com/wiki/download/attachments/12345/image1.png",
+            "imgs/image2.jpg": "https://confluence.example.com/wiki/download/attachments/12345/image2.jpg",
+        }
+        mock_upload.assert_called_once()
+
+    @patch("skills.confluence.scripts.confluence.get_api_base", return_value="/wiki/rest/api")
+    @patch("skills.confluence.scripts.confluence.list_attachments")
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    @patch("skills.confluence.scripts.confluence.upload_attachment")
+    def test_handles_upload_failures(self, mock_upload, mock_creds, mock_list_att, mock_api_base):
+        """Verify function handles upload failures gracefully with detail."""
+        mock_creds.return_value = Credentials(
+            url="https://confluence.example.com",
+            token="test123",
+            email="test@example.com",
+        )
+        mock_list_att.return_value = {}
+        mock_upload.side_effect = [
+            None,
+            APIError("Upload failed", response='{"message": "Quota exceeded"}'),
+        ]
 
         images = [
             {"path": Path("image1.png"), "original_ref": "image1.png"},
@@ -2475,7 +2520,6 @@ class TestUploadImagesAndBuildUrls:
 
         result = _upload_images_and_build_urls("12345", images)
 
-        # First image should be in result, second should not be
         assert "image1.png" in result
         assert "image2.jpg" not in result
         assert len(result) == 1

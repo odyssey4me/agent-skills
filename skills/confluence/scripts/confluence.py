@@ -1184,6 +1184,9 @@ def replace_image_paths(body: str, replacements: dict[str, str]) -> str:
 def _upload_images_and_build_urls(page_id: str, images: list[dict[str, Any]]) -> dict[str, str]:
     """Upload images as attachments and return path-to-URL mapping.
 
+    Checks for existing attachments first to avoid duplicate upload errors.
+    Existing attachments are reused without re-uploading.
+
     Args:
         page_id: Confluence page ID.
         images: Image dicts from extract_local_images.
@@ -1193,15 +1196,38 @@ def _upload_images_and_build_urls(page_id: str, images: list[dict[str, Any]]) ->
     """
     creds = get_credentials("confluence")
     base_url = creds.url.rstrip("/")
+    api_base = get_api_base()
+    prefix = api_base.rsplit("/rest/api", 1)[0]
     replacements: dict[str, str] = {}
 
+    existing: dict[str, dict[str, Any]] = {}
+    try:
+        for _att_id, att in list_attachments(page_id).items():
+            existing[att["title"]] = att
+    except APIError:
+        pass
+
     for img in images:
-        try:
-            upload_attachment(page_id, img["path"])
-            download_url = f"{base_url}/wiki/download/attachments/{page_id}/{img['path'].name}"
-            replacements[img["original_ref"]] = download_url
-        except APIError as e:
-            print(f"Warning: failed to upload {img['path'].name}: {e}", file=sys.stderr)
+        filename = img["path"].name
+        if filename in existing:
+            download_path = existing[filename]["download"]
+            replacements[img["original_ref"]] = f"{base_url}{prefix}{download_path}"
+        else:
+            try:
+                upload_attachment(page_id, img["path"])
+                download_url = f"{base_url}{prefix}/download/attachments/{page_id}/{filename}"
+                replacements[img["original_ref"]] = download_url
+            except APIError as e:
+                detail = ""
+                if e.response:
+                    try:
+                        detail = json.loads(e.response).get("message", "")
+                    except (json.JSONDecodeError, TypeError, AttributeError):
+                        detail = str(e.response)[:200]
+                msg = f"Warning: failed to upload {filename}: {e}"
+                if detail:
+                    msg += f" — {detail}"
+                print(msg, file=sys.stderr)
 
     return replacements
 
