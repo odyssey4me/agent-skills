@@ -1953,6 +1953,7 @@ def _summarise_value(value_obj: dict[str, Any] | list | str) -> str:
 DEFAULT_FIELDS = [
     "summary",
     "status",
+    "resolution",
     "assignee",
     "priority",
     "created",
