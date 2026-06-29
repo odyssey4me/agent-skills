@@ -46,9 +46,22 @@ The `gog` CLI does not strip YAML frontmatter. Before importing, read the markdo
 | `space_below` | 8 | `gog docs format --space-below N` |
 | `pageless` | true | `--pageless` flag |
 
-### Stripping frontmatter
+### Removing frontmatter after import
 
-Read the file, remove the YAML block between `---` delimiters at the start, write the body to a temporary file, and pass that to `gog docs write --file`.
+During markdown import, YAML frontmatter (`---` delimited) converts to a horizontal rule, followed by plain text `key: value` lines. The closing `---` may convert to a second horizontal rule or may be absent — check `gog docs structure` to confirm. After importing, remove these converted elements:
+
+```bash
+# Import the full file (frontmatter included)
+gog docs write <docId> --file document.md --markdown --replace --pageless
+
+# Use the document structure to find the end of the converted frontmatter
+gog docs structure <docId> --json
+
+# Delete from the start of the document to the end of the converted frontmatter
+gog docs delete <docId> --start 1 --end <index_after_frontmatter>
+```
+
+The agent should read the frontmatter before import to extract metadata (title, folder_id, formatting preferences), then use those values for the create/format commands. The agent knows the frontmatter field count from reading the file, so it can identify the converted content in the structure output and determine the correct end index.
 
 ## Import Pre-flight Checks
 
