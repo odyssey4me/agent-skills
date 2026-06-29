@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.10.0"
+  version: "0.10.1"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -71,56 +71,7 @@ token: your-token
 
 ## Configuration Defaults
 
-Optionally configure defaults in `~/.config/agent-skills/jira.yaml` to reduce repetitive typing:
-
-```yaml
-# Authentication (optional if using environment variables)
-url: https://yourcompany.atlassian.net
-email: you@example.com
-token: your-token
-
-# Optional defaults
-defaults:
-  jql_scope: "project = DEMO AND assignee = currentUser()"
-  security_level: "Internal"
-  max_results: 25
-  fields: ["summary", "status", "resolution", "assignee", "priority", "created", "updated"]
-  custom_fields:
-    story_points: "customfield_10028"
-    assigned_team: "customfield_12345"
-  custom_field_schemas:
-    story_points: "number"
-    assigned_team: "option"
-
-# Optional project-specific defaults
-projects:
-  DEMO:
-    issue_type: "Task"
-    priority: "Medium"
-  PROD:
-    issue_type: "Bug"
-    priority: "High"
-```
-
-### How Defaults Work
-
-- **CLI arguments always override** config defaults
-- **JQL scope** is prepended to all searches: `(scope) AND (your_query)`
-- **Security level** applies to comments and transitions with comments
-- **Project defaults** apply when creating issues in that project
-- **Custom fields** map friendly names to instance-specific custom field IDs.
-  These fields are automatically included in API requests and displayed in
-  formatted output. If a mapping is not configured, the skill auto-discovers
-  the field ID and schema type from the Jira API and saves both to the config.
-  Use `--set-field NAME=VALUE` on `issue create` and `issue update` to set
-  custom field values using the friendly name.
-- **Custom field schemas** store the Jira schema type for each custom field
-  (e.g. `number`, `option`, `securitylevel`). This lets `--set-field` format
-  values with the appropriate structure (e.g. `{"value": "..."}` for options) without extra API
-  calls. Schemas are saved automatically during discovery. If missing, run
-  `config discover <field_name>` to populate them.
-
-### View Configuration
+Optionally configure defaults (JQL scope, fields, custom fields, project defaults) in `~/.config/agent-skills/jira.yaml`. CLI arguments always override config defaults. See [configuration.md](references/configuration.md) for the full config format and defaults behavior.
 
 ```bash
 # Show all configuration
@@ -183,117 +134,26 @@ The available JQL functions depend on your Jira deployment type. Run
 Get, create, update, or comment on issues.
 
 ```bash
-# Get issue details
+# Get issue details (--fields, --contributors)
 $SKILL_DIR/scripts/jira.py issue get DEMO-123
+$SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status,assignee" --contributors
 
-# Get issue with specific fields only
-$SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status,assignee"
-
-# Get issue with contributors listed
-$SKILL_DIR/scripts/jira.py issue get DEMO-123 --contributors
-
-# List comments on an issue
+# List comments
 $SKILL_DIR/scripts/jira.py issue comments DEMO-123
-$SKILL_DIR/scripts/jira.py issue comments DEMO-123 --max-results 10
 
-# Create new issue
+# Create (--project, --type, --summary required; --description, --priority, --labels, --assignee, --set-field, --link, --from-file, --json)
 $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task"
-
-# Create issue with custom fields
-$SKILL_DIR/scripts/jira.py issue create --project DEMO --type Story --summary "New story" --set-field story_points=5
-
-# Update issue
-$SKILL_DIR/scripts/jira.py issue update DEMO-123 --summary "Updated summary"
-
-# Update custom fields
-$SKILL_DIR/scripts/jira.py issue update DEMO-123 --set-field assigned_team="Platform Team"
-
-# Create issue from a markdown file
-$SKILL_DIR/scripts/jira.py issue create --from-file issue.md
-
-# Create issue from file with CLI overrides
 $SKILL_DIR/scripts/jira.py issue create --from-file issue.md --priority Critical
 
-# Update issue from a markdown file
-$SKILL_DIR/scripts/jira.py issue update DEMO-123 --from-file changes.md
+# Update (--summary, --description, --priority, --labels, --assignee, --set-field, --link, --from-file)
+$SKILL_DIR/scripts/jira.py issue update DEMO-123 --summary "Updated" --set-field story_points=5
+$SKILL_DIR/scripts/jira.py issue update DEMO-123 --link "Blocks:DEMO-456"
 
-# Create issue with links
-$SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task" --link "Blocks:DEMO-456" --link "Relates:DEMO-789"
-
-# Add links to existing issue
-$SKILL_DIR/scripts/jira.py issue update DEMO-123 --link "is blocked by:DEMO-456"
-
-# Add comment
+# Comment (--security-level for private comments)
 $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
-
-# Add private comment with security level
-$SKILL_DIR/scripts/jira.py issue comment DEMO-123 "Internal note" --security-level "Internal"
 ```
 
-**Arguments for `issue get`:**
-- `issue_key`: Issue key (required)
-- `--fields`: Comma-separated list of fields to include (uses config default if not specified)
-- `--contributors`: Show unique contributors (reporter, assignee, comment authors). Opt-in; requires an extra API call.
-
-**Arguments for `issue create`:**
-- `--project`: Project key (required unless provided in `--from-file`)
-- `--type`: Issue type (required unless project default configured or provided in `--from-file`)
-- `--summary`: Issue summary (required unless provided in `--from-file`)
-- `--description`: Issue description (cannot be used with `--from-file`)
-- `--priority`: Priority name
-- `--labels`: Comma-separated labels
-- `--assignee`: Assignee account ID
-- `--set-field NAME=VALUE`: Set a custom field (repeatable)
-- `--from-file PATH`: Read issue fields and description from a markdown file (see below)
-- `--link TYPE:ISSUE`: Link to another issue (repeatable). Type can be a name, outward, or inward label (e.g. `Blocks`, `is blocked by`, `Relates`)
-- `--json`: Output as JSON
-
-**Arguments for `issue update`:**
-- `issue_key`: Issue key (required)
-- `--summary`: New summary
-- `--description`: New description (cannot be used with `--from-file`)
-- `--priority`: New priority
-- `--labels`: New labels (comma-separated)
-- `--assignee`: New assignee account ID
-- `--set-field NAME=VALUE`: Set a custom field (repeatable)
-- `--from-file PATH`: Read issue fields and description from a markdown file (see below)
-- `--link TYPE:ISSUE`: Link to another issue (repeatable)
-
-**Arguments for `issue comments`:**
-- `issue_key`: Issue key (required)
-- `--max-results`: Maximum number of comments (default: 50)
-
-**Markdown file format for `--from-file`:**
-
-The file uses YAML frontmatter (between `---` delimiters) for issue fields and
-the markdown body for the description. CLI arguments override frontmatter values.
-
-```yaml
----
-summary: "Issue title"
-project: "DEMO"          # create only; ignored on update
-type: "Task"             # create only; ignored on update
-priority: "High"
-labels:
-  - label1
-  - label2
-assignee: "account-id"
-fields:                  # custom fields, same names as --set-field
-  story_points: 5
-  assigned_team: "Platform"
-links:                   # issue links (additive with --link CLI args)
-  - blocks: DEMO-456
-  - relates to: DEMO-789
-  - is cloned by: DEMO-100
----
-
-Markdown body becomes the issue description.
-Supports headings, bold, links, lists, and tables.
-
-Link type names can be the type name, outward label, or inward label
-(e.g. `blocks`, `is blocked by`, `Relates`). The direction is resolved
-automatically based on which label matches.
-```
+See [from-file-format.md](references/from-file-format.md) for the `--from-file` markdown format and [examples.md](references/examples.md) for more patterns.
 
 ### transitions
 
@@ -311,170 +171,16 @@ $SKILL_DIR/scripts/jira.py transitions do DEMO-123 "Done" --comment "Completed"
 $SKILL_DIR/scripts/jira.py transitions do DEMO-123 "Done" --comment "Internal resolution notes" --security-level "Internal"
 ```
 
-### config
+### Additional Commands
 
-Manage configuration and view effective defaults.
+See [advanced-commands.md](references/advanced-commands.md) for full documentation of these commands:
 
-```bash
-# Show all configuration and defaults
-$SKILL_DIR/scripts/jira.py config show
-
-# Show project-specific defaults
-$SKILL_DIR/scripts/jira.py config show --project DEMO
-
-# Discover and save a custom field mapping
-$SKILL_DIR/scripts/jira.py config discover story_points
-$SKILL_DIR/scripts/jira.py config discover security_level
-```
-
-This displays:
-- Authentication settings (with masked token)
-- Default JQL scope, security level, max results, and fields
-- Project-specific defaults for issue type and priority
-
-**`config discover`** takes a snake_case friendly name, queries the Jira API
-for a matching field (underscores become spaces for matching, case-insensitive),
-and saves the mapping to `~/.config/agent-skills/jira.yaml` under
-`defaults.custom_fields`.
-
-### fields
-
-List available fields in your Jira instance.
-
-```bash
-# List all global fields
-$SKILL_DIR/scripts/jira.py fields
-
-# List fields for specific project and issue type
-$SKILL_DIR/scripts/jira.py fields --project DEMO --issue-type Task
-```
-
-**Arguments:**
-- `--project`: Project key for context-specific fields
-- `--issue-type`: Issue type name (requires --project)
-
-**Note:** Fields vary by project and issue type. When creating or searching issues, use `--project` and `--issue-type` to see only the fields available in that context.
-
-### statuses
-
-List available statuses and status categories.
-
-```bash
-# List all statuses
-$SKILL_DIR/scripts/jira.py statuses
-
-# List status categories (To Do, In Progress, Done)
-$SKILL_DIR/scripts/jira.py statuses --categories
-```
-
-**Arguments:**
-- `--categories`: Show status categories instead of individual statuses
-
-**Recommendation:** Use `statusCategory` in JQL queries for more portable queries:
-- `statusCategory = "To Do"` - matches all statuses in the To Do category
-- `statusCategory = "In Progress"` - matches all in-progress statuses
-- `statusCategory = Done` - matches all completed statuses
-
-This is more reliable than using specific status names, which vary between projects.
-
-### user
-
-Search for Jira users by email, name, or username. On Jira Cloud, returns
-accountId values needed for JQL queries.
-
-```bash
-# Search by email
-$SKILL_DIR/scripts/jira.py user search "jdoe@example.com"
-
-# Search by display name
-$SKILL_DIR/scripts/jira.py user search "Jane Doe"
-```
-
-**Arguments for `user search`:**
-- `query`: Email, display name, or username to search for
-
-### collaboration
-
-Discover collaboration patterns across issues and epics.
-
-```bash
-# Find epics with multiple contributors (assignees)
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO
-
-# Require at least 3 contributors
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO --min-contributors 3
-
-# Limit number of epics checked
-$SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
-```
-
-**Arguments for `collaboration epics`:**
-- `--project`: Project key to scope the search
-- `--min-contributors`: Minimum unique assignees to qualify (default: 2)
-- `--max-results`: Maximum epics to check (default: 50)
-
-**Note:** This makes N+1 API calls (1 for epics + 1 per epic for children). Use `--max-results` to control cost.
-
-### automations
-
-List and inspect Jira automation rules. Uses the Automation Rule Management API via the gateway path, reusing existing Jira Cloud credentials. **Cloud-only** — Data Center and Server instances will receive a clear error.
-
-```bash
-# List all automation rules
-$SKILL_DIR/scripts/jira.py automations list
-
-# List rules scoped to a specific project
-$SKILL_DIR/scripts/jira.py automations list --project OSPRH
-
-# List only enabled rules
-$SKILL_DIR/scripts/jira.py automations list --state ENABLED
-
-# Get full details of a rule (triggers, conditions, actions)
-$SKILL_DIR/scripts/jira.py automations get <rule-uuid>
-```
-
-**Arguments for `automations list`:**
-- `--project`: Filter to rules scoped to this project key
-- `--state`: Filter by state (`ENABLED` or `DISABLED`)
-- `--limit`: Maximum rules to return (default: 100)
-
-**Arguments for `automations get`:**
-- `uuid` (positional): Automation rule UUID (shown in list output)
-
-The `get` command renders a markdown document describing the rule step by step: metadata, trigger, conditions, actions, branches, and external connections. Component types are translated to human-readable labels (e.g., `jira.issue.event.trigger:created` → "Issue created") and value configurations are summarised inline.
-
-**Note:** The automation API requires the Atlassian Cloud ID, which is fetched automatically from `_edge/tenant_info` and cached for the session.
-
-## Examples
-
-### Create and verify an issue
-
-```bash
-# Create the issue
-$SKILL_DIR/scripts/jira.py issue create \
-  --project DEMO \
-  --type Bug \
-  --summary "Login button not working" \
-  --description "The login button on the homepage does not respond to clicks."
-
-# Verify it was created correctly
-$SKILL_DIR/scripts/jira.py issue get DEMO-456
-```
-
-### Move issue through workflow
-
-```bash
-# Check available transitions first
-$SKILL_DIR/scripts/jira.py transitions list DEMO-123
-
-# Start work on an issue
-$SKILL_DIR/scripts/jira.py transitions do DEMO-123 "In Progress"
-
-# Verify the transition
-$SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status"
-```
-
-See [examples.md](references/examples.md) for more usage patterns.
+- **config** — view/manage configuration defaults and discover custom field mappings
+- **fields** — list available fields (global or per project/issue type)
+- **statuses** — list statuses and status categories
+- **user** — search users by email/name (returns accountId on Cloud)
+- **collaboration** — discover cross-team collaboration patterns in epics
+- **automations** — list and inspect Jira automation rules (Cloud-only)
 
 ## JQL Reference
 
@@ -492,30 +198,3 @@ Use `statusCategory` (`"To Do"`, `"In Progress"`, `Done`) for queries that work 
 
 This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
-## Troubleshooting
-
-### Check command fails
-
-Run `$SKILL_DIR/scripts/jira.py check` to diagnose issues. It will provide specific error messages and setup instructions.
-
-### Authentication failed
-
-1. Verify your API token is correct
-2. Ensure you're using your email (not username)
-3. For Jira Cloud, use your Atlassian account email
-4. For Jira Data Center/Server, use your username
-
-### Permission denied
-
-You may not have access to the requested project or issue. Contact your Jira administrator.
-
-### JQL syntax error
-
-Use the Jira web interface to test your JQL query before using it in scripts.
-
-### Import errors
-
-Ensure dependencies are installed:
-```bash
-pip install --user requests keyring pyyaml
-```

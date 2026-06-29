@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "2.4.0"
+  version: "2.4.1"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -175,32 +175,6 @@ $SKILL_DIR/scripts/confluence.py page get 123456 --frontmatter -o page.md
 - `--frontmatter`: Output as markdown with YAML frontmatter (title, space, labels, parent) for round-tripping with `page create`/`page update`
 - `--output`/`-o`: Write output to file; images are downloaded to a sibling directory named after the file stem
 
-#### Example Output
-
-```bash
-$ $SKILL_DIR/scripts/confluence.py page get "API Documentation"
-
-Page ID: 123456
-Title: API Documentation
-Type: page
-Space: DEMO
-Status: current
-Version: 1
-
----
-
-# API Documentation
-
-## Overview
-
-This document describes our **REST API**.
-
-## Endpoints
-
-- `GET /api/users` - List users
-- `POST /api/users` - Create user
-```
-
 ### page create / update
 
 For creating and updating pages with Markdown support, see [references/creating-content.md](references/creating-content.md).
@@ -333,62 +307,6 @@ This displays:
 - Default CQL scope, max results, and default space
 - Space-specific defaults for parent pages and labels
 
-## Examples
-
-### Search for Pages
-
-```bash
-# Find pages in a space
-$SKILL_DIR/scripts/confluence.py search "type=page AND space = DEMO"
-
-# Search by title
-$SKILL_DIR/scripts/confluence.py search "title~login"
-
-# Find recent pages
-$SKILL_DIR/scripts/confluence.py search "type=page AND created >= now('-7d')"
-```
-
-### View Page Content
-
-```bash
-# View page as Markdown
-$SKILL_DIR/scripts/confluence.py page get "My Page Title"
-
-# View page metadata only
-$SKILL_DIR/scripts/confluence.py page get 123456 --no-body
-
-# Export to file with images
-$SKILL_DIR/scripts/confluence.py page get "My Page" -o exported-page.md
-```
-
-### List and Explore Spaces
-
-```bash
-# List all spaces
-$SKILL_DIR/scripts/confluence.py space list
-
-# Get details about a space
-$SKILL_DIR/scripts/confluence.py space get DEMO
-```
-
-### Using Configuration Defaults
-
-With defaults configured as shown in the [Configuration Defaults](#configuration-defaults) section:
-
-```bash
-# Search uses CQL scope automatically
-$SKILL_DIR/scripts/confluence.py search "type=page"
-# Becomes: (space = DEMO) AND (type=page)
-
-# Search with automatic max_results from config
-$SKILL_DIR/scripts/confluence.py search "status=current"
-# Uses configured max_results (25) automatically
-
-# Override defaults when needed
-$SKILL_DIR/scripts/confluence.py search "type=page" --max-results 100
-# CLI argument overrides the configured default of 25
-```
-
 ## CQL Reference
 
 Common CQL (Confluence Query Language) queries:
@@ -416,36 +334,3 @@ $SKILL_DIR/scripts/confluence.py search "type=page AND space=DEMO AND created >=
 
 This skill makes API calls requiring structured input/output. A standard-capability model is recommended.
 
-## Troubleshooting
-
-### Check command fails
-
-Run `$SKILL_DIR/scripts/confluence.py check` to diagnose issues. It will provide specific error messages and setup instructions.
-
-### Authentication failed
-
-1. Verify your API token is correct
-2. Ensure you're using your email (not username) for Cloud instances
-3. For Cloud, use your Atlassian account email
-### Permission denied
-
-You may not have access to the requested space or page. Contact your Confluence administrator.
-
-### CQL syntax error
-
-Test your CQL query in the Confluence web interface search before using it in the CLI.
-
-### Page not found
-
-When searching by title, ensure the title is exact (case-sensitive). You can use:
-- Exact title: `$SKILL_DIR/scripts/confluence.py page get "Exact Page Title"`
-- Page ID: `$SKILL_DIR/scripts/confluence.py page get 123456`
-
-### Import errors
-
-Ensure dependencies are installed:
-```bash
-pip install --user requests keyring pyyaml
-```
-
-**Note:** This skill supports Atlassian Cloud only. Data Center/Server instances are not supported.

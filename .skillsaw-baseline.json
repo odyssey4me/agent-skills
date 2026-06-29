@@ -1,26 +1,8 @@
 {
   "version": "1",
   "generated_by": "skillsaw 0.14.0",
-  "generated_at": "2026-06-29T10:47:12.065897+00:00",
+  "generated_at": "2026-06-29T11:00:25.893495+00:00",
   "violations": [
-    {
-      "fingerprint": "ceafe9e6a62a3fbe",
-      "rule_id": "context-budget",
-      "file_path": "skills/confluence/SKILL.md",
-      "message": "Estimated 3,171 tokens exceeds skill warn limit of 3,000",
-      "severity": "warning",
-      "value": 3171,
-      "baseline_mode": "ceiling"
-    },
-    {
-      "fingerprint": "eb80cd8f76a31050",
-      "rule_id": "context-budget",
-      "file_path": "skills/jira/SKILL.md",
-      "message": "Estimated 4,285 tokens exceeds skill warn limit of 3,000",
-      "severity": "warning",
-      "value": 4285,
-      "baseline_mode": "ceiling"
-    },
     {
       "fingerprint": "34f89167ca2aa6ce",
       "rule_id": "content-placeholder-text",

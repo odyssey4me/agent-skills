@@ -4,3 +4,10 @@ exclude:
   - ".claude/**"
   - "templates/**"
   - "tests/**"
+
+rules:
+  context-budget:
+    limits:
+      skill:
+        warn: 2500
+        error: 3000
