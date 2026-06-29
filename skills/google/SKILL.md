@@ -186,10 +186,11 @@ For importing markdown with formatting, table styling, and round-trip editing, s
 ```bash
 # Import markdown as a new document with standard formatting
 gog docs create "Document Title" --file document.md --pageless
+gog docs format <docId> --line-spacing 115 --space-below 8
 
 # Update an existing document from markdown with formatting
-gog docs write <docId> --file document.md --markdown --replace \
-  --pageless --line-spacing 115 --space-below 8pt
+gog docs write <docId> --file document.md --markdown --replace --pageless
+gog docs format <docId> --line-spacing 115 --space-below 8
 ```
 
 ### Google Sheets

@@ -60,9 +60,9 @@ Full command reference for `gog docs`. All commands support `--json` and `--plai
 - `--at <index>` — insertion index
 - `--at-end` — append at end
 - `--pageless` — set document to pageless mode
-- `--line-spacing <N>` — paragraph line spacing percentage (e.g. 115)
-- `--space-above <Npt>` — space above paragraphs in points
-- `--space-below <Npt>` — space below paragraphs in points
+- `--line-spacing <N>` — paragraph line spacing percentage, plain-text writes only (not with `--markdown`)
+- `--space-above <N>` — space above paragraphs in points (float), plain-text writes only
+- `--space-below <N>` — space below paragraphs in points (float), plain-text writes only
 - `--check-orphans` — block markdown replacement when open comment quotes would disappear
 
 ## Formatting
@@ -79,8 +79,12 @@ Full command reference for `gog docs`. All commands support `--json` and `--plai
 - `--bold` / `--italic` / `--underline` — text styling
 - `--font-size <pt>` — font size in points
 - `--font-family "Arial"` — font family
-- `--start <index>` / `--end <index>` — range to format
+- `--match <text>` — only format the first text match
+- `--match-all` — format all matches instead of only the first
 - `--alignment LEFT|CENTER|RIGHT|JUSTIFIED` — paragraph alignment
+- `--line-spacing <N>` — paragraph line spacing percentage (float, e.g. 115)
+- `--space-above <N>` — space above paragraphs in points (float)
+- `--space-below <N>` — space below paragraphs in points (float)
 
 ## Tables
 
