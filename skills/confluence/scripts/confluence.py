@@ -438,6 +438,65 @@ def _strip_frontmatter(text: str) -> str:
     return text
 
 
+def _heading_to_slug(text: str) -> str:
+    """Convert heading text to a markdown-style anchor slug."""
+    slug = text.lower().strip()
+    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+    slug = re.sub(r"[\s]+", "-", slug)
+    return slug
+
+
+def _collect_anchor_hrefs(node: Any) -> set[str]:
+    """Collect all #anchor hrefs from link marks in an ADF tree."""
+    anchors: set[str] = set()
+    if isinstance(node, dict):
+        for mark in node.get("marks", []):
+            if mark.get("type") == "link":
+                href = mark.get("attrs", {}).get("href", "")
+                if href.startswith("#"):
+                    anchors.add(href[1:])
+        for v in node.values():
+            anchors.update(_collect_anchor_hrefs(v))
+    elif isinstance(node, list):
+        for item in node:
+            anchors.update(_collect_anchor_hrefs(item))
+    return anchors
+
+
+def _insert_anchor_macros(adf: dict[str, Any]) -> None:
+    """Insert Confluence anchor macros before headings that are link targets.
+
+    Scans the ADF for ``#slug`` links, matches them to headings by slug,
+    and inserts an anchor macro before each matched heading so the links
+    resolve correctly in Confluence.
+    """
+    anchors_needed = _collect_anchor_hrefs(adf)
+    if not anchors_needed:
+        return
+
+    content = adf.get("content", [])
+    new_content: list[dict[str, Any]] = []
+    for node in content:
+        if node.get("type") == "heading":
+            text = "".join(c.get("text", "") for c in node.get("content", []))
+            slug = _heading_to_slug(text)
+            if slug in anchors_needed:
+                new_content.append(
+                    {
+                        "type": "extension",
+                        "attrs": {
+                            "extensionType": "com.atlassian.confluence.macro.core",
+                            "extensionKey": "anchor",
+                            "parameters": {
+                                "macroParams": {"": {"value": slug}},
+                            },
+                        },
+                    }
+                )
+        new_content.append(node)
+    adf["content"] = new_content
+
+
 def markdown_to_adf(markdown: str, *, include_toc: bool = False) -> dict[str, Any]:
     """Convert Markdown to ADF (Atlassian Document Format).
 
@@ -449,6 +508,7 @@ def markdown_to_adf(markdown: str, *, include_toc: bool = False) -> dict[str, An
         ADF JSON structure.
     """
     adf = dict(_marklassian_md_to_adf(markdown))
+    _insert_anchor_macros(adf)
     if include_toc:
         _prepend_toc_adf(adf)
     return adf

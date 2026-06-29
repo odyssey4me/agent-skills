@@ -228,6 +228,61 @@ class TestMarkdownConversion:
         assert "This is a paragraph" in markdown
 
 
+class TestAnchorMacroInsertion:
+    """Tests for internal anchor link handling in markdown_to_adf."""
+
+    def test_inserts_anchor_before_target_heading(self):
+        """Anchor macro inserted before heading that is a link target."""
+        md = "See [below](#my-heading).\n\n## My Heading\n\nContent."
+        adf = markdown_to_adf(md)
+        anchor_idx = next(
+            i
+            for i, n in enumerate(adf["content"])
+            if n.get("type") == "extension" and n.get("attrs", {}).get("extensionKey") == "anchor"
+        )
+        heading_idx = next(
+            i
+            for i, n in enumerate(adf["content"])
+            if n.get("type") == "heading"
+            and any(c.get("text") == "My Heading" for c in n.get("content", []))
+        )
+        assert anchor_idx == heading_idx - 1
+        params = adf["content"][anchor_idx]["attrs"]["parameters"]["macroParams"]
+        assert params[""]["value"] == "my-heading"
+
+    def test_no_anchor_for_unlinked_headings(self):
+        """Headings without links pointing to them get no anchor macro."""
+        md = "## No Links Here\n\nJust text."
+        adf = markdown_to_adf(md)
+        extensions = [n for n in adf["content"] if n.get("type") == "extension"]
+        assert len(extensions) == 0
+
+    def test_multiple_anchors(self):
+        """Multiple anchor links each get their own macro."""
+        md = (
+            "See [A](#heading-a) and [B](#heading-b).\n\n"
+            "## Heading A\n\nText.\n\n"
+            "## Heading B\n\nText."
+        )
+        adf = markdown_to_adf(md)
+        anchors = [
+            n
+            for n in adf["content"]
+            if n.get("type") == "extension" and n.get("attrs", {}).get("extensionKey") == "anchor"
+        ]
+        assert len(anchors) == 2
+        values = {a["attrs"]["parameters"]["macroParams"][""]["value"] for a in anchors}
+        assert values == {"heading-a", "heading-b"}
+
+    def test_heading_slug_strips_special_chars(self):
+        """Heading slugs handle colons and special characters."""
+        from skills.confluence.scripts.confluence import _heading_to_slug
+
+        assert _heading_to_slug("Appendix: Coaching Approaches") == "appendix-coaching-approaches"
+        assert _heading_to_slug("GPS Coaching") == "gps-coaching"
+        assert _heading_to_slug("Stage 1: Awareness") == "stage-1-awareness"
+
+
 class TestCQLScope:
     """Tests for CQL scope merging."""
 
