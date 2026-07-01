@@ -1478,7 +1478,13 @@ def format_issue(issue: dict[str, Any], custom_fields: dict[str, str] | None = N
     resolution_obj = fields.get("resolution")
     resolution_name = resolution_obj.get("name") if resolution_obj else None
 
-    result = f"### {key}: {summary}\n- **Status:** {status}\n"
+    issue_type = fields.get("issuetype", {})
+    issue_type_name = issue_type.get("name") if issue_type else None
+
+    result = f"### {key}: {summary}\n"
+    if issue_type_name:
+        result += f"- **Type:** {issue_type_name}\n"
+    result += f"- **Status:** {status}\n"
     if resolution_name:
         result += f"- **Resolution:** {resolution_name}\n"
     result += f"- **Assignee:** {assignee_name}\n- **Priority:** {priority_name}"
@@ -1511,7 +1517,12 @@ def format_issues_list(
         assignee_name = assignee.get("displayName", "Unassigned") if assignee else "Unassigned"
         resolution_obj = fields.get("resolution")
         resolution_name = resolution_obj.get("name") if resolution_obj else None
-        entry = f"### {key}: {summary}\n- **Status:** {status}\n"
+        issue_type = fields.get("issuetype", {})
+        issue_type_name = issue_type.get("name") if issue_type else None
+        entry = f"### {key}: {summary}\n"
+        if issue_type_name:
+            entry += f"- **Type:** {issue_type_name}\n"
+        entry += f"- **Status:** {status}\n"
         if resolution_name:
             entry += f"- **Resolution:** {resolution_name}\n"
         entry += f"- **Assignee:** {assignee_name}"
@@ -1952,6 +1963,7 @@ def _summarise_value(value_obj: dict[str, Any] | list | str) -> str:
 
 DEFAULT_FIELDS = [
     "summary",
+    "issuetype",
     "status",
     "resolution",
     "assignee",

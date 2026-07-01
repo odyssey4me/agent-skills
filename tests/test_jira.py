@@ -575,6 +575,7 @@ class TestFormatting:
             "key": "DEMO-123",
             "fields": {
                 "summary": "Test issue",
+                "issuetype": {"name": "Bug"},
                 "status": {"name": "Open"},
                 "assignee": {"displayName": "Alice"},
                 "priority": {"name": "High"},
@@ -584,6 +585,7 @@ class TestFormatting:
         result = format_issue(issue)
 
         assert result.startswith("### DEMO-123: Test issue\n")
+        assert "- **Type:** Bug" in result
         assert "- **Status:** Open" in result
         assert "- **Assignee:** Alice" in result
         assert "- **Priority:** High" in result
