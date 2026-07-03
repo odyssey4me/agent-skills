@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "2.5.0"
+  version: "2.6.0"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -68,36 +68,19 @@ token: your-token
 
 ## Configuration Defaults
 
-Optionally configure defaults in `~/.config/agent-skills/confluence.yaml` to reduce repetitive typing:
+Optionally configure defaults in `~/.config/agent-skills/confluence.yaml`:
 
 ```yaml
-# Authentication (optional if using environment variables)
 url: https://yourcompany.atlassian.net/wiki
 email: you@example.com
 token: your-token
-
-# Optional defaults
 defaults:
   cql_scope: "space = DEMO"
   max_results: 25
   default_space: "DEMO"
 ```
 
-### How Defaults Work
-
-- **CLI arguments always override** config defaults
-- **CQL scope** is prepended to all searches: `(scope) AND (your_query)`
-- **Default space** is used when space parameter is omitted
-
-### View Configuration
-
-```bash
-# Show all configuration
-$SKILL_DIR/scripts/confluence.py config show
-
-# Show space-specific defaults
-$SKILL_DIR/scripts/confluence.py config show --space DEMO
-```
+View configuration: `$SKILL_DIR/scripts/confluence.py config show`
 
 ## Commands
 
@@ -165,7 +148,7 @@ $SKILL_DIR/scripts/confluence.py page get "My Page" -o my-page.md
 $SKILL_DIR/scripts/confluence.py page get 123456 --frontmatter -o page.md
 ```
 
-**Output**: By default, displays page metadata and body content converted to Markdown for readability. When `--output`/`-o` is used, image attachments are automatically downloaded to a sibling directory named after the output file (e.g. `-o my-page.md` saves images to `my-page/`) and referenced as relative paths in the markdown output. Without `--output`, no images are downloaded.
+**Output**: Page metadata and content as Markdown. Images are downloaded to a sibling directory when using `--output`/`-o`.
 
 **Arguments:**
 - `page_identifier`: Page ID or title (required)
@@ -174,6 +157,22 @@ $SKILL_DIR/scripts/confluence.py page get 123456 --frontmatter -o page.md
 - `--no-body`: Don't include body content
 - `--frontmatter`: Output as markdown with YAML frontmatter (title, space, labels, parent) for round-tripping with `page create`/`page update`
 - `--output`/`-o`: Write output to file; images are downloaded to a sibling directory named after the file stem
+
+### page history
+
+Show version history for a page.
+
+```bash
+# By title
+$SKILL_DIR/scripts/confluence.py page history "My Page Title"
+
+# By ID, limit results
+$SKILL_DIR/scripts/confluence.py page history 123456 --max-results 10
+```
+
+**Arguments:**
+- `page_identifier`: Page ID or title (required)
+- `--max-results`: Maximum versions to return (default: 25)
 
 ### page create / update
 
@@ -309,25 +308,44 @@ This displays:
 
 ## CQL Reference
 
-Common CQL (Confluence Query Language) queries:
+See the [Confluence CQL documentation](https://support.atlassian.com/confluence-cloud/articles/advanced-searching-using-cql/) for full CQL syntax.
 
-| Query | Description |
-|-------|-------------|
-| `type = page` | All pages |
-| `type = blogpost` | All blog posts |
-| `space = DEMO` | Content in DEMO space |
-| `title ~ "login"` | Title contains "login" |
-| `text ~ "API"` | Body text contains "API" |
-| `created >= now("-7d")` | Created in last 7 days |
-| `lastmodified >= startOfDay()` | Modified today |
-| `creator = currentUser()` | Created by you |
-| `contributor = "username"` | User contributed |
-| `label = "important"` | Has "important" label |
+Common patterns: `type=page`, `space=KEY`, `title~text`, `text~keyword`, `created >= now("-7d")`, `label=name`.
 
-Combine with `AND`, `OR`, and use `ORDER BY` for sorting:
-
+Combine with `AND`, `OR`, and `ORDER BY`:
 ```bash
-$SKILL_DIR/scripts/confluence.py search "type=page AND space=DEMO AND created >= now('-30d') ORDER BY created DESC"
+$SKILL_DIR/scripts/confluence.py search "type=page AND space=DEMO ORDER BY created DESC"
+```
+
+## Examples
+
+Common Confluence tasks:
+
+**Search and read:**
+```bash
+# Search for pages about authentication
+confluence search "type=page AND text~authentication" --space DOCS
+
+# Get a page's content
+confluence page get "Installation Guide"
+```
+
+**Create and update:**
+```bash
+# Create a page from Markdown
+confluence page create --space DOCS --title "API Reference" --body-file api.md --toc
+
+# Update an existing page
+confluence page update 123456 --body-file updated-api.md
+```
+
+**Manage spaces:**
+```bash
+# List all spaces
+confluence space list
+
+# Get space details
+confluence space get DOCS
 ```
 
 ## Model Guidance

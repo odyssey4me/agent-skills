@@ -591,6 +591,27 @@ class TestAPIFunctions:
         call_args = mock_delete.call_args
         assert "content/123" in call_args[0][1]
 
+    @patch("skills.confluence.scripts.confluence.get")
+    @patch("skills.confluence.scripts.confluence.get_api_base")
+    def test_get_page_versions(self, mock_get_api_base, mock_get):
+        """Test getting page version history."""
+        from skills.confluence.scripts.confluence import get_page_versions
+
+        mock_get_api_base.return_value = "https://example.atlassian.net/wiki"
+        mock_get.return_value = {
+            "results": [
+                {"number": 2, "when": "2024-06-15T14:30:00.000Z", "by": {"displayName": "Alice"}},
+                {"number": 1, "when": "2024-01-01T12:00:00.000Z", "by": {"displayName": "Bob"}},
+            ],
+        }
+
+        versions = get_page_versions("123", max_results=10)
+        assert len(versions) == 2
+        assert versions[0]["number"] == 2
+        mock_get.assert_called_once()
+        call_args = mock_get.call_args
+        assert "content/123/version" in call_args[0][1]
+
 
 class TestFormatFunctions:
     """Tests for page formatting functions."""
@@ -604,7 +625,15 @@ class TestFormatFunctions:
             "title": "Test Page",
             "type": "page",
             "space": {"key": "DEMO", "name": "Demo Space"},
-            "version": {"number": 5, "when": "2024-01-01T12:00:00Z"},
+            "version": {
+                "number": 5,
+                "when": "2024-06-15T14:30:00.000Z",
+                "by": {"displayName": "Bob"},
+            },
+            "history": {
+                "createdDate": "2024-01-01T12:00:00.000Z",
+                "createdBy": {"displayName": "Alice"},
+            },
             "body": {"storage": {"value": "<p>Content</p>"}},
         }
 
@@ -612,6 +641,25 @@ class TestFormatFunctions:
         assert result.startswith("### Test Page\n")
         assert "- **Page ID:** 123" in result
         assert "- **Space:** DEMO" in result
+        assert "- **Created:** 2024-01-01 12:00 UTC by Alice" in result
+        assert "- **Last modified:** 2024-06-15 14:30 UTC by Bob" in result
+
+    def test_format_page_without_history(self):
+        """Test page formatting without history data."""
+        from skills.confluence.scripts.confluence import format_page
+
+        page = {
+            "id": "456",
+            "title": "Simple Page",
+            "type": "page",
+            "space": {"key": "TEST"},
+            "version": {"number": 1},
+        }
+
+        result = format_page(page)
+        assert "- **Page ID:** 456" in result
+        assert "Created" not in result
+        assert "Last modified" not in result
 
     def test_format_pages_list(self):
         """Test formatting list of pages as markdown."""
@@ -637,6 +685,44 @@ class TestFormatFunctions:
         assert "### Page 2" in result
         assert "- **Page ID:** 1" in result
         assert "- **Page ID:** 2" in result
+
+    def test_format_page_versions(self):
+        """Test version history formatting."""
+        from skills.confluence.scripts.confluence import format_page_versions
+
+        versions = [
+            {
+                "number": 3,
+                "when": "2024-06-15T14:30:00.000Z",
+                "by": {"displayName": "Alice"},
+                "message": "Updated intro",
+            },
+            {
+                "number": 2,
+                "when": "2024-03-10T09:00:00.000Z",
+                "by": {"displayName": "Bob"},
+            },
+            {
+                "number": 1,
+                "when": "2024-01-01T12:00:00.000Z",
+                "by": {"displayName": "Alice"},
+            },
+        ]
+
+        result = format_page_versions(versions)
+        assert "### Version 3" in result
+        assert "### Version 2" in result
+        assert "### Version 1" in result
+        assert "- **Author:** Alice" in result
+        assert "- **Author:** Bob" in result
+        assert "- **Message:** Updated intro" in result
+        assert result.count("- **Message:**") == 1
+
+    def test_format_page_versions_empty(self):
+        """Test version history formatting with no versions."""
+        from skills.confluence.scripts.confluence import format_page_versions
+
+        assert format_page_versions([]) == "No version history found"
 
     def test_format_content_markdown_to_adf(self):
         """Test format_content converts markdown to ADF."""
@@ -895,6 +981,31 @@ class TestCommandHandlers:
 
         result = cmd_page(args)
         assert result == 0
+
+    @patch("skills.confluence.scripts.confluence.get_page_versions")
+    @patch("skills.confluence.scripts.confluence.get_page")
+    def test_cmd_page_history(self, mock_get_page, mock_get_versions):
+        """Test page history command."""
+        import argparse
+
+        from skills.confluence.scripts.confluence import cmd_page
+
+        mock_get_page.return_value = {"id": "123", "title": "Test Page"}
+        mock_get_versions.return_value = [
+            {"number": 2, "when": "2024-06-15T14:30:00.000Z", "by": {"displayName": "Alice"}},
+            {"number": 1, "when": "2024-01-01T12:00:00.000Z", "by": {"displayName": "Bob"}},
+        ]
+
+        args = argparse.Namespace(
+            page_command="history",
+            page_identifier="123",
+            max_results=25,
+            json=False,
+        )
+
+        result = cmd_page(args)
+        assert result == 0
+        mock_get_versions.assert_called_once_with("123", max_results=25)
 
     @patch("skills.confluence.scripts.confluence.create_page")
     @patch("skills.confluence.scripts.confluence.get_space_defaults")
@@ -2161,7 +2272,8 @@ class TestFrontmatter:
             "id": "123",
             "title": "Test Page",
             "space": {"key": "DEMO"},
-            "version": {"number": 3},
+            "version": {"number": 3, "when": "2024-06-15T14:30:00.000Z"},
+            "history": {"createdDate": "2024-01-01T12:00:00.000Z"},
             "ancestors": [{"id": "100"}, {"id": "200"}],
             "metadata": {
                 "labels": {
@@ -2192,6 +2304,8 @@ class TestFrontmatter:
         assert "space: DEMO" in result
         assert "page_id: 123" in result
         assert "version: 3" in result
+        assert "created: 2024-01-01 12:00 UTC" in result
+        assert "updated: 2024-06-15 14:30 UTC" in result
         assert "parent: 200" in result
         assert "labels: docs, api" in result
         assert "Hello world" in result

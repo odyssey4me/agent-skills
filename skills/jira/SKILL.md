@@ -194,6 +194,41 @@ assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC
 
 Use `statusCategory` (`"To Do"`, `"In Progress"`, `Done`) for queries that work across projects.
 
+## Examples
+
+Common Jira workflows:
+
+**Search and view:**
+```bash
+# Find all open tasks assigned to you
+jira search "assignee = currentUser() AND status = Open"
+
+# Get issue details
+jira issue get DEMO-123 --fields "summary,status,assignee"
+
+# List issue comments
+jira issue comments DEMO-123
+```
+
+**Create and update:**
+```bash
+# Create a new bug
+jira issue create --project DEMO --type Bug --summary "Login page broken"
+
+# Update an issue and add a comment
+jira issue update DEMO-123 --priority High --assignee "user@example.com"
+jira issue comment DEMO-123 "Assigned to review"
+```
+
+**Workflow:**
+```bash
+# List available transitions
+jira transitions list DEMO-123
+
+# Move issue to Done
+jira transitions do DEMO-123 "Done" --comment "Completed"
+```
+
 ## Model Guidance
 
 This skill makes API calls requiring structured input/output. A standard-capability model is recommended.

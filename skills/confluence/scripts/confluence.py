@@ -25,6 +25,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -903,6 +904,20 @@ def _truncate(text: str, max_length: int) -> str:
     return text[: max_length - 3] + "..."
 
 
+def _format_confluence_date(iso_date: str) -> str:
+    """Format an ISO 8601 date string for display."""
+    if not iso_date:
+        return ""
+    clean = iso_date.replace("Z", "+00:00")
+    try:
+        from datetime import datetime
+
+        dt = datetime.fromisoformat(clean).astimezone(UTC)
+        return dt.strftime("%Y-%m-%d %H:%M UTC")
+    except (ValueError, TypeError):
+        return iso_date
+
+
 def format_page(
     page: dict[str, Any],
     *,
@@ -934,6 +949,15 @@ def format_page(
     version_info = page.get("version", {})
     version = version_info.get("number", "1") if version_info else "1"
 
+    history = page.get("history", {})
+    created_date = _format_confluence_date(history.get("createdDate", ""))
+    created_by = history.get("createdBy", {})
+    created_by_name = created_by.get("displayName", "") if created_by else ""
+
+    modified_date = _format_confluence_date(version_info.get("when", "") if version_info else "")
+    modified_by = version_info.get("by", {}) if version_info else {}
+    modified_by_name = modified_by.get("displayName", "") if modified_by else ""
+
     result = (
         f"### {title}\n"
         f"- **Page ID:** {page_id}\n"
@@ -942,6 +966,18 @@ def format_page(
         f"- **Status:** {status}\n"
         f"- **Version:** {version}"
     )
+
+    if created_date:
+        created_line = f"\n- **Created:** {created_date}"
+        if created_by_name:
+            created_line += f" by {created_by_name}"
+        result += created_line
+
+    if modified_date:
+        modified_line = f"\n- **Last modified:** {modified_date}"
+        if modified_by_name:
+            modified_line += f" by {modified_by_name}"
+        result += modified_line
 
     if include_body:
         body = page.get("body", {})
@@ -989,12 +1025,21 @@ def format_page_with_frontmatter(
     ancestors = page.get("ancestors", [])
     parent_id = ancestors[-1].get("id", "") if ancestors else ""
 
+    # Extract dates
+    history = page.get("history", {})
+    created_date = _format_confluence_date(history.get("createdDate", ""))
+    modified_date = _format_confluence_date(version_info.get("when", "") if version_info else "")
+
     # Build frontmatter
     fm_lines = ["---"]
     fm_lines.append(f"title: {title}")
     fm_lines.append(f"space: {space_key}")
     fm_lines.append(f"page_id: {page_id}")
     fm_lines.append(f"version: {version}")
+    if created_date:
+        fm_lines.append(f"created: {created_date}")
+    if modified_date:
+        fm_lines.append(f"updated: {modified_date}")
     if parent_id:
         fm_lines.append(f"parent: {parent_id}")
     if labels_list:
@@ -1154,6 +1199,65 @@ def get_page(
         if isinstance(response, dict):
             return response
         return {}
+
+
+def get_page_versions(
+    page_id: str,
+    *,
+    max_results: int = 25,
+) -> list[dict[str, Any]]:
+    """Get version history for a page.
+
+    Args:
+        page_id: Page ID.
+        max_results: Maximum versions to return.
+
+    Returns:
+        List of version dictionaries (newest first).
+
+    Raises:
+        APIError: If the request fails.
+    """
+    params: dict[str, Any] = {
+        "limit": max_results,
+        "expand": "content",
+    }
+    response = get(
+        "confluence",
+        api_path(f"content/{page_id}/version"),
+        params=params,
+    )
+    if isinstance(response, dict):
+        return response.get("results", [])
+    return response if isinstance(response, list) else []
+
+
+def format_page_versions(versions: list[dict[str, Any]]) -> str:
+    """Format page version history for display.
+
+    Args:
+        versions: List of version dictionaries from the API.
+
+    Returns:
+        Formatted markdown string.
+    """
+    if not versions:
+        return "No version history found"
+
+    parts = []
+    for v in versions:
+        number = v.get("number", "?")
+        when = _format_confluence_date(v.get("when", ""))
+        by = v.get("by", {})
+        by_name = by.get("displayName", "Unknown") if by else "Unknown"
+        message = v.get("message", "")
+
+        entry = f"### Version {number}\n- **Date:** {when}\n- **Author:** {by_name}"
+        if message:
+            entry += f"\n- **Message:** {message}"
+        parts.append(entry)
+
+    return "\n\n".join(parts)
 
 
 _IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
@@ -1887,7 +1991,7 @@ def cmd_page(args: argparse.Namespace) -> int:
     try:
         if args.page_command == "get":
             # Determine what to expand
-            expand = ["body.atlas_doc_format", "version", "space"]
+            expand = ["body.atlas_doc_format", "version", "space", "history"]
             if args.expand:
                 expand = args.expand.split(",")
 
@@ -1896,6 +2000,7 @@ def cmd_page(args: argparse.Namespace) -> int:
                     "body.atlas_doc_format",
                     "version",
                     "space",
+                    "history",
                     "metadata.labels",
                     "ancestors",
                 ]
@@ -1963,6 +2068,19 @@ def cmd_page(args: argparse.Namespace) -> int:
                 print(f"Saved to: {args.output}")
             else:
                 print(output)
+
+        elif args.page_command == "history":
+            page = get_page(args.page_identifier)
+            page_id = page.get("id", "")
+            if not page_id:
+                print("Error: could not resolve page ID", file=sys.stderr)
+                return 1
+
+            versions = get_page_versions(page_id, max_results=args.max_results)
+            if args.json:
+                print(format_json(versions))
+            else:
+                print(format_page_versions(versions))
 
         elif args.page_command == "create":
             # Get body content
@@ -2357,6 +2475,14 @@ def main() -> int:
     get_parser.add_argument(
         "--output", "-o", help="Write output to file (images downloaded to sibling directory)"
     )
+
+    # History subcommand
+    history_parser = page_subparsers.add_parser("history", help="Show page version history")
+    history_parser.add_argument("page_identifier", help="Page ID or title")
+    history_parser.add_argument(
+        "--max-results", type=int, default=25, help="Max versions to return (default: 25)"
+    )
+    history_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Create subcommand
     create_parser = page_subparsers.add_parser("create", help="Create new page")
