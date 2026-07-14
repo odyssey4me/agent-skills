@@ -4,6 +4,7 @@
     "config:recommended",
     "helpers:pinGitHubActionDigests"
   ],
+  "dependencyDashboard": false,
   "schedule": [
     "after 10pm every weekday",
     "every weekend",
