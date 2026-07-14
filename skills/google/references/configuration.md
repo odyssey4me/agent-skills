@@ -121,9 +121,7 @@ gog config set timezone "America/New_York"
 
 ## Dependency management
 
-The gogcli version is pinned in `skills/google/dependencies.json` with SHA-256 checksums for all platform release artifacts. The `check` command reports whether the installed binary matches the pinned version and when it was last security-validated.
-
-Updates are managed by Renovate and validated by CI before merge. See [SECURITY.md](https://github.com/odyssey4me/agent-skills/blob/main/SECURITY.md) for the full security validation process.
+The gogcli version is pinned in `skills/google/SKILL.md` frontmatter (`gogcli-version`). Updates are managed by Renovate and validated by CI (checksum verification and govulncheck) before merge. See [SECURITY.md](https://github.com/odyssey4me/agent-skills/blob/main/SECURITY.md) for the full security validation process.
 
 ## Schema introspection
 

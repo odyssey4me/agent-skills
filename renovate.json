@@ -20,11 +20,11 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Update gogcli version in dependencies.json",
+      "description": "Update gogcli version in SKILL.md frontmatter",
       "managerFilePatterns": [
-        "/skills/google/dependencies\\.json$/"
+        "/skills/google/SKILL\\.md$/"
       ],
-      "matchStrings": ["\"version\":\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\"repository\":\\s*\"(?<packageName>[^\"]+)\""],
+      "matchStrings": ["gogcli-version:\\s*\"(?<currentValue>[^\"]+)\"\\s*\\n\\s*gogcli-repository:\\s*(?<packageName>[^\\s]+)"],
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.*)$"
     }
@@ -63,11 +63,10 @@
       "groupName": "github-actions"
     },
     {
-      "description": "gogcli: require manual merge and security validation",
+      "description": "gogcli: security validation with extended release age",
       "matchPackageNames": [
         "openclaw/gogcli"
       ],
-      "automerge": false,
       "minimumReleaseAge": "7 days"
     }
   ]

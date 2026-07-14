@@ -11,11 +11,11 @@ To report a security vulnerability, please open a [GitHub issue](https://github.
 - **SHA-pinned GitHub Actions** — all actions are pinned to commit digests, not mutable version tags. [Renovate](https://docs.renovatebot.com/) maintains the pins via the `helpers:pinGitHubActionDigests` preset.
 - **Minimum release age** — dependency updates are held for 14 days (`minimumReleaseAge`) before Renovate proposes them, reducing exposure to compromised releases.
 - **Automated updates with gated merge** — patch and minor updates auto-merge when CI passes. Major updates and security-sensitive dependencies (e.g. gogcli) require manual review.
-- **External binary verification** — the gogcli dependency is pinned by version with SHA-256 checksums in `skills/google/dependencies.json`. See [External CLI tools](#external-cli-tools) below for the full validation process.
+- **External binary verification** — the gogcli dependency is pinned by version in `skills/google/SKILL.md` frontmatter and verified against upstream checksums in CI. See [External CLI tools](#external-cli-tools) below for the full validation process.
 
 ### Least-privilege CI
 
-- Each workflow declares explicit `permissions`, defaulting to `contents: read`. Only workflows that need write access (release, gogcli validation) request it.
+- Each workflow declares explicit `permissions`, defaulting to `contents: read`. Only workflows that need write access (release) request it.
 - See `.github/workflows/` for the specific permissions granted to each workflow.
 
 ### Branch protection
@@ -43,20 +43,17 @@ Some skills depend on external CLI tools (e.g. `gog` for Google Workspace, `gh` 
 
 #### gogcli (gog)
 
-The Google Workspace skill pins a specific gogcli version with SHA-256 checksums in `skills/google/dependencies.json`. The update and validation process:
+The Google Workspace skill pins a specific gogcli version in `skills/google/SKILL.md` frontmatter. The update and validation process:
 
-1. **Renovate** detects new [gogcli releases](https://github.com/openclaw/gogcli/releases) and opens a PR bumping the version. gogcli PRs require manual review (no auto-merge) and have a 7-day minimum release age.
+1. **Renovate** detects new [gogcli releases](https://github.com/openclaw/gogcli/releases) and opens a PR bumping the version. gogcli PRs have a 7-day minimum release age.
 
 2. **CI validation** (`validate-gogcli` workflow) runs automatically on the PR:
-   - Fetches release checksums from the GitHub release and updates `dependencies.json`
-   - Downloads the release tarball and verifies its SHA-256 checksum
+   - Fetches release checksums from the GitHub release
+   - Downloads the release tarball and verifies its SHA-256 checksum against upstream
    - Clones the gogcli source at the tagged version
    - Runs [`govulncheck`](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck) to scan for known CVEs in gogcli's Go dependencies
-   - Stamps a validation timestamp in `dependencies.json`
 
-3. **Manual review and merge** after all checks pass.
-
-The `check` command (`skills/google/scripts/google.py check`) reports whether the installed binary matches the pinned version and when it was last validated.
+3. **Auto-merge** after all checks pass.
 
 #### Limitations
 

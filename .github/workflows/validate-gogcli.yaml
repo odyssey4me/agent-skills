@@ -3,26 +3,25 @@ name: Validate gogcli
 on:
   pull_request:
     paths:
-      - skills/google/dependencies.json
+      - skills/google/SKILL.md
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Read pinned version
         id: deps
         run: |
-          version=$(jq -r '.gogcli.version' skills/google/dependencies.json)
-          repo=$(jq -r '.gogcli.repository' skills/google/dependencies.json)
+          version=$(grep 'gogcli-version:' skills/google/SKILL.md | sed 's/.*"\(.*\)"/\1/')
+          repo=$(grep 'gogcli-repository:' skills/google/SKILL.md | awk '{print $2}')
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "repo=${repo}" >> "$GITHUB_OUTPUT"
+          echo "gogcli version: ${version}, repo: ${repo}"
 
       - name: Fetch release checksums
         run: |
@@ -33,34 +32,6 @@ jobs:
             -o /tmp/checksums.txt
           cat /tmp/checksums.txt
 
-      - name: Update checksums in dependencies.json
-        run: |
-          version="${{ steps.deps.outputs.version }}"
-          checksums_file="/tmp/checksums.txt"
-
-          get_sha() {
-            awk -v name="$1" '$2 == name {print $1}' "$checksums_file"
-          }
-
-          jq \
-            --arg ver "$version" \
-            --arg linux_amd64 "$(get_sha "gogcli_${version}_linux_amd64.tar.gz")" \
-            --arg linux_arm64 "$(get_sha "gogcli_${version}_linux_arm64.tar.gz")" \
-            --arg darwin_amd64 "$(get_sha "gogcli_${version}_darwin_amd64.tar.gz")" \
-            --arg darwin_arm64 "$(get_sha "gogcli_${version}_darwin_arm64.tar.gz")" \
-            --arg windows_amd64 "$(get_sha "gogcli_${version}_windows_amd64.zip")" \
-            --arg windows_arm64 "$(get_sha "gogcli_${version}_windows_arm64.zip")" \
-            '.gogcli.checksums = {
-               ("gogcli_" + $ver + "_linux_amd64.tar.gz"): $linux_amd64,
-               ("gogcli_" + $ver + "_linux_arm64.tar.gz"): $linux_arm64,
-               ("gogcli_" + $ver + "_darwin_amd64.tar.gz"): $darwin_amd64,
-               ("gogcli_" + $ver + "_darwin_arm64.tar.gz"): $darwin_arm64,
-               ("gogcli_" + $ver + "_windows_amd64.zip"): $windows_amd64,
-               ("gogcli_" + $ver + "_windows_arm64.zip"): $windows_arm64
-             }' \
-            skills/google/dependencies.json > /tmp/deps.json
-          mv /tmp/deps.json skills/google/dependencies.json
-
       - name: Download and verify release tarball
         run: |
           version="${{ steps.deps.outputs.version }}"
@@ -69,7 +40,7 @@ jobs:
             "https://github.com/${repo}/releases/download/v${version}/gogcli_${version}_linux_amd64.tar.gz" \
             -o /tmp/gogcli.tar.gz
           actual=$(sha256sum /tmp/gogcli.tar.gz | awk '{print $1}')
-          expected=$(jq -r ".gogcli.checksums[\"gogcli_${version}_linux_amd64.tar.gz\"]" skills/google/dependencies.json)
+          expected=$(awk -v name="gogcli_${version}_linux_amd64.tar.gz" '$2 == name {print $1}' /tmp/checksums.txt)
           if [ "$actual" != "$expected" ]; then
             echo "::error::Checksum mismatch! Expected: ${expected}, Got: ${actual}"
             exit 1
@@ -90,28 +61,3 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           cd /tmp/gogcli-src
           govulncheck ./...
-
-      - name: Check for checksum changes
-        id: changes
-        run: |
-          if git diff --quiet skills/google/dependencies.json; then
-            echo "No checksum changes — skipping commit"
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Checksums updated — will commit"
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Update validation timestamp and commit
-        if: steps.changes.outputs.changed == 'true'
-        run: |
-          timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          jq --arg ts "$timestamp" '.gogcli.validated = $ts' \
-            skills/google/dependencies.json > /tmp/deps.json
-          mv /tmp/deps.json skills/google/dependencies.json
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add skills/google/dependencies.json
-          git commit -m "chore(google): validate gogcli v${{ steps.deps.outputs.version }}"
-          git push

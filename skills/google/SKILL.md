@@ -6,10 +6,12 @@ description: >-
   files, edit documents, update spreadsheets, or create presentations.
 metadata:
   author: odyssey4me
-  version: "1.1.0"
+  version: "1.2.0"
   category: productivity
   tags: "gmail, calendar, drive, docs, sheets, slides"
   complexity: lightweight
+  gogcli-version: "0.31.0"
+  gogcli-repository: openclaw/gogcli
 license: MIT
 allowed-tools: Bash(gog:*)
 ---
@@ -20,7 +22,7 @@ This skill provides Google Workspace integration using the `gog` CLI ([gogcli](h
 
 ## Prerequisites
 
-Install the `gog` binary:
+Install the `gog` binary (CI-validated version is listed in the frontmatter above):
 
 ```bash
 # Homebrew
@@ -46,16 +48,6 @@ gog auth add your@email.com --services gmail,calendar,drive,docs,sheets,slides
 gog auth doctor
 ```
 
-### Migrating from legacy Python OAuth
-
-If you previously used the Python-based Google skills, clean up the old tokens and config:
-
-```bash
-$SKILL_DIR/scripts/google.py cleanup
-```
-
-Then set up fresh authentication with gog as described above.
-
 ## Quick Reference
 
 ```bash
@@ -70,12 +62,6 @@ gog slides info <presentationId>                # Presentation metadata
 All commands support `--json` for structured output and `--plain` for TSV.
 
 ## Commands
-
-### Check Setup
-
-```bash
-$SKILL_DIR/scripts/google.py check
-```
 
 ### Gmail
 
