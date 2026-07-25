@@ -85,6 +85,7 @@ Full command reference for `gog docs`. All commands support `--json` and `--plai
 - `--line-spacing <N>` — paragraph line spacing percentage (float, e.g. 115)
 - `--space-above <N>` — space above paragraphs in points (float)
 - `--space-below <N>` — space below paragraphs in points (float)
+- `--spacing-mode NEVER_COLLAPSE|COLLAPSE_LISTS` — paragraph spacing mode
 
 ## Tables
 

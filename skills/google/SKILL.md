@@ -6,7 +6,7 @@ description: >-
   files, edit documents, update spreadsheets, or create presentations.
 metadata:
   author: odyssey4me
-  version: "1.2.0"
+  version: "1.2.1"
   category: productivity
   tags: "gmail, calendar, drive, docs, sheets, slides"
   complexity: lightweight

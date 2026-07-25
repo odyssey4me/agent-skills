@@ -131,12 +131,16 @@ Repeat for the paragraph after each table.
 
 ## Bullet List Spacing
 
-After markdown import, bullet list items default to `spacingMode: COLLAPSE_LISTS`, which causes Google Docs to collapse spacing between consecutive list items regardless of `spaceBelow` settings. The fix is to set `spacingMode: NEVER_COLLAPSE` on bullet paragraphs, but `gog docs format` does not yet support a `--spacing-mode` flag.
-
-Tracked in [openclaw/gogcli#885](https://github.com/openclaw/gogcli/issues/885). Once resolved:
+After markdown import, bullet list items default to `spacingMode: COLLAPSE_LISTS`, which causes Google Docs to collapse spacing between consecutive list items regardless of `spaceBelow` settings. Fix by setting `spacingMode: NEVER_COLLAPSE` on bullet paragraphs:
 
 ```bash
 gog docs format <docId> --spacing-mode NEVER_COLLAPSE
+```
+
+Accepted values: `NEVER_COLLAPSE`, `COLLAPSE_LISTS`. Composes with other flags:
+
+```bash
+gog docs format <docId> --spacing-mode NEVER_COLLAPSE --space-below 8
 ```
 
 ## Local Image Handling
