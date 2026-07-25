@@ -1481,13 +1481,16 @@ def format_issue(issue: dict[str, Any], custom_fields: dict[str, str] | None = N
     issue_type = fields.get("issuetype", {})
     issue_type_name = issue_type.get("name") if issue_type else None
 
+    reporter = fields.get("reporter", {})
+    reporter_name = reporter.get("displayName", "Unknown") if reporter else "Unknown"
+
     result = f"### {key}: {summary}\n"
     if issue_type_name:
         result += f"- **Type:** {issue_type_name}\n"
     result += f"- **Status:** {status}\n"
     if resolution_name:
         result += f"- **Resolution:** {resolution_name}\n"
-    result += f"- **Assignee:** {assignee_name}\n- **Priority:** {priority_name}"
+    result += f"- **Assignee:** {assignee_name}\n- **Reporter:** {reporter_name}\n- **Priority:** {priority_name}"
 
     return _append_custom_fields(result, fields, custom_fields)
 
@@ -1967,6 +1970,7 @@ DEFAULT_FIELDS = [
     "status",
     "resolution",
     "assignee",
+    "reporter",
     "priority",
     "created",
     "updated",

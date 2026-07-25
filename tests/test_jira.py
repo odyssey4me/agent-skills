@@ -578,6 +578,7 @@ class TestFormatting:
                 "issuetype": {"name": "Bug"},
                 "status": {"name": "Open"},
                 "assignee": {"displayName": "Alice"},
+                "reporter": {"displayName": "Bob"},
                 "priority": {"name": "High"},
             },
         }
@@ -588,6 +589,7 @@ class TestFormatting:
         assert "- **Type:** Bug" in result
         assert "- **Status:** Open" in result
         assert "- **Assignee:** Alice" in result
+        assert "- **Reporter:** Bob" in result
         assert "- **Priority:** High" in result
 
     def test_format_issues_list(self):
