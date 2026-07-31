@@ -577,7 +577,8 @@ def _parse_markdown_to_adf(text: str) -> list[dict[str, Any]]:
     lines = text.split("\n")
     blocks: list[dict[str, Any]] = []
     pending_lines: list[str] = []
-    list_items: list[dict[str, Any]] = []
+    bullet_items: list[dict[str, Any]] = []
+    ordered_items: list[dict[str, Any]] = []
     table_rows: list[dict[str, Any]] = []
     i = 0
 
@@ -588,9 +589,12 @@ def _parse_markdown_to_adf(text: str) -> list[dict[str, Any]]:
             pending_lines.clear()
 
     def _flush_list() -> None:
-        if list_items:
-            blocks.append({"type": "bulletList", "content": list(list_items)})
-            list_items.clear()
+        if bullet_items:
+            blocks.append({"type": "bulletList", "content": list(bullet_items)})
+            bullet_items.clear()
+        if ordered_items:
+            blocks.append({"type": "orderedList", "content": list(ordered_items)})
+            ordered_items.clear()
 
     def _flush_table() -> None:
         if table_rows:
@@ -646,13 +650,36 @@ def _parse_markdown_to_adf(text: str) -> list[dict[str, Any]]:
         if list_match:
             _flush_pending()
             _flush_table()
-            list_items.append(
+            if ordered_items:
+                _flush_list()
+            bullet_items.append(
                 {
                     "type": "listItem",
                     "content": [
                         {
                             "type": "paragraph",
                             "content": _parse_inline(list_match.group(1)),
+                        }
+                    ],
+                }
+            )
+            i += 1
+            continue
+
+        # Ordered list item
+        ordered_match = re.match(r"^\d+[.)]\s+(.+)$", stripped)
+        if ordered_match:
+            _flush_pending()
+            _flush_table()
+            if bullet_items:
+                _flush_list()
+            ordered_items.append(
+                {
+                    "type": "listItem",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": _parse_inline(ordered_match.group(1)),
                         }
                     ],
                 }

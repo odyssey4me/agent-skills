@@ -532,6 +532,38 @@ class TestApiHelpers:
         assert len(blocks) == 1
         assert blocks[0]["type"] == "paragraph"
 
+    def test_parse_markdown_to_adf_ordered_list(self):
+        """Test numbered list items produce an orderedList node."""
+        blocks = _parse_markdown_to_adf("1. First\n2. Second\n3. Third")
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "orderedList"
+        items = blocks[0]["content"]
+        assert len(items) == 3
+        assert items[0]["content"][0]["content"][0]["text"] == "First"
+        assert items[1]["content"][0]["content"][0]["text"] == "Second"
+        assert items[2]["content"][0]["content"][0]["text"] == "Third"
+
+    def test_parse_markdown_to_adf_ordered_list_with_parens(self):
+        """Test numbered list items with parenthesis delimiter."""
+        blocks = _parse_markdown_to_adf("1) First\n2) Second")
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "orderedList"
+        assert len(blocks[0]["content"]) == 2
+
+    def test_parse_markdown_to_adf_mixed_lists(self):
+        """Test bullet and ordered lists stay separate."""
+        blocks = _parse_markdown_to_adf("- Bullet\n\n1. Ordered")
+        assert len(blocks) == 2
+        assert blocks[0]["type"] == "bulletList"
+        assert blocks[1]["type"] == "orderedList"
+
+    def test_parse_markdown_to_adf_adjacent_list_types(self):
+        """Test switching list type without blank line flushes previous list."""
+        blocks = _parse_markdown_to_adf("- Bullet\n1. Ordered")
+        assert len(blocks) == 2
+        assert blocks[0]["type"] == "bulletList"
+        assert blocks[1]["type"] == "orderedList"
+
 
 class TestFormatting:
     """Tests for formatting functions."""
