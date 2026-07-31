@@ -14,9 +14,9 @@ from skills.jira.scripts.jira import (
     JiraDefaults,
     JiraDetectionError,
     ProjectDefaults,
+    _adf_to_markdown,
     _build_epic_children_jql,
     _deployment_cache,
-    _extract_text_from_adf,
     _format_component,
     _format_scope_ari,
     _format_timestamp,
@@ -48,6 +48,7 @@ from skills.jira.scripts.jira import (
     create_issue,
     create_link,
     delete_credential,
+    delete_link,
     detect_deployment_type,
     discover_custom_field,
     do_transition,
@@ -2643,12 +2644,12 @@ class TestComments:
         assert result[1]["body"] == "Second"
         assert mock_get.call_count == 2
 
-    def test_extract_text_from_adf_plain_string(self):
-        """Test ADF extraction with a plain text string (DC format)."""
-        assert _extract_text_from_adf("Hello world") == "Hello world"
+    def test_adf_to_markdown_plain_string(self):
+        """Test ADF conversion with a plain text string (DC format)."""
+        assert _adf_to_markdown("Hello world") == "Hello world"
 
-    def test_extract_text_from_adf_dict(self):
-        """Test ADF extraction with an ADF document node."""
+    def test_adf_to_markdown_paragraph(self):
+        """Test ADF conversion with a simple paragraph."""
         adf = {
             "type": "doc",
             "version": 1,
@@ -2662,13 +2663,13 @@ class TestComments:
                 }
             ],
         }
+        assert _adf_to_markdown(adf) == "Hello world"
 
-        assert _extract_text_from_adf(adf) == "Hello world"
-
-    def test_extract_text_from_adf_nested(self):
-        """Test ADF extraction with nested content."""
+    def test_adf_to_markdown_multiple_paragraphs(self):
+        """Test ADF conversion preserves paragraph separation."""
         adf = {
             "type": "doc",
+            "version": 1,
             "content": [
                 {
                     "type": "paragraph",
@@ -2680,13 +2681,432 @@ class TestComments:
                 },
             ],
         }
+        result = _adf_to_markdown(adf)
+        assert "Line 1" in result
+        assert "Line 2" in result
+        assert result.index("Line 1") < result.index("Line 2")
 
-        assert _extract_text_from_adf(adf) == "Line 1Line 2"
+    def test_adf_to_markdown_missing_version(self):
+        """Test ADF conversion injects version when missing."""
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "No version"}],
+                }
+            ],
+        }
+        assert _adf_to_markdown(adf) == "No version"
 
-    def test_extract_text_from_adf_non_dict(self):
-        """Test ADF extraction with non-dict, non-string input."""
-        assert _extract_text_from_adf(42) == ""
-        assert _extract_text_from_adf(None) == ""
+    def test_adf_to_markdown_non_dict(self):
+        """Test ADF conversion with non-dict, non-string input."""
+        assert _adf_to_markdown(42) == ""
+        assert _adf_to_markdown(None) == ""
+
+    def test_adf_to_markdown_inline_card(self):
+        """Test ADF conversion renders inlineCard nodes."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "See "},
+                        {
+                            "type": "inlineCard",
+                            "attrs": {"url": "https://jira.example.com/browse/PROJ-456"},
+                        },
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "PROJ-456" in result
+
+    def test_adf_to_markdown_mention(self):
+        """Test ADF conversion renders mention nodes."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "mention", "attrs": {"id": "abc123", "text": "Jane Doe"}},
+                    ],
+                }
+            ],
+        }
+        assert "Jane Doe" in _adf_to_markdown(adf)
+
+    def test_adf_to_markdown_emoji(self):
+        """Test ADF conversion renders emoji nodes."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "emoji",
+                            "attrs": {"shortName": ":thumbsup:", "text": "\U0001f44d"},
+                        },
+                    ],
+                }
+            ],
+        }
+        assert "\U0001f44d" in _adf_to_markdown(adf)
+
+    def test_adf_to_markdown_status(self):
+        """Test ADF conversion renders status lozenges."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "status", "attrs": {"text": "IN PROGRESS", "color": "blue"}},
+                    ],
+                }
+            ],
+        }
+        assert "IN PROGRESS" in _adf_to_markdown(adf)
+
+    def test_adf_to_markdown_date(self):
+        """Test ADF conversion renders date nodes."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "date", "attrs": {"timestamp": "1672531200000"}},
+                    ],
+                }
+            ],
+        }
+        assert "2023-01-01" in _adf_to_markdown(adf)
+
+    def test_adf_to_markdown_heading(self):
+        """Test ADF conversion renders headings."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "heading",
+                    "attrs": {"level": 2},
+                    "content": [{"type": "text", "text": "Title"}],
+                }
+            ],
+        }
+        assert "## Title" in _adf_to_markdown(adf)
+
+    def test_adf_to_markdown_bullet_list(self):
+        """Test ADF conversion renders bullet lists."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "bulletList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item A"}],
+                                }
+                            ],
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item B"}],
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "- Item A" in result
+        assert "- Item B" in result
+
+    def test_adf_to_markdown_ordered_list(self):
+        """Test ADF conversion renders ordered lists."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "orderedList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "First"}],
+                                }
+                            ],
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Second"}],
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "1. First" in result
+        assert "2. Second" in result
+
+    def test_adf_to_markdown_code_block(self):
+        """Test ADF conversion renders code blocks."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "codeBlock",
+                    "attrs": {"language": "python"},
+                    "content": [{"type": "text", "text": "print('hello')"}],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "```python" in result
+        assert "print('hello')" in result
+
+    def test_adf_to_markdown_blockquote(self):
+        """Test ADF conversion renders blockquotes."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "blockquote",
+                    "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "Quote"}]}
+                    ],
+                }
+            ],
+        }
+        assert "> Quote" in _adf_to_markdown(adf)
+
+    def test_adf_to_markdown_table(self):
+        """Test ADF conversion renders tables."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "table",
+                    "attrs": {"isNumberColumnEnabled": False, "layout": "default"},
+                    "content": [
+                        {
+                            "type": "tableRow",
+                            "content": [
+                                {
+                                    "type": "tableHeader",
+                                    "content": [
+                                        {
+                                            "type": "paragraph",
+                                            "content": [{"type": "text", "text": "Col A"}],
+                                        }
+                                    ],
+                                },
+                                {
+                                    "type": "tableHeader",
+                                    "content": [
+                                        {
+                                            "type": "paragraph",
+                                            "content": [{"type": "text", "text": "Col B"}],
+                                        }
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            "type": "tableRow",
+                            "content": [
+                                {
+                                    "type": "tableCell",
+                                    "content": [
+                                        {
+                                            "type": "paragraph",
+                                            "content": [{"type": "text", "text": "1"}],
+                                        }
+                                    ],
+                                },
+                                {
+                                    "type": "tableCell",
+                                    "content": [
+                                        {
+                                            "type": "paragraph",
+                                            "content": [{"type": "text", "text": "2"}],
+                                        }
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "Col A" in result
+        assert "Col B" in result
+        assert "1" in result
+        assert "2" in result
+
+    def test_adf_to_markdown_text_with_marks(self):
+        """Test ADF conversion applies marks to text nodes."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Hello "},
+                        {
+                            "type": "text",
+                            "text": "bold",
+                            "marks": [{"type": "strong"}],
+                        },
+                        {"type": "text", "text": " world"},
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "Hello **bold** world" in result
+
+    def test_adf_to_markdown_link_mark(self):
+        """Test ADF conversion renders link marks."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "click here",
+                            "marks": [{"type": "link", "attrs": {"href": "https://example.com"}}],
+                        },
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "[click here](https://example.com)" in result
+
+    def test_adf_to_markdown_task_list(self):
+        """Test ADF conversion renders task lists with checkbox state."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "taskList",
+                    "attrs": {"localId": "x"},
+                    "content": [
+                        {
+                            "type": "taskItem",
+                            "attrs": {"state": "DONE", "localId": "a"},
+                            "content": [{"type": "text", "text": "Done task"}],
+                        },
+                        {
+                            "type": "taskItem",
+                            "attrs": {"state": "TODO", "localId": "b"},
+                            "content": [{"type": "text", "text": "Todo task"}],
+                        },
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "[x] Done task" in result
+        assert "[ ] Todo task" in result
+
+    def test_adf_to_markdown_panel(self):
+        """Test ADF conversion renders panel content."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "panel",
+                    "attrs": {"panelType": "warning"},
+                    "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "Be careful"}]}
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "Be careful" in result
+
+    def test_adf_to_markdown_hard_break(self):
+        """Test ADF conversion renders hard breaks."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Line 1"},
+                        {"type": "hardBreak"},
+                        {"type": "text", "text": "Line 2"},
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "Line 1" in result
+        assert "Line 2" in result
+
+    def test_adf_to_markdown_fallback_on_unsupported(self):
+        """Test ADF conversion falls back to text extraction for unsupported nodes."""
+        adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "decisionList",
+                    "attrs": {"localId": "x"},
+                    "content": [
+                        {
+                            "type": "decisionItem",
+                            "attrs": {"localId": "a", "state": "DECIDED"},
+                            "content": [{"type": "text", "text": "Go with option A"}],
+                        }
+                    ],
+                }
+            ],
+        }
+        result = _adf_to_markdown(adf)
+        assert "Go with option A" in result
 
     def test_format_comments(self):
         """Test formatting comments as markdown."""
@@ -2718,6 +3138,7 @@ class TestComments:
                 "created": "2026-01-01T00:00:00.000+0000",
                 "body": {
                     "type": "doc",
+                    "version": 1,
                     "content": [
                         {
                             "type": "paragraph",
@@ -4226,6 +4647,90 @@ class TestIssueLinking:
         assert payload["type"]["name"] == "Blocks"
 
 
+class TestDeleteLink:
+    """Tests for delete_link()."""
+
+    SAMPLE_ISSUE = {
+        "fields": {
+            "issuelinks": [
+                {
+                    "id": "10001",
+                    "type": {
+                        "name": "Blocks",
+                        "inward": "is blocked by",
+                        "outward": "blocks",
+                    },
+                    "outwardIssue": {"key": "TGT-2"},
+                },
+                {
+                    "id": "10002",
+                    "type": {
+                        "name": "Relates",
+                        "inward": "relates to",
+                        "outward": "relates to",
+                    },
+                    "inwardIssue": {"key": "TGT-3"},
+                },
+            ]
+        }
+    }
+
+    @patch("skills.jira.scripts.jira.delete")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get_issue")
+    def test_delete_link_by_outward_label(self, mock_get, mock_api_path, mock_delete):
+        """Test deleting a link using outward label."""
+        mock_get.return_value = self.SAMPLE_ISSUE
+        mock_api_path.return_value = "rest/api/3/issueLink/10001"
+        mock_delete.return_value = {}
+
+        delete_link("SRC-1", "blocks", "TGT-2")
+
+        mock_delete.assert_called_once_with("jira", "rest/api/3/issueLink/10001")
+
+    @patch("skills.jira.scripts.jira.delete")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get_issue")
+    def test_delete_link_by_type_name(self, mock_get, mock_api_path, mock_delete):
+        """Test deleting a link using type name."""
+        mock_get.return_value = self.SAMPLE_ISSUE
+        mock_api_path.return_value = "rest/api/3/issueLink/10001"
+        mock_delete.return_value = {}
+
+        delete_link("SRC-1", "Blocks", "TGT-2")
+
+        mock_delete.assert_called_once()
+
+    @patch("skills.jira.scripts.jira.delete")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get_issue")
+    def test_delete_link_inward_issue(self, mock_get, mock_api_path, mock_delete):
+        """Test deleting a link where the target is the inward issue."""
+        mock_get.return_value = self.SAMPLE_ISSUE
+        mock_api_path.return_value = "rest/api/3/issueLink/10002"
+        mock_delete.return_value = {}
+
+        delete_link("SRC-1", "Relates", "TGT-3")
+
+        mock_delete.assert_called_once()
+
+    @patch("skills.jira.scripts.jira.get_issue")
+    def test_delete_link_not_found(self, mock_get):
+        """Test that missing link raises ValueError."""
+        mock_get.return_value = self.SAMPLE_ISSUE
+
+        with pytest.raises(ValueError, match="No 'Blocks' link found"):
+            delete_link("SRC-1", "Blocks", "NONEXISTENT-99")
+
+    @patch("skills.jira.scripts.jira.get_issue")
+    def test_delete_link_wrong_type(self, mock_get):
+        """Test that wrong link type raises ValueError."""
+        mock_get.return_value = self.SAMPLE_ISSUE
+
+        with pytest.raises(ValueError, match="No 'Clones' link found"):
+            delete_link("SRC-1", "Clones", "TGT-2")
+
+
 class TestParseLinkArgs:
     """Tests for _parse_link_args()."""
 
@@ -4405,6 +4910,62 @@ class TestCmdIssueLinkIntegration:
         mock_link.assert_called_once_with("DEMO-123", "Blocks", "DEMO-456")
         captured = capsys.readouterr()
         assert "Linked DEMO-123" in captured.out
+
+    @patch("skills.jira.scripts.jira.delete_link")
+    @patch("skills.jira.scripts.jira.update_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_update_with_unlinks(self, mock_jira_defaults, mock_update, mock_unlink, capsys):
+        """Test issue update with --unlink args."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_update.return_value = {}
+
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            from_file=None,
+            set_field=None,
+            link=None,
+            unlink=["Blocks:DEMO-456"],
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        mock_unlink.assert_called_once_with("DEMO-123", "Blocks", "DEMO-456")
+        captured = capsys.readouterr()
+        assert "Unlinked DEMO-123" in captured.out
+
+    @patch("skills.jira.scripts.jira.delete_link")
+    @patch("skills.jira.scripts.jira.update_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_unlink_failure_continues(self, mock_jira_defaults, mock_update, mock_unlink, capsys):
+        """Test that an unlink failure doesn't fail the whole update."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_update.return_value = {}
+        mock_unlink.side_effect = ValueError("No 'Blocks' link found")
+
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            from_file=None,
+            set_field=None,
+            link=None,
+            unlink=["Blocks:DEMO-456"],
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Warning: failed to unlink from DEMO-456" in captured.err
 
     @patch("skills.jira.scripts.jira.create_link")
     @patch("skills.jira.scripts.jira.create_issue")

@@ -11,7 +11,7 @@ Usage:
     python jira.py transitions list DEMO-123
 
 Requirements:
-    pip install --user requests keyring pyyaml
+    pip install --user requests keyring pyyaml pyadf
 """
 
 from __future__ import annotations
@@ -1492,7 +1492,15 @@ def format_issue(issue: dict[str, Any], custom_fields: dict[str, str] | None = N
         result += f"- **Resolution:** {resolution_name}\n"
     result += f"- **Assignee:** {assignee_name}\n- **Reporter:** {reporter_name}\n- **Priority:** {priority_name}"
 
-    return _append_custom_fields(result, fields, custom_fields)
+    result = _append_custom_fields(result, fields, custom_fields)
+
+    description = fields.get("description")
+    if description:
+        desc_md = _adf_to_markdown(description).strip()
+        if desc_md:
+            result += f"\n\n#### Description\n\n{desc_md}"
+
+    return result
 
 
 def format_issues_list(
@@ -2339,6 +2347,45 @@ def create_link(source_key: str, link_type: str, target_key: str) -> None:
     )
 
 
+def delete_link(issue_key: str, link_type: str, target_key: str) -> None:
+    """Remove a link between two issues.
+
+    Fetches the issue's links, finds the one matching the given type and
+    target, and deletes it via the API.
+
+    Args:
+        issue_key: The issue to remove the link from.
+        link_type: Link type name, inward, or outward label.
+        target_key: The linked issue key.
+
+    Raises:
+        ValueError: If no matching link is found.
+    """
+    issue = get_issue(issue_key, fields=["issuelinks"])
+    links = issue.get("fields", {}).get("issuelinks", [])
+    lt_lower = link_type.lower()
+    target_lower = target_key.upper()
+
+    for link in links:
+        link_type_obj = link.get("type", {})
+        type_name = link_type_obj.get("name", "").lower()
+        inward_label = link_type_obj.get("inward", "").lower()
+        outward_label = link_type_obj.get("outward", "").lower()
+
+        if lt_lower not in (type_name, inward_label, outward_label):
+            continue
+
+        outward_issue = link.get("outwardIssue", {})
+        inward_issue = link.get("inwardIssue", {})
+        linked_key = (outward_issue.get("key", "") or inward_issue.get("key", "")).upper()
+
+        if linked_key == target_lower:
+            delete("jira", api_path(f"issueLink/{link['id']}"))
+            return
+
+    raise ValueError(f"No '{link_type}' link found between {issue_key} and {target_key}")
+
+
 def add_comment(issue_key: str, body: str, security_level: str | None = None) -> dict[str, Any]:
     """Add a comment to an issue.
 
@@ -2367,17 +2414,38 @@ def add_comment(issue_key: str, body: str, security_level: str | None = None) ->
 # ============================================================================
 
 
-def _extract_text_from_adf(node: Any) -> str:
-    """Recursively extract plain text from an ADF (Atlassian Document Format) node.
+def _adf_to_markdown(node: Any) -> str:
+    """Convert an ADF (Atlassian Document Format) node to markdown.
 
-    For plain string bodies (Data Center), returns the string as-is.
+    Uses the pyadf library for conversion. For plain string bodies (Data
+    Center), returns the string as-is.
 
     Args:
         node: ADF JSON node (dict) or plain text string.
 
     Returns:
-        Extracted plain text.
+        Markdown-formatted string.
     """
+    if isinstance(node, str):
+        return node
+    if not isinstance(node, dict):
+        return ""
+
+    from pyadf import Document, MarkdownConfig
+
+    if node.get("type") == "doc" and "version" not in node:
+        node = {**node, "version": 1}
+
+    try:
+        doc = Document(node)
+        config = MarkdownConfig(date_format="%Y-%m-%d")
+        return doc.to_markdown(config, on_known_unsupported="skip")
+    except Exception:
+        return _adf_extract_text(node)
+
+
+def _adf_extract_text(node: Any) -> str:
+    """Fallback plain-text extractor for ADF nodes that pyadf cannot parse."""
     if isinstance(node, str):
         return node
     if not isinstance(node, dict):
@@ -2386,8 +2454,8 @@ def _extract_text_from_adf(node: Any) -> str:
         return node.get("text", "")
     parts = []
     for child in node.get("content", []):
-        parts.append(_extract_text_from_adf(child))
-    return "".join(parts)
+        parts.append(_adf_extract_text(child))
+    return " ".join(part for part in parts if part)
 
 
 def get_comments(issue_key: str, max_results: int = 50) -> list[dict[str, Any]]:
@@ -2447,7 +2515,7 @@ def format_comments(comments: list[dict[str, Any]], issue_key: str) -> str:
         # Trim to date + time (YYYY-MM-DDTHH:MM)
         if "T" in created:
             created = created[:16].replace("T", " ")
-        body = _extract_text_from_adf(comment.get("body", ""))
+        body = _adf_to_markdown(comment.get("body", "")).strip()
         parts.append(f"\n### {display_name} ({created})\n{body}")
 
     return "\n".join(parts)
@@ -3487,6 +3555,21 @@ def cmd_issue(args: argparse.Namespace) -> int:
                         file=sys.stderr,
                     )
 
+            # Process unlinks (CLI only)
+            cli_unlinks = _parse_link_args(getattr(args, "unlink", None))
+            if isinstance(cli_unlinks, str):
+                print(f"Error: {cli_unlinks}", file=sys.stderr)
+                return 1
+            for link_type, target_key in cli_unlinks:
+                try:
+                    delete_link(args.issue_key, link_type, target_key)
+                    print(f"  Unlinked {args.issue_key} --[{link_type}]--> {target_key}")
+                except (ValueError, APIError) as unlink_err:
+                    print(
+                        f"  Warning: failed to unlink from {target_key}: {unlink_err}",
+                        file=sys.stderr,
+                    )
+
         elif args.issue_command == "comment":
             defaults = get_jira_defaults()
             security_level = args.security_level or defaults.security_level
@@ -4094,6 +4177,12 @@ def main() -> int:
         action="append",
         metavar="TYPE:ISSUE",
         help="Link to another issue (e.g. --link 'Blocks:DEMO-456')",
+    )
+    update_parser.add_argument(
+        "--unlink",
+        action="append",
+        metavar="TYPE:ISSUE",
+        help="Remove a link to another issue (e.g. --unlink 'Blocks:DEMO-456')",
     )
 
     # Comment subcommand

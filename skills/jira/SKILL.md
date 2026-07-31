@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.11.0"
+  version: "0.13.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -19,7 +19,7 @@ Interact with Jira for issue tracking, search, and workflow management.
 
 1. **Install Python dependencies**:
    ```bash
-   pip install --user requests keyring pyyaml
+   pip install --user requests keyring pyyaml pyadf
    ```
 
 2. **Download the skill** from [Releases](https://github.com/odyssey4me/agent-skills/releases) or use directly from this repository.
@@ -33,7 +33,7 @@ $SKILL_DIR/scripts/jira.py check
 ```
 
 This will check:
-- Python dependencies (requests, keyring, pyyaml)
+- Python dependencies (requests, keyring, pyyaml, pyadf)
 - Authentication configuration
 - Connectivity to Jira
 
@@ -145,9 +145,10 @@ $SKILL_DIR/scripts/jira.py issue comments DEMO-123
 $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task"
 $SKILL_DIR/scripts/jira.py issue create --from-file issue.md --priority Critical
 
-# Update (--summary, --description, --priority, --labels, --assignee, --set-field, --link, --from-file)
+# Update (--summary, --description, --priority, --labels, --assignee, --set-field, --link, --unlink, --from-file)
 $SKILL_DIR/scripts/jira.py issue update DEMO-123 --summary "Updated" --set-field story_points=5
 $SKILL_DIR/scripts/jira.py issue update DEMO-123 --link "Blocks:DEMO-456"
+$SKILL_DIR/scripts/jira.py issue update DEMO-123 --unlink "Blocks:DEMO-456"
 
 # Comment (--security-level for private comments)
 $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
