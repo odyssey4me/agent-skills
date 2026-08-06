@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.14.0"
+  version: "0.15.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -141,12 +141,15 @@ $SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status,assignee"
 # List comments
 $SKILL_DIR/scripts/jira.py issue comments DEMO-123
 
-# Create (--project, --type, --summary required; --description, --priority, --labels, --assignee, --set-field, --link, --from-file, --json)
+# Create (--project, --type, --summary required; --description, --priority, --labels, --assignee, --parent, --set-field, --link, --from-file, --json)
 $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task"
+$SKILL_DIR/scripts/jira.py issue create --project DEMO --type Story --summary "New story" --parent EPIC-123
 $SKILL_DIR/scripts/jira.py issue create --from-file issue.md --priority Critical
 
-# Update (--summary, --description, --priority, --labels, --assignee, --set-field, --link, --unlink, --from-file)
+# Update (--summary, --description, --priority, --labels, --assignee, --parent, --remove-parent, --set-field, --link, --unlink, --from-file)
 $SKILL_DIR/scripts/jira.py issue update DEMO-123 --summary "Updated" --set-field story_points=5
+$SKILL_DIR/scripts/jira.py issue update DEMO-123 --parent EPIC-456
+$SKILL_DIR/scripts/jira.py issue update DEMO-123 --remove-parent
 $SKILL_DIR/scripts/jira.py issue update DEMO-123 --link "Blocks:DEMO-456"
 $SKILL_DIR/scripts/jira.py issue update DEMO-123 --unlink "Blocks:DEMO-456"
 
@@ -215,6 +218,15 @@ jira issue comments DEMO-123
 ```bash
 # Create a new bug
 jira issue create --project DEMO --type Bug --summary "Login page broken"
+
+# Create a story under an epic
+jira issue create --project DEMO --type Story --summary "Implement feature" --parent EPIC-123
+
+# Set or change an issue's parent (works for any hierarchy level)
+jira issue update DEMO-123 --parent EPIC-456
+
+# Remove an issue's parent
+jira issue update DEMO-123 --remove-parent
 
 # Update an issue and add a comment
 jira issue update DEMO-123 --priority High --assignee "user@example.com"

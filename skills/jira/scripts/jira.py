@@ -1251,7 +1251,7 @@ def ensure_field_included(fields: list[str] | None, field: str) -> list[str]:
 
 
 _ISSUE_FILE_KNOWN_KEYS = frozenset(
-    {"summary", "project", "type", "priority", "labels", "assignee", "fields", "links"}
+    {"summary", "project", "type", "priority", "labels", "assignee", "fields", "links", "parent"}
 )
 
 
@@ -1306,7 +1306,7 @@ def parse_issue_file(file_path: str) -> tuple[dict[str, Any], str | None]:
             file=sys.stderr,
         )
 
-    for key in ("summary", "project", "type", "priority", "assignee"):
+    for key in ("summary", "project", "type", "priority", "assignee", "parent"):
         if key in fields and fields[key] is not None:
             fields[key] = str(fields[key])
 
@@ -1511,9 +1511,19 @@ def format_issue(issue: dict[str, Any], custom_fields: dict[str, str] | None = N
     reporter = fields.get("reporter", {})
     reporter_name = reporter.get("displayName", "Unknown") if reporter else "Unknown"
 
+    parent = fields.get("parent")
+    parent_str = None
+    if parent and isinstance(parent, dict):
+        parent_key = parent.get("key", "")
+        parent_summary = parent.get("fields", {}).get("summary", "")
+        if parent_key:
+            parent_str = f"{parent_key}: {parent_summary}" if parent_summary else parent_key
+
     result = f"### {key}: {summary}\n"
     if issue_type_name:
         result += f"- **Type:** {issue_type_name}\n"
+    if parent_str:
+        result += f"- **Parent:** {parent_str}\n"
     result += f"- **Status:** {status}\n"
     if resolution_name:
         result += f"- **Resolution:** {resolution_name}\n"
@@ -2208,6 +2218,7 @@ def create_issue(
     labels: list[str] | None = None,
     assignee: str | None = None,
     extra_fields: dict[str, Any] | None = None,
+    parent: str | None = None,
 ) -> dict[str, Any]:
     """Create a new issue.
 
@@ -2220,6 +2231,8 @@ def create_issue(
         labels: List of labels.
         assignee: Assignee account ID.
         extra_fields: Additional fields keyed by field ID.
+        parent: Parent issue key for hierarchy (e.g., epic for stories,
+            feature for epics).
 
     Returns:
         Created issue dictionary.
@@ -2242,6 +2255,9 @@ def create_issue(
     if assignee:
         fields["assignee"] = {"accountId": assignee}
 
+    if parent:
+        fields["parent"] = {"key": parent}
+
     if extra_fields:
         fields.update(extra_fields)
 
@@ -2259,6 +2275,8 @@ def update_issue(
     labels: list[str] | None = None,
     assignee: str | None = None,
     extra_fields: dict[str, Any] | None = None,
+    parent: str | None = None,
+    remove_parent: bool = False,
 ) -> dict[str, Any]:
     """Update an existing issue.
 
@@ -2270,6 +2288,8 @@ def update_issue(
         labels: New labels.
         assignee: New assignee account ID.
         extra_fields: Additional fields keyed by field ID.
+        parent: New parent issue key for hierarchy.
+        remove_parent: If True, remove the parent relationship.
 
     Returns:
         Response dictionary (empty on success).
@@ -2290,6 +2310,11 @@ def update_issue(
 
     if assignee:
         fields["assignee"] = {"accountId": assignee}
+
+    if remove_parent:
+        fields["parent"] = None
+    elif parent:
+        fields["parent"] = {"key": parent}
 
     if extra_fields:
         fields.update(extra_fields)
@@ -3477,6 +3502,8 @@ def cmd_issue(args: argparse.Namespace) -> int:
                     return 1
                 extra_fields.update(cli_result)
 
+            parent = getattr(args, "parent", None) or file_fields.get("parent")
+
             issue = create_issue(
                 project=project,
                 issue_type=issue_type,
@@ -3486,6 +3513,7 @@ def cmd_issue(args: argparse.Namespace) -> int:
                 labels=labels,
                 assignee=assignee,
                 extra_fields=extra_fields or None,
+                parent=parent,
             )
             new_key = issue.get("key", "N/A")
             if args.json:
@@ -3554,6 +3582,9 @@ def cmd_issue(args: argparse.Namespace) -> int:
                     return 1
                 extra_fields.update(cli_result)
 
+            parent = getattr(args, "parent", None) or file_fields.get("parent")
+            remove_parent = getattr(args, "remove_parent", False)
+
             update_issue(
                 issue_key=args.issue_key,
                 summary=summary,
@@ -3562,6 +3593,8 @@ def cmd_issue(args: argparse.Namespace) -> int:
                 labels=labels,
                 assignee=assignee,
                 extra_fields=extra_fields or None,
+                parent=parent,
+                remove_parent=remove_parent,
             )
             print(f"Updated issue: {args.issue_key}")
 
@@ -4172,6 +4205,11 @@ def main() -> int:
         help="Read issue fields and description from a markdown file with YAML frontmatter",
     )
     create_parser.add_argument(
+        "--parent",
+        metavar="ISSUE",
+        help="Parent issue key (e.g. --parent EPIC-123 for story→epic, or FEAT-1 for epic→feature)",
+    )
+    create_parser.add_argument(
         "--link",
         action="append",
         metavar="TYPE:ISSUE",
@@ -4198,6 +4236,17 @@ def main() -> int:
         dest="from_file",
         metavar="PATH",
         help="Read issue fields and description from a markdown file with YAML frontmatter",
+    )
+    update_parser.add_argument(
+        "--parent",
+        metavar="ISSUE",
+        help="Set parent issue key (e.g. --parent EPIC-123 for story→epic)",
+    )
+    update_parser.add_argument(
+        "--remove-parent",
+        action="store_true",
+        default=False,
+        help="Remove the parent relationship from this issue",
     )
     update_parser.add_argument(
         "--link",

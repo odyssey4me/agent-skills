@@ -12,6 +12,7 @@ labels:
   - label1
   - label2
 assignee: "account-id"
+parent: "EPIC-123"       # parent issue key for hierarchy (epic→story, feature→epic, etc.)
 fields:                  # custom fields, same names as --set-field
   story_points: 5
   assigned_team: "Platform"

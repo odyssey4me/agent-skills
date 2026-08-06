@@ -625,6 +625,65 @@ class TestFormatting:
         assert "- **Reporter:** Bob" in result
         assert "- **Priority:** High" in result
 
+    def test_format_issue_with_parent(self):
+        """Test issue formatting shows parent when present."""
+        issue = {
+            "key": "DEMO-124",
+            "fields": {
+                "summary": "Child story",
+                "issuetype": {"name": "Story"},
+                "status": {"name": "Open"},
+                "assignee": {"displayName": "Alice"},
+                "reporter": {"displayName": "Bob"},
+                "priority": {"name": "Medium"},
+                "parent": {
+                    "key": "EPIC-1",
+                    "fields": {"summary": "Parent epic"},
+                },
+            },
+        }
+
+        result = format_issue(issue)
+
+        assert "- **Parent:** EPIC-1: Parent epic" in result
+
+    def test_format_issue_parent_without_summary(self):
+        """Test parent display when summary is not included."""
+        issue = {
+            "key": "DEMO-124",
+            "fields": {
+                "summary": "Child story",
+                "issuetype": {"name": "Story"},
+                "status": {"name": "Open"},
+                "assignee": {"displayName": "Alice"},
+                "reporter": {"displayName": "Bob"},
+                "priority": {"name": "Medium"},
+                "parent": {"key": "EPIC-1"},
+            },
+        }
+
+        result = format_issue(issue)
+
+        assert "- **Parent:** EPIC-1\n" in result
+
+    def test_format_issue_no_parent(self):
+        """Test issue formatting omits parent line when no parent."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test issue",
+                "issuetype": {"name": "Bug"},
+                "status": {"name": "Open"},
+                "assignee": {"displayName": "Alice"},
+                "reporter": {"displayName": "Bob"},
+                "priority": {"name": "High"},
+            },
+        }
+
+        result = format_issue(issue)
+
+        assert "Parent" not in result
+
     def test_format_issues_list(self):
         """Test formatting issue list as markdown."""
         issues = [
@@ -1237,6 +1296,26 @@ class TestApiOperations:
 
         assert result["key"] == "DEMO-123"
 
+    @patch("skills.jira.scripts.jira.post")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.format_rich_text")
+    def test_create_issue_with_parent(self, mock_format_text, mock_api_path, mock_post):
+        """Test creating an issue with a parent."""
+        mock_api_path.return_value = "rest/api/3/issue"
+        mock_format_text.return_value = {"type": "doc"}
+        mock_post.return_value = {"key": "DEMO-124"}
+
+        result = create_issue(
+            project="DEMO",
+            issue_type="Story",
+            summary="Child story",
+            parent="EPIC-1",
+        )
+
+        assert result["key"] == "DEMO-124"
+        payload = mock_post.call_args[0][2]
+        assert payload["fields"]["parent"] == {"key": "EPIC-1"}
+
     @patch("skills.jira.scripts.jira.put")
     @patch("skills.jira.scripts.jira.api_path")
     def test_update_issue(self, mock_api_path, mock_put):
@@ -1247,6 +1326,32 @@ class TestApiOperations:
         result = update_issue("DEMO-123", summary="Updated summary")
 
         assert result == {}
+
+    @patch("skills.jira.scripts.jira.put")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_update_issue_with_parent(self, mock_api_path, mock_put):
+        """Test updating an issue's parent."""
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123"
+        mock_put.return_value = {}
+
+        result = update_issue("DEMO-123", parent="EPIC-1")
+
+        assert result == {}
+        payload = mock_put.call_args[0][2]
+        assert payload["fields"]["parent"] == {"key": "EPIC-1"}
+
+    @patch("skills.jira.scripts.jira.put")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_update_issue_remove_parent(self, mock_api_path, mock_put):
+        """Test removing an issue's parent."""
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123"
+        mock_put.return_value = {}
+
+        result = update_issue("DEMO-123", remove_parent=True)
+
+        assert result == {}
+        payload = mock_put.call_args[0][2]
+        assert payload["fields"]["parent"] is None
 
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
@@ -1701,10 +1806,41 @@ class TestCommandHandlers:
             json=False,
             from_file=None,
             set_field=None,
+            parent=None,
         )
 
         result = cmd_issue(args)
         assert result == 0
+
+    @patch("skills.jira.scripts.jira.create_issue")
+    @patch("skills.jira.scripts.jira.get_project_defaults")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_create_with_parent(self, mock_jira_defaults, mock_defaults, mock_create):
+        """Test issue create command with --parent."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_defaults.return_value = ProjectDefaults()
+        mock_create.return_value = {"key": "DEMO-124"}
+
+        args = argparse.Namespace(
+            issue_command="create",
+            project="DEMO",
+            issue_type="Story",
+            summary="Child story",
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            json=False,
+            from_file=None,
+            set_field=None,
+            parent="EPIC-1",
+        )
+
+        result = cmd_issue(args)
+        assert result == 0
+        mock_create.assert_called_once()
+        call_kwargs = mock_create.call_args
+        assert call_kwargs[1]["parent"] == "EPIC-1" or call_kwargs.kwargs.get("parent") == "EPIC-1"
 
     @patch("skills.jira.scripts.jira.get_transitions")
     @patch("skills.jira.scripts.jira.format_table")
@@ -1781,6 +1917,8 @@ class TestCommandHandlers:
             assignee=None,
             from_file=None,
             set_field=None,
+            parent=None,
+            remove_parent=False,
         )
 
         result = cmd_issue(args)
@@ -1788,6 +1926,60 @@ class TestCommandHandlers:
         assert result == 0
         captured = capsys.readouterr()
         assert "Updated issue: DEMO-123" in captured.out
+
+    @patch("skills.jira.scripts.jira.update_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_update_with_parent(self, mock_jira_defaults, mock_update, capsys):
+        """Test issue update command with --parent."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_update.return_value = {}
+
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            from_file=None,
+            set_field=None,
+            parent="EPIC-1",
+            remove_parent=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        mock_update.assert_called_once()
+        assert mock_update.call_args.kwargs.get("parent") == "EPIC-1"
+
+    @patch("skills.jira.scripts.jira.update_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_update_remove_parent(self, mock_jira_defaults, mock_update, capsys):
+        """Test issue update command with --remove-parent."""
+        mock_jira_defaults.return_value = JiraDefaults()
+        mock_update.return_value = {}
+
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            from_file=None,
+            set_field=None,
+            parent=None,
+            remove_parent=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        mock_update.assert_called_once()
+        assert mock_update.call_args.kwargs.get("remove_parent") is True
 
     @patch("skills.jira.scripts.jira.add_comment")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
@@ -4114,6 +4306,20 @@ class TestParseIssueFile:
         assert fields["summary"] == "12345"
         assert fields["priority"] == "1"
 
+    def test_parent_in_frontmatter(self, tmp_path):
+        """Test parent key in frontmatter is parsed correctly."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Child\nproject: DEMO\ntype: Story\nparent: EPIC-1\n---\n")
+        fields, _ = parse_issue_file(str(f))
+        assert fields["parent"] == "EPIC-1"
+
+    def test_parent_numeric_coerced_to_string(self, tmp_path):
+        """Test numeric parent value is coerced to string."""
+        f = tmp_path / "issue.md"
+        f.write_text("---\nsummary: Child\nparent: 12345\n---\n")
+        fields, _ = parse_issue_file(str(f))
+        assert fields["parent"] == "12345"
+
 
 class TestFromFileIntegration:
     """Tests for --from-file integration in cmd_issue()."""
@@ -4159,6 +4365,7 @@ class TestFromFileIntegration:
             labels=None,
             assignee=None,
             extra_fields=None,
+            parent=None,
         )
 
     @patch("skills.jira.scripts.jira.create_issue")
@@ -4342,6 +4549,8 @@ class TestFromFileIntegration:
             labels=None,
             assignee=None,
             extra_fields=None,
+            parent=None,
+            remove_parent=False,
         )
         captured = capsys.readouterr()
         assert "Updated issue: DEMO-123" in captured.out
