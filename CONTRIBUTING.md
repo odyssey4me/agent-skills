@@ -104,10 +104,12 @@ Rationale: skills run against the user's *system* interpreter, not a managed
 virtualenv, so the floor determines who can use them at all. Ubuntu 24.04 LTS
 ships 3.12 and is supported until 2029; Debian 12 ships 3.11.
 
-The next release is non-blocking because it usually breaks on missing wheels
-for transitive C extensions rather than on our own code — as of writing,
-3.15rc1 cannot install `cffi` (pulled in via `keyring`). It's there as an
-early warning, not a gate.
+The next release is non-blocking because it tends to break on packaging
+rather than on our own code. Transitive C extensions often have no prebuilt
+wheel for it yet, so installation falls back to a source build that needs a
+compiler: 3.15rc1 has no `cffi` wheel (pulled in via `keyring`), which builds
+fine on CI runners but fails on a machine without a toolchain. The suite
+itself passes on 3.15rc1. It's an early warning, not a gate.
 
 ## Code Style
 
