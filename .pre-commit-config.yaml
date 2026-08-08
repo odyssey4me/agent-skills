@@ -1,28 +1,40 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
-  # Ruff - Fast Python linter and formatter
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.13
+  # Ruff - Fast Python linter and formatter.
+  # Run through `uv run` rather than ruff-pre-commit so the version comes from
+  # uv.lock — the same resolution CI uses. A separately pinned hook rev drifts
+  # from the lockfile and lets pre-commit pass while CI fails.
+  - repo: local
     hooks:
       # Run the linter
       - id: ruff
         name: ruff lint
-        args: [--fix]
+        entry: uv run --extra dev ruff check --fix
+        language: system
+        types_or: [python, pyi]
         stages: [pre-commit]
       # Run the formatter
       - id: ruff-format
         name: ruff format
+        entry: uv run --extra dev ruff format
+        language: system
+        types_or: [python, pyi]
         stages: [pre-commit]
-      # Pre-push: strict checks matching CI (no auto-fix)
-      - id: ruff
+      # Pre-push: strict checks matching CI (no auto-fix, whole tree)
+      - id: ruff-check-prepush
         name: ruff check (pre-push)
-        alias: ruff-check-prepush
+        entry: uv run --extra dev ruff check .
+        language: system
+        pass_filenames: false
+        always_run: true
         stages: [pre-push]
-      - id: ruff-format
+      - id: ruff-format-prepush
         name: ruff format check (pre-push)
-        alias: ruff-format-prepush
-        args: [--check]
+        entry: uv run --extra dev ruff format --check .
+        language: system
+        pass_filenames: false
+        always_run: true
         stages: [pre-push]
 
   # Skillsaw - Agent skill linter
@@ -38,7 +50,7 @@ repos:
     hooks:
       - id: validate-skills
         name: validate skill structure
-        entry: python scripts/validate_skill.py
+        entry: uv run --extra dev python scripts/validate_skill.py
         language: system
         files: ^skills/.*/SKILL\.md$
         pass_filenames: false
@@ -53,9 +65,19 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      # Also enforced by a Claude Code hook, but that only covers commits Claude
+      # makes — this covers every commit, whoever makes it.
+      - id: skill-versions
+        name: skill versions bumped
+        entry: scripts/check_versions.sh
+        language: system
+        files: ^skills/
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: diff-cover
         name: coverage for changed lines
-        entry: bash -c 'pytest tests/ -q --cov=skills --cov=scripts --cov-report=xml:coverage.xml && diff-cover coverage.xml --compare-branch=HEAD --fail-under=80'
+        entry: bash -c 'uv run --extra dev pytest tests/ -q --cov=skills --cov=scripts --cov-report=xml:coverage.xml && uv run --extra dev diff-cover coverage.xml --compare-branch=HEAD --fail-under=80'
         language: system
         pass_filenames: false
         types: [python]
@@ -76,7 +98,7 @@ repos:
     hooks:
       - id: validate-skills-prepush
         name: validate skill structure (pre-push)
-        entry: python scripts/validate_skill.py
+        entry: uv run --extra dev python scripts/validate_skill.py
         language: system
         pass_filenames: false
         args: [skills/*]
@@ -85,10 +107,21 @@ repos:
 
       - id: pytest-coverage
         name: pytest (full test suite with coverage)
-        entry: pytest
+        entry: uv run --extra dev pytest
         language: system
         pass_filenames: false
         args: [tests/, -v, --cov=skills, --cov=scripts, --cov-report=term-missing, --cov-fail-under=80]
+        stages: [pre-push]
+        always_run: true
+
+      # CI's test matrix covers 3.11 as well as 3.12; .python-version only pins
+      # the default. Without this leg, 3.11-only breakage is CI-first.
+      - id: pytest-py311
+        name: pytest (Python 3.11 matrix leg)
+        entry: uv run --extra dev --python 3.11 pytest
+        language: system
+        pass_filenames: false
+        args: [tests/, -q]
         stages: [pre-push]
         always_run: true
 
