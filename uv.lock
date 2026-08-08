@@ -19,6 +19,7 @@ dev = [
     { name = "markdown-it-py" },
     { name = "marklassian" },
     { name = "pre-commit" },
+    { name = "pyadf" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pyyaml" },
@@ -35,6 +36,7 @@ requires-dist = [
     { name = "markdown-it-py", marker = "extra == 'dev'", specifier = ">=3.0.0" },
     { name = "marklassian", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
+    { name = "pyadf", marker = "extra == 'dev'", specifier = ">=0.5.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
@@ -444,7 +446,7 @@ name = "importlib-metadata"
 version = "9.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.13'" },
+    { name = "zipp" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/01/15bb152d77b21318514a96f43af312635eb2500c96b55398d020c93d86ea/importlib_metadata-9.0.0.tar.gz", hash = "sha256:a4f57ab599e6a2e3016d7595cfd72eb4661a5106e787a95bcc90c7105b831efc", size = 56405, upload-time = "2026-03-20T06:42:56.999Z" }
 wheels = [
@@ -719,6 +721,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8e/22/2de9408ac81acbb8a7d05d4cc064a152ccf33b3d480ebe0cd292153db239/pre_commit-4.6.0.tar.gz", hash = "sha256:718d2208cef53fdc38206e40524a6d4d9576d103eb16f0fec11c875e7716e9d9", size = 198525, upload-time = "2026-04-21T20:31:41.613Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/80/6e/4b28b62ecb6aae56769c34a8ff1d661473ec1e9519e2d5f8b2c150086b26/pre_commit-4.6.0-py2.py3-none-any.whl", hash = "sha256:e2cf246f7299edcabcf15f9b0571fdce06058527f0a06535068a86d38089f29b", size = 226472, upload-time = "2026-04-21T20:31:40.092Z" },
+]
+
+[[package]]
+name = "pyadf"
+version = "0.5.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/80/81/719bfc44067b23f9dd17135810e170d91f07e95179142691a76b290520ea/pyadf-0.5.2.tar.gz", hash = "sha256:6a189b0689201e71249727256bb48698ba99133e7726065abf32cd9a72e99376", size = 65995, upload-time = "2026-06-11T23:06:06.235Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5b/1b/76d0227d0018f91b8d1c17bf096528c67837fe8c6961361bca5254f198fa/pyadf-0.5.2-cp311-abi3-macosx_10_12_x86_64.whl", hash = "sha256:139f3a3a85529e206a6b8641a4240c851c5691d8ff608897beb14855a414c402", size = 640454, upload-time = "2026-06-11T23:05:57.551Z" },
+    { url = "https://files.pythonhosted.org/packages/11/d0/ff487a93f36b493b8b602c658724f3683b3806b4e96723cc95bbd9e83e15/pyadf-0.5.2-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:57f5a07b535f9cb664de5893195aea6cf597e2d2179fca58f98931a8664ec50c", size = 624560, upload-time = "2026-06-11T23:05:59.32Z" },
+    { url = "https://files.pythonhosted.org/packages/67/b4/891c34d3147573aa0c3d3b8ba0c8bfde037a2614d0cdb698703defd5a60d/pyadf-0.5.2-cp311-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:35bff7abc8112c0fcc826dcf2066078104961958aedf0d142499bc5654c24f1e", size = 708718, upload-time = "2026-06-11T23:06:00.741Z" },
+    { url = "https://files.pythonhosted.org/packages/47/91/4702145dfb98961bbb2a4588b57285419be5faa76e2048ae6ecfd4a56722/pyadf-0.5.2-cp311-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:10b617395cbf918ca3cc8f540b802b3f43a5be82088ada7449a572b5adc6a211", size = 725778, upload-time = "2026-06-11T23:06:02.102Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/70/15619991c9c8c20a43f17f8d8b6a16016475d1dd0f313addd042f29b3822/pyadf-0.5.2-cp311-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:d2226549683633711171c930995ca391a264c2a9227402fb36acd72e0a95ca78", size = 725014, upload-time = "2026-06-11T23:06:03.488Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/de/4a20b29d6cd6ca5f1c64a70ee1164d62f86e0932a1bfd67f04560486fa50/pyadf-0.5.2-cp311-abi3-win_amd64.whl", hash = "sha256:05e8d7ffa28a4f7eb48e2223aac1d3005d3cf5f869f7b981c72ed5726e2ada08", size = 580151, upload-time = "2026-06-11T23:06:05.008Z" },
 ]
 
 [[package]]
