@@ -114,10 +114,11 @@ repos:
         stages: [pre-push]
         always_run: true
 
-      # CI's test matrix covers 3.11 as well as 3.12; .python-version only pins
-      # the default. Without this leg, 3.11-only breakage is CI-first.
+      # .python-version pins the default (3.14, the newest supported). This
+      # covers the other end of the CI matrix; without it, breakage on the
+      # oldest supported Python is CI-first.
       - id: pytest-py311
-        name: pytest (Python 3.11 matrix leg)
+        name: pytest (oldest supported Python)
         entry: uv run --extra dev --python 3.11 pytest
         language: system
         pass_filenames: false

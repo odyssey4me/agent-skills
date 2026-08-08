@@ -8,6 +8,9 @@ version = "0.2.0"
 description = "Portable skills for AI coding assistants"
 readme = "README.md"
 license = { text = "Apache-2.0" }
+# Floor is set by pyadf, which requires >=3.11. Ceiling is 3.14 (current
+# stable); 3.15 is blocked only by transitive wheels (cffi, via keyring) not
+# yet publishing for it, so revisit once those land.
 requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -16,6 +19,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 
 # No runtime dependencies - skills are self-contained
