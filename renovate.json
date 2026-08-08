@@ -28,6 +28,16 @@
       "matchStrings": ["gogcli-version:\\s*\"(?<currentValue>[^\"]+)\"\\s*\\n\\s*gogcli-repository:\\s*(?<packageName>[^\\s]+)"],
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Update pinned govulncheck version in validate-gogcli workflow",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/validate-gogcli\\.yaml$/"
+      ],
+      "matchStrings": ["go install golang\\.org/x/vuln/cmd/govulncheck@(?<currentValue>v[^\\s]+)"],
+      "datasourceTemplate": "go",
+      "depNameTemplate": "golang.org/x/vuln"
     }
   ],
   "packageRules": [
