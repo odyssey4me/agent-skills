@@ -33,9 +33,18 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # The next release is an early warning, not a gate — it usually breaks on
+    # missing wheels for transitive C extensions. See CONTRIBUTING.md.
+    continue-on-error: ${{ matrix.experimental || false }}
     strategy:
+      # Without this, one failing leg cancels the others and hides whether the
+      # failure is version-specific.
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - python-version: "3.15"
+            experimental: true
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 

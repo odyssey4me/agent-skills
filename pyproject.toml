@@ -8,9 +8,9 @@ version = "0.2.0"
 description = "Portable skills for AI coding assistants"
 readme = "README.md"
 license = { text = "Apache-2.0" }
-# Floor is set by pyadf, which requires >=3.11. Ceiling is 3.14 (current
-# stable); 3.15 is blocked only by transitive wheels (cffi, via keyring) not
-# yet publishing for it, so revisit once those land.
+# Floor tracks upstream Python's EOL schedule, not our dependencies' floors.
+# Raise this only when a version reaches end-of-life — 3.11 in October 2027.
+# See the Python support policy in CONTRIBUTING.md.
 requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 3 - Alpha",

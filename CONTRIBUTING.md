@@ -88,9 +88,30 @@ docs(readme): update installation instructions
 - Fill out PR template
 - Request review
 
+## Python Support Policy
+
+We support **every Python still receiving upstream security fixes, plus the
+next release**. Today that means 3.11, 3.12, 3.13 and 3.14 are tested and
+must pass; 3.15 is tested but allowed to fail.
+
+The floor follows [upstream Python's EOL schedule](https://devguide.python.org/versions/),
+not our dependencies' requirements. When a version reaches end-of-life, drop
+it from the matrix and raise `requires-python` — 3.11 goes in October 2027.
+Don't raise the floor early just because a dependency wants a newer Python;
+find a different dependency, or gate the import.
+
+Rationale: skills run against the user's *system* interpreter, not a managed
+virtualenv, so the floor determines who can use them at all. Ubuntu 24.04 LTS
+ships 3.12 and is supported until 2029; Debian 12 ships 3.11.
+
+The next release is non-blocking because it usually breaks on missing wheels
+for transitive C extensions rather than on our own code — as of writing,
+3.15rc1 cannot install `cffi` (pulled in via `keyring`). It's there as an
+early warning, not a gate.
+
 ## Code Style
 
-- **Python**: 3.11+
+- **Python**: see the support policy above
 - **Formatting**: ruff (line-length 100)
 - **Type hints**: Required for all function signatures
 - **Docstrings**: Google style
