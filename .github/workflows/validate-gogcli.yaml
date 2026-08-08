@@ -4,6 +4,15 @@ on:
   pull_request:
     paths:
       - skills/google/SKILL.md
+      # A path-filtered workflow must list its own file, or changes to it are
+      # never exercised by the PR that makes them. Without this, the actions
+      # pinned below (setup-go is used nowhere else) merge unverified.
+      - .github/workflows/validate-gogcli.yaml
+  # On-demand runs, and a weekly re-check so newly disclosed Go vulns in the
+  # pinned gogcli release surface without waiting for a version bump.
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: read
