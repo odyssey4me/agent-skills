@@ -48,8 +48,10 @@ for skill in skills/*/; do
   skill_name=$(basename "$skill")
   [ -f "${skill}SKILL.md" ] || continue
   current=$(extract_version "${skill}SKILL.md")
+  # `|| true` matters: a skill added since TAG makes `git show` exit 128, which
+  # under `set -e` would abort before the "new skill" branch below is reached.
   released=$(git show "${TAG}:${skill}SKILL.md" 2>/dev/null \
-    | sed -n 's/^  version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' | head -1)
+    | sed -n 's/^  version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' | head -1 || true)
   changed_files=$(git diff "$TAG" -- "$skill" --stat 2>/dev/null | grep -c '|' || true)
 
   if [ "$changed_files" -eq 0 ]; then
