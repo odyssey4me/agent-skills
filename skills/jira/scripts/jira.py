@@ -75,9 +75,14 @@ def get_credential(key: str) -> str | None:
         key: The credential key (e.g., "jira-token", "jira-email").
 
     Returns:
-        The credential value, or None if not found.
+        The credential value, or None if not found or if no keyring
+        backend is available (e.g. on a headless host — callers then
+        fall back to environment variables and the config file).
     """
-    return keyring.get_password(SERVICE_NAME, key)
+    try:
+        return keyring.get_password(SERVICE_NAME, key)
+    except keyring.errors.KeyringError:
+        return None
 
 
 def set_credential(key: str, value: str) -> None:
@@ -96,7 +101,7 @@ def delete_credential(key: str) -> None:
     Args:
         key: The credential key.
     """
-    with contextlib.suppress(keyring.errors.PasswordDeleteError):
+    with contextlib.suppress(keyring.errors.KeyringError):
         keyring.delete_password(SERVICE_NAME, key)
 
 
