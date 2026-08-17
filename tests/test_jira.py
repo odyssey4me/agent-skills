@@ -1885,14 +1885,16 @@ class TestCommandHandlers:
         result = cmd_search(args)
         assert result == 0
 
+    @patch("skills.jira.scripts.jira.get_remote_links")
     @patch("skills.jira.scripts.jira.get_issue")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
     @patch("skills.jira.scripts.jira.format_issue")
-    def test_cmd_issue_get(self, mock_format, mock_defaults, mock_get_issue):
+    def test_cmd_issue_get(self, mock_format, mock_defaults, mock_get_issue, mock_remote_links):
         """Test issue get command."""
         mock_defaults.return_value = JiraDefaults()
         mock_get_issue.return_value = {"key": "DEMO-123"}
         mock_format.return_value = "Issue: DEMO-123"
+        mock_remote_links.return_value = []
 
         args = argparse.Namespace(
             issue_command="get",
@@ -2578,16 +2580,18 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert '{"key": "DEMO-123"}' in captured.out
 
+    @patch("skills.jira.scripts.jira.get_remote_links")
     @patch("skills.jira.scripts.jira.get_issue")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
     @patch("skills.jira.scripts.jira.format_json")
     def test_cmd_issue_get_json_output(
-        self, mock_format_json, mock_defaults, mock_get_issue, capsys
+        self, mock_format_json, mock_defaults, mock_get_issue, mock_remote_links, capsys
     ):
         """Test issue get with JSON output."""
         mock_defaults.return_value = JiraDefaults()
         mock_get_issue.return_value = {"key": "DEMO-123"}
         mock_format_json.return_value = '{"key": "DEMO-123"}'
+        mock_remote_links.return_value = []
 
         args = argparse.Namespace(
             issue_command="get",
@@ -3558,10 +3562,13 @@ class TestContributors:
 
         assert result == {"Bob"}
 
+    @patch("skills.jira.scripts.jira.get_remote_links")
     @patch("skills.jira.scripts.jira.get_comments")
     @patch("skills.jira.scripts.jira.get_issue")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
-    def test_cmd_issue_get_with_contributors(self, mock_defaults, mock_get, mock_comments, capsys):
+    def test_cmd_issue_get_with_contributors(
+        self, mock_defaults, mock_get, mock_comments, mock_remote_links, capsys
+    ):
         """Test issue get with --contributors flag."""
         mock_defaults.return_value = JiraDefaults()
         mock_get.return_value = {
@@ -3575,6 +3582,7 @@ class TestContributors:
             },
         }
         mock_comments.return_value = [{"author": {"displayName": "Charlie"}}]
+        mock_remote_links.return_value = []
 
         args = argparse.Namespace(
             issue_command="get",
@@ -3593,12 +3601,13 @@ class TestContributors:
         assert "Bob" in captured.out
         assert "Charlie" in captured.out
 
+    @patch("skills.jira.scripts.jira.get_remote_links")
     @patch("skills.jira.scripts.jira.get_comments")
     @patch("skills.jira.scripts.jira.get_issue")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
     @patch("skills.jira.scripts.jira.format_json")
     def test_cmd_issue_get_with_contributors_json(
-        self, mock_format_json, mock_defaults, mock_get, mock_comments
+        self, mock_format_json, mock_defaults, mock_get, mock_comments, mock_remote_links
     ):
         """Test issue get with --contributors and --json."""
         mock_defaults.return_value = JiraDefaults()
@@ -3611,6 +3620,7 @@ class TestContributors:
         }
         mock_comments.return_value = []
         mock_format_json.return_value = "{}"
+        mock_remote_links.return_value = []
 
         args = argparse.Namespace(
             issue_command="get",
