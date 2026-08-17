@@ -44,6 +44,7 @@ from skills.jira.scripts.jira import (
     cmd_statuses,
     cmd_transitions,
     cmd_user,
+    cmd_versions,
     coerce_field_value,
     create_issue,
     create_link,
@@ -67,6 +68,9 @@ from skills.jira.scripts.jira import (
     format_json,
     format_rich_text,
     format_table,
+    format_version,
+    format_version_report,
+    format_versions_list,
     get_api_version,
     get_automation_rule,
     get_cloud_id,
@@ -83,12 +87,17 @@ from skills.jira.scripts.jira import (
     get_project_defaults,
     get_richfilter,
     get_transitions,
+    get_version,
+    get_version_issue_counts,
+    get_version_issues,
+    get_version_unresolved_count,
     is_cloud,
     list_automation_rules,
     list_dashboards,
     list_fields,
     list_filters_favourite,
     list_filters_my,
+    list_project_versions,
     list_richfilters,
     list_status_categories,
     list_statuses,
@@ -830,6 +839,91 @@ class TestFormatting:
 
         assert "- **Story Points:** 3" in result
         assert result.count("Story Points") == 1
+
+    def test_format_issue_with_issue_links(self):
+        """Test issue formatting shows issue links."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test issue",
+                "status": {"name": "Open"},
+                "assignee": {"displayName": "Alice"},
+                "reporter": {"displayName": "Bob"},
+                "priority": {"name": "High"},
+                "issuelinks": [
+                    {
+                        "type": {"name": "Blocks", "outward": "blocks", "inward": "is blocked by"},
+                        "outwardIssue": {
+                            "key": "DEMO-456",
+                            "fields": {"summary": "Blocked issue", "status": {"name": "Open"}},
+                        },
+                    },
+                    {
+                        "type": {
+                            "name": "Relates",
+                            "outward": "relates to",
+                            "inward": "relates to",
+                        },
+                        "inwardIssue": {
+                            "key": "DEMO-789",
+                            "fields": {"summary": "Related issue", "status": {"name": "Done"}},
+                        },
+                    },
+                ],
+            },
+        }
+
+        result = format_issue(issue)
+
+        assert "#### Issue Links" in result
+        assert "**blocks** DEMO-456: Blocked issue (Open)" in result
+        assert "**relates to** DEMO-789: Related issue (Done)" in result
+
+    def test_format_issue_with_remote_links(self):
+        """Test issue formatting shows remote/web links."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test issue",
+                "status": {"name": "Open"},
+                "assignee": {"displayName": "Alice"},
+                "reporter": {"displayName": "Bob"},
+                "priority": {"name": "High"},
+            },
+        }
+        remote_links = [
+            {"title": "CVE Record", "url": "https://cve.org/CVE-2025-1234"},
+            {
+                "title": "MR #4",
+                "url": "https://gitlab.example.com/mr/4",
+                "relationship": "mentioned on",
+            },
+        ]
+
+        result = format_issue(issue, remote_links=remote_links)
+
+        assert "#### Web Links" in result
+        assert "[CVE Record](https://cve.org/CVE-2025-1234)" in result
+        assert "[MR #4](https://gitlab.example.com/mr/4) — mentioned on" in result
+
+    def test_format_issue_no_links(self):
+        """Test issue formatting omits link sections when none exist."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test issue",
+                "status": {"name": "Open"},
+                "assignee": {"displayName": "Alice"},
+                "reporter": {"displayName": "Bob"},
+                "priority": {"name": "High"},
+                "issuelinks": [],
+            },
+        }
+
+        result = format_issue(issue, remote_links=[])
+
+        assert "Issue Links" not in result
+        assert "Web Links" not in result
 
     def test_format_issues_list_empty(self):
         """Test formatting empty issue list."""
@@ -2588,10 +2682,13 @@ class TestCommandHandlers:
             json=False,
         )
 
-        result = cmd_issue(args)
+        with patch("skills.jira.scripts.jira.get_remote_links", return_value=[]):
+            result = cmd_issue(args)
 
         assert result == 0
-        mock_get_issue.assert_called_once_with("DEMO-123", fields=["summary", "status"])
+        mock_get_issue.assert_called_once_with(
+            "DEMO-123", fields=["summary", "status", "issuelinks"]
+        )
 
     @patch("skills.jira.scripts.jira.get_issue")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
@@ -2609,10 +2706,13 @@ class TestCommandHandlers:
             json=False,
         )
 
-        result = cmd_issue(args)
+        with patch("skills.jira.scripts.jira.get_remote_links", return_value=[]):
+            result = cmd_issue(args)
 
         assert result == 0
-        mock_get_issue.assert_called_once_with("DEMO-123", fields=["summary", "status", "assignee"])
+        mock_get_issue.assert_called_once_with(
+            "DEMO-123", fields=["summary", "status", "assignee", "issuelinks"]
+        )
 
 
 class TestGetIssueWithFields:
@@ -6328,3 +6428,319 @@ class TestCmdRichFilter:
         assert result == 0
         captured = capsys.readouterr()
         assert "No gadgets" in captured.out
+
+
+class TestGetRemoteLinks:
+    """Tests for get_remote_links."""
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_returns_remote_links(self, mock_api_path, mock_get):
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123/remotelink"
+        mock_get.return_value = [
+            {
+                "id": 100,
+                "object": {
+                    "url": "https://example.com/page",
+                    "title": "Example Page",
+                },
+            },
+            {
+                "id": 101,
+                "relationship": "mentioned on",
+                "object": {
+                    "url": "https://gitlab.example.com/mr/1",
+                    "title": "MR #1",
+                },
+            },
+        ]
+
+        from skills.jira.scripts.jira import get_remote_links
+
+        result = get_remote_links("DEMO-123")
+
+        assert len(result) == 2
+        assert result[0] == {"title": "Example Page", "url": "https://example.com/page"}
+        assert result[1] == {
+            "title": "MR #1",
+            "url": "https://gitlab.example.com/mr/1",
+            "relationship": "mentioned on",
+        }
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_returns_empty_on_api_error(self, mock_api_path, mock_get):
+        from skills.jira.scripts.jira import APIError, get_remote_links
+
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123/remotelink"
+        mock_get.side_effect = APIError("Not found", status_code=404)
+
+        result = get_remote_links("DEMO-123")
+        assert result == []
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_skips_entries_without_url(self, mock_api_path, mock_get):
+        from skills.jira.scripts.jira import get_remote_links
+
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123/remotelink"
+        mock_get.return_value = [
+            {"id": 100, "object": {"title": "No URL"}},
+            {"id": 101, "object": {"url": "https://example.com", "title": "Has URL"}},
+        ]
+
+        result = get_remote_links("DEMO-123")
+        assert len(result) == 1
+        assert result[0]["url"] == "https://example.com"
+
+
+# ============================================================================
+# VERSIONS API TESTS
+# ============================================================================
+
+
+class TestVersionsApi:
+    """Tests for project version and release report API helpers."""
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/project/OSPRH/versions")
+    def test_list_project_versions_excludes_archived(self, _mock_path, mock_get):
+        mock_get.return_value = [
+            {"id": "1", "name": "1.0", "archived": False},
+            {"id": "2", "name": "0.9", "archived": True},
+        ]
+        result = list_project_versions("OSPRH")
+        assert len(result) == 1
+        assert result[0]["id"] == "1"
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/project/OSPRH/versions")
+    def test_list_project_versions_includes_archived(self, _mock_path, mock_get):
+        mock_get.return_value = [
+            {"id": "1", "name": "1.0", "archived": False},
+            {"id": "2", "name": "0.9", "archived": True},
+        ]
+        result = list_project_versions("OSPRH", include_archived=True)
+        assert len(result) == 2
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/project/OSPRH/versions")
+    def test_list_project_versions_non_list(self, _mock_path, mock_get):
+        mock_get.return_value = {}
+        assert list_project_versions("OSPRH") == []
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch("skills.jira.scripts.jira.api_path", return_value="rest/api/3/version/106586")
+    def test_get_version(self, _mock_path, mock_get):
+        mock_get.return_value = {"id": "106586", "name": "2024.1"}
+        result = get_version("106586")
+        assert result["name"] == "2024.1"
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch(
+        "skills.jira.scripts.jira.api_path",
+        return_value="rest/api/3/version/106586/relatedIssueCounts",
+    )
+    def test_get_version_issue_counts(self, _mock_path, mock_get):
+        mock_get.return_value = {"issuesFixedCount": 10, "issuesAffectedCount": 3}
+        result = get_version_issue_counts("106586")
+        assert result["issuesFixedCount"] == 10
+
+    @patch("skills.jira.scripts.jira.get")
+    @patch(
+        "skills.jira.scripts.jira.api_path",
+        return_value="rest/api/3/version/106586/unresolvedIssueCount",
+    )
+    def test_get_version_unresolved_count(self, _mock_path, mock_get):
+        mock_get.return_value = {"issuesUnresolvedCount": 4, "issuesCount": 10}
+        result = get_version_unresolved_count("106586")
+        assert result["issuesUnresolvedCount"] == 4
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_get_version_issues_builds_jql(self, mock_search):
+        mock_search.return_value = [{"key": "OSPRH-1"}]
+        result = get_version_issues("106586")
+        assert result == [{"key": "OSPRH-1"}]
+        jql = mock_search.call_args[0][0]
+        assert "fixVersion = 106586" in jql
+
+
+class TestVersionsFormatters:
+    """Tests for version formatters."""
+
+    def test_format_version_released(self):
+        version = {
+            "id": "106586",
+            "name": "2024.1",
+            "released": True,
+            "releaseDate": "2024-06-01",
+            "startDate": "2024-01-01",
+            "description": "First release",
+        }
+        counts = {"issuesFixedCount": 10, "issuesAffectedCount": 2}
+        unresolved = {"issuesUnresolvedCount": 3, "issuesCount": 10}
+        out = format_version(version, issue_counts=counts, unresolved=unresolved)
+        assert "2024.1" in out
+        assert "Released" in out
+        assert "2024-06-01" in out
+        assert "Issues fixed:** 10" in out
+        assert "Unresolved:** 3 of 10" in out
+        assert "First release" in out
+
+    def test_format_version_unreleased(self):
+        version = {"id": "1", "name": "Next", "released": False, "archived": False}
+        out = format_version(version)
+        assert "Unreleased" in out
+
+    def test_format_version_archived(self):
+        version = {"id": "1", "name": "Old", "archived": True}
+        out = format_version(version)
+        assert "Archived" in out
+
+    def test_format_versions_list_empty(self):
+        assert format_versions_list([]) == "No versions found"
+
+    def test_format_versions_list(self):
+        versions = [
+            {"id": "1", "name": "1.0", "released": True},
+            {"id": "2", "name": "2.0", "released": False},
+        ]
+        out = format_versions_list(versions)
+        assert "1.0" in out
+        assert "2.0" in out
+
+    def test_format_version_report_groups_by_category(self):
+        version = {"id": "106586", "name": "2024.1", "released": False}
+        issues = [
+            {
+                "key": "OSPRH-1",
+                "fields": {
+                    "summary": "Todo item",
+                    "status": {"name": "To Do", "statusCategory": {"name": "To Do"}},
+                },
+            },
+            {
+                "key": "OSPRH-2",
+                "fields": {
+                    "summary": "Done item",
+                    "status": {"name": "Done", "statusCategory": {"name": "Done"}},
+                },
+            },
+        ]
+        out = format_version_report(version, issues)
+        assert "Release Report: 2024.1" in out
+        assert "Total issues:** 2" in out
+        assert "To Do (1)" in out
+        assert "Done (1)" in out
+        assert "OSPRH-1" in out
+        assert "OSPRH-2" in out
+
+    def test_format_version_report_no_issues(self):
+        version = {"id": "1", "name": "Empty", "released": False}
+        out = format_version_report(version, [])
+        assert "No issues assigned" in out
+
+
+# ============================================================================
+# VERSIONS COMMAND TESTS
+# ============================================================================
+
+
+class TestCmdVersions:
+    """Tests for cmd_versions."""
+
+    @patch("skills.jira.scripts.jira.list_project_versions")
+    def test_list(self, mock_list, capsys):
+        mock_list.return_value = [{"id": "1", "name": "1.0", "released": True}]
+        args = Mock(versions_command="list", project="OSPRH", archived=False, json=False)
+        assert cmd_versions(args) == 0
+        assert "1.0" in capsys.readouterr().out
+
+    @patch("skills.jira.scripts.jira.list_project_versions")
+    def test_list_empty(self, mock_list, capsys):
+        mock_list.return_value = []
+        args = Mock(versions_command="list", project="OSPRH", archived=False, json=False)
+        assert cmd_versions(args) == 0
+        assert "No versions found" in capsys.readouterr().out
+
+    @patch("skills.jira.scripts.jira.list_project_versions")
+    def test_list_json(self, mock_list, capsys):
+        mock_list.return_value = [{"id": "1", "name": "1.0"}]
+        args = Mock(versions_command="list", project="OSPRH", archived=False, json=True)
+        assert cmd_versions(args) == 0
+        assert '"name": "1.0"' in capsys.readouterr().out
+
+    @patch("skills.jira.scripts.jira.get_version_unresolved_count")
+    @patch("skills.jira.scripts.jira.get_version_issue_counts")
+    @patch("skills.jira.scripts.jira.get_version")
+    def test_get(self, mock_get, mock_counts, mock_unresolved, capsys):
+        mock_get.return_value = {"id": "106586", "name": "2024.1", "released": True}
+        mock_counts.return_value = {"issuesFixedCount": 5, "issuesAffectedCount": 1}
+        mock_unresolved.return_value = {"issuesUnresolvedCount": 2, "issuesCount": 5}
+        args = Mock(versions_command="get", version_id="106586", json=False)
+        assert cmd_versions(args) == 0
+        out = capsys.readouterr().out
+        assert "2024.1" in out
+        assert "Issues fixed:** 5" in out
+
+    @patch("skills.jira.scripts.jira.get_version_unresolved_count")
+    @patch("skills.jira.scripts.jira.get_version_issue_counts")
+    @patch("skills.jira.scripts.jira.get_version")
+    def test_get_json(self, mock_get, mock_counts, mock_unresolved, capsys):
+        mock_get.return_value = {"id": "106586", "name": "2024.1"}
+        mock_counts.return_value = {"issuesFixedCount": 5}
+        mock_unresolved.return_value = {"issuesUnresolvedCount": 2}
+        args = Mock(versions_command="get", version_id="106586", json=True)
+        assert cmd_versions(args) == 0
+        out = capsys.readouterr().out
+        assert "_issueCounts" in out
+        assert "_unresolved" in out
+
+    @patch("skills.jira.scripts.jira.get_version")
+    @patch("skills.jira.scripts.jira.get_version_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_issues(self, mock_defaults, mock_issues, mock_get_version, capsys):
+        mock_defaults.return_value = JiraDefaults()
+        mock_issues.return_value = [
+            {
+                "key": "OSPRH-1",
+                "fields": {
+                    "summary": "Item",
+                    "status": {"name": "Done", "statusCategory": {"name": "Done"}},
+                },
+            },
+        ]
+        mock_get_version.return_value = {"id": "106586", "name": "2024.1"}
+        args = Mock(
+            versions_command="issues",
+            version_id="106586",
+            max_results=200,
+            fields=None,
+            json=False,
+        )
+        assert cmd_versions(args) == 0
+        out = capsys.readouterr().out
+        assert "Release Report: 2024.1" in out
+        assert "OSPRH-1" in out
+
+    @patch("skills.jira.scripts.jira.get_version_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_issues_json(self, mock_defaults, mock_issues, capsys):
+        mock_defaults.return_value = JiraDefaults()
+        mock_issues.return_value = [{"key": "OSPRH-1"}]
+        args = Mock(
+            versions_command="issues",
+            version_id="106586",
+            max_results=200,
+            fields=None,
+            json=True,
+        )
+        assert cmd_versions(args) == 0
+        assert "OSPRH-1" in capsys.readouterr().out
+
+    @patch("skills.jira.scripts.jira.list_project_versions")
+    def test_api_error(self, mock_list, capsys):
+        mock_list.side_effect = APIError("boom", status_code=404, response="not found")
+        args = Mock(versions_command="list", project="OSPRH", archived=False, json=False)
+        assert cmd_versions(args) == 1
+        assert "Error: boom" in capsys.readouterr().err

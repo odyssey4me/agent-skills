@@ -1483,12 +1483,17 @@ def _append_custom_fields(text: str, fields: dict, custom_fields: dict[str, str]
     return text
 
 
-def format_issue(issue: dict[str, Any], custom_fields: dict[str, str] | None = None) -> str:
+def format_issue(
+    issue: dict[str, Any],
+    custom_fields: dict[str, str] | None = None,
+    remote_links: list[dict[str, str]] | None = None,
+) -> str:
     """Format a Jira issue for display.
 
     Args:
         issue: Jira issue dictionary.
         custom_fields: Mapping of friendly names to custom field IDs.
+        remote_links: Optional list of remote links from get_remote_links().
 
     Returns:
         Formatted issue string.
@@ -1530,6 +1535,44 @@ def format_issue(issue: dict[str, Any], custom_fields: dict[str, str] | None = N
     result += f"- **Assignee:** {assignee_name}\n- **Reporter:** {reporter_name}\n- **Priority:** {priority_name}"
 
     result = _append_custom_fields(result, fields, custom_fields)
+
+    # Issue links
+    issue_links = fields.get("issuelinks", [])
+    if issue_links:
+        result += "\n\n#### Issue Links\n"
+        for link in issue_links:
+            link_type = link.get("type", {})
+            outward = link.get("outwardIssue")
+            inward = link.get("inwardIssue")
+            if outward:
+                label = link_type.get("outward", link_type.get("name", ""))
+                linked = outward
+            elif inward:
+                label = link_type.get("inward", link_type.get("name", ""))
+                linked = inward
+            else:
+                continue
+            linked_key = linked.get("key", "")
+            linked_summary = linked.get("fields", {}).get("summary", "")
+            linked_status = linked.get("fields", {}).get("status", {}).get("name", "")
+            line = f"- **{label}** {linked_key}"
+            if linked_summary:
+                line += f": {linked_summary}"
+            if linked_status:
+                line += f" ({linked_status})"
+            result += f"\n{line}"
+
+    # Remote (web) links
+    if remote_links:
+        result += "\n\n#### Web Links\n"
+        for rl in remote_links:
+            title = rl.get("title", rl["url"])
+            url = rl["url"]
+            rel = rl.get("relationship")
+            line = f"- [{title}]({url})"
+            if rel:
+                line += f" — {rel}"
+            result += f"\n{line}"
 
     description = fields.get("description")
     if description:
@@ -2438,6 +2481,35 @@ def delete_link(issue_key: str, link_type: str, target_key: str) -> None:
     raise ValueError(f"No '{link_type}' link found between {issue_key} and {target_key}")
 
 
+def get_remote_links(issue_key: str) -> list[dict[str, str]]:
+    """Get remote (web) links attached to an issue.
+
+    Returns:
+        List of dicts with 'title', 'url', and optional 'relationship' keys.
+    """
+    try:
+        response = get("jira", api_path(f"issue/{issue_key}/remotelink"))
+    except APIError:
+        return []
+    if not isinstance(response, list):
+        return []
+    results = []
+    for entry in response:
+        obj = entry.get("object", {})
+        url = obj.get("url")
+        if not url:
+            continue
+        item: dict[str, str] = {
+            "title": obj.get("title", url),
+            "url": url,
+        }
+        rel = entry.get("relationship")
+        if rel:
+            item["relationship"] = rel
+        results.append(item)
+    return results
+
+
 def add_comment(issue_key: str, body: str, security_level: str | None = None) -> dict[str, Any]:
     """Add a comment to an issue.
 
@@ -3263,6 +3335,216 @@ def format_filter(filt: dict[str, Any]) -> str:
 
 
 # ============================================================================
+# PROJECT VERSIONS & RELEASE REPORTS
+# ============================================================================
+
+
+def list_project_versions(project_key: str, include_archived: bool = False) -> list[dict[str, Any]]:
+    """List versions (releases) defined for a project.
+
+    Args:
+        project_key: Project key (e.g., OSPRH) or numeric project ID.
+        include_archived: If True, include archived versions.
+
+    Returns:
+        List of version dictionaries.
+    """
+    response = get("jira", api_path(f"project/{project_key}/versions"))
+    versions = response if isinstance(response, list) else []
+    if not include_archived:
+        versions = [v for v in versions if not v.get("archived")]
+    return versions
+
+
+def get_version(version_id: str) -> dict[str, Any]:
+    """Get details of a single version by ID.
+
+    Args:
+        version_id: The numeric version ID (e.g., 106586).
+
+    Returns:
+        Version dictionary.
+    """
+    response = get("jira", api_path(f"version/{version_id}"))
+    return response if isinstance(response, dict) else {}
+
+
+def get_version_issue_counts(version_id: str) -> dict[str, Any]:
+    """Get the fixed/affected issue counts for a version.
+
+    Args:
+        version_id: The numeric version ID.
+
+    Returns:
+        Dict with ``issuesFixedCount`` and ``issuesAffectedCount`` keys.
+    """
+    response = get("jira", api_path(f"version/{version_id}/relatedIssueCounts"))
+    return response if isinstance(response, dict) else {}
+
+
+def get_version_unresolved_count(version_id: str) -> dict[str, Any]:
+    """Get the unresolved issue count for a version.
+
+    Args:
+        version_id: The numeric version ID.
+
+    Returns:
+        Dict with ``issuesUnresolvedCount`` and ``issuesCount`` keys.
+    """
+    response = get("jira", api_path(f"version/{version_id}/unresolvedIssueCount"))
+    return response if isinstance(response, dict) else {}
+
+
+def get_version_issues(
+    version_id: str,
+    max_results: int = 200,
+    fields: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Get issues assigned to a version's fix version (release report).
+
+    Args:
+        version_id: The numeric version ID.
+        max_results: Maximum number of issues to return.
+        fields: Optional list of fields to include.
+
+    Returns:
+        List of issue dictionaries.
+    """
+    jql = f"fixVersion = {version_id} ORDER BY status ASC, priority DESC"
+    return search_issues(jql, max_results=max_results, fields=fields)
+
+
+def _version_status(version: dict[str, Any]) -> str:
+    """Derive a human-readable status label for a version."""
+    if version.get("archived"):
+        return "Archived"
+    if version.get("released"):
+        return "Released"
+    return "Unreleased"
+
+
+def format_version(
+    version: dict[str, Any],
+    issue_counts: dict[str, Any] | None = None,
+    unresolved: dict[str, Any] | None = None,
+) -> str:
+    """Format a single version for display.
+
+    Args:
+        version: Version dictionary from the Jira API.
+        issue_counts: Optional related issue counts from get_version_issue_counts().
+        unresolved: Optional unresolved counts from get_version_unresolved_count().
+
+    Returns:
+        Formatted markdown string.
+    """
+    name = version.get("name", "Unknown")
+    result = f"### {name}\n"
+    result += f"- **ID:** {version.get('id', 'N/A')}\n"
+    result += f"- **Status:** {_version_status(version)}"
+    if version.get("overdue"):
+        result += " (overdue)"
+    result += "\n"
+
+    start_date = version.get("startDate")
+    if start_date:
+        result += f"- **Start date:** {start_date}\n"
+    release_date = version.get("releaseDate")
+    if release_date:
+        result += f"- **Release date:** {release_date}\n"
+
+    if issue_counts:
+        fixed = issue_counts.get("issuesFixedCount")
+        affected = issue_counts.get("issuesAffectedCount")
+        if fixed is not None:
+            result += f"- **Issues fixed:** {fixed}\n"
+        if affected is not None:
+            result += f"- **Issues affected:** {affected}\n"
+    if unresolved:
+        unresolved_count = unresolved.get("issuesUnresolvedCount")
+        total_count = unresolved.get("issuesCount")
+        if unresolved_count is not None:
+            line = f"- **Unresolved:** {unresolved_count}"
+            if total_count is not None:
+                line += f" of {total_count}"
+            result += line + "\n"
+
+    description = version.get("description")
+    if description:
+        result += f"\n{description}"
+
+    return result.rstrip()
+
+
+def format_versions_list(versions: list[dict[str, Any]]) -> str:
+    """Format a list of versions for display.
+
+    Args:
+        versions: List of version dictionaries.
+
+    Returns:
+        Formatted markdown string.
+    """
+    if not versions:
+        return "No versions found"
+    return "\n\n".join(format_version(v) for v in versions)
+
+
+# Status categories in workflow order for release-report grouping
+_STATUS_CATEGORY_ORDER = ["To Do", "In Progress", "Done"]
+
+
+def format_version_report(
+    version: dict[str, Any],
+    issues: list[dict[str, Any]],
+    custom_fields: dict[str, str] | None = None,
+) -> str:
+    """Format a version's issues as a release report grouped by status category.
+
+    Args:
+        version: Version dictionary from the Jira API.
+        issues: List of issue dictionaries assigned to the version.
+        custom_fields: Mapping of friendly names to custom field IDs.
+
+    Returns:
+        Formatted markdown string.
+    """
+    name = version.get("name", "Unknown")
+    parts = [f"## Release Report: {name}"]
+    parts.append(f"- **Status:** {_version_status(version)}")
+    release_date = version.get("releaseDate")
+    if release_date:
+        parts.append(f"- **Release date:** {release_date}")
+    parts.append(f"- **Total issues:** {len(issues)}")
+
+    if not issues:
+        parts.append("\nNo issues assigned to this version.")
+        return "\n".join(parts)
+
+    # Group issues by status category
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for issue in issues:
+        category = (
+            issue.get("fields", {})
+            .get("status", {})
+            .get("statusCategory", {})
+            .get("name", "Unknown")
+        )
+        grouped.setdefault(category, []).append(issue)
+
+    # Order known categories first, then any others
+    ordered_categories = [c for c in _STATUS_CATEGORY_ORDER if c in grouped]
+    ordered_categories += [c for c in grouped if c not in _STATUS_CATEGORY_ORDER]
+
+    for category in ordered_categories:
+        category_issues = grouped[category]
+        parts.append(f"\n### {category} ({len(category_issues)})\n")
+        parts.append(format_issues_list(category_issues, custom_fields=custom_fields))
+
+    return "\n".join(parts)
+
+
+# ============================================================================
 # COMMAND HANDLERS
 # ============================================================================
 
@@ -3405,23 +3687,30 @@ def cmd_issue(args: argparse.Namespace) -> int:
 
             for field_id in custom_fields.values():
                 fields = ensure_field_included(fields, field_id)
+            if fields is not None:
+                fields = ensure_field_included(fields, "issuelinks")
 
             issue = get_issue(args.issue_key, fields=fields)
+            remote_links = get_remote_links(args.issue_key)
 
             if getattr(args, "contributors", False):
                 comments = get_comments(args.issue_key)
                 contributor_names = extract_contributors(issue, comments)
                 if args.json:
                     issue["_contributors"] = sorted(contributor_names)
+                    issue["_remote_links"] = remote_links
                     print(format_json(issue))
                 else:
-                    output = format_issue(issue, custom_fields=custom_fields)
+                    output = format_issue(
+                        issue, custom_fields=custom_fields, remote_links=remote_links
+                    )
                     output += f"\n- **Contributors:** {', '.join(sorted(contributor_names))}"
                     print(output)
             elif args.json:
+                issue["_remote_links"] = remote_links
                 print(format_json(issue))
             else:
-                print(format_issue(issue, custom_fields=custom_fields))
+                print(format_issue(issue, custom_fields=custom_fields, remote_links=remote_links))
 
         elif args.issue_command == "comments":
             max_results = getattr(args, "max_results", 50) or 50
@@ -4094,6 +4383,65 @@ def cmd_richfilter(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_versions(args: argparse.Namespace) -> int:
+    """Handle versions command."""
+    try:
+        if args.versions_command == "list":
+            versions = list_project_versions(
+                args.project,
+                include_archived=getattr(args, "archived", False),
+            )
+            if getattr(args, "json", False):
+                print(format_json(versions))
+            elif not versions:
+                print("No versions found.")
+            else:
+                print(format_versions_list(versions))
+
+        elif args.versions_command == "get":
+            version = get_version(args.version_id)
+            issue_counts = get_version_issue_counts(args.version_id)
+            unresolved = get_version_unresolved_count(args.version_id)
+            if getattr(args, "json", False):
+                version["_issueCounts"] = issue_counts
+                version["_unresolved"] = unresolved
+                print(format_json(version))
+            else:
+                print(format_version(version, issue_counts=issue_counts, unresolved=unresolved))
+
+        elif args.versions_command == "issues":
+            defaults = get_jira_defaults()
+            custom_fields = defaults.custom_fields or {}
+            if args.fields:
+                fields = args.fields.split(",")
+            elif defaults.fields:
+                fields = defaults.fields
+            else:
+                fields = None
+            for field_id in custom_fields.values():
+                fields = ensure_field_included(fields, field_id)
+
+            max_results = getattr(args, "max_results", 200) or 200
+            issues = get_version_issues(args.version_id, max_results=max_results, fields=fields)
+
+            if getattr(args, "json", False):
+                print(format_json(issues))
+            else:
+                version = get_version(args.version_id)
+                print(format_version_report(version, issues, custom_fields=custom_fields))
+
+        return 0
+
+    except APIError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        if e.response:
+            print(f"Response: {e.response}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
 # ============================================================================
 # MAIN CLI
 # ============================================================================
@@ -4479,6 +4827,51 @@ def main() -> int:
     rf_list_parser = rf_subparsers.add_parser("list", help="List Rich Filters")
     rf_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    # ========================================================================
+    # VERSIONS COMMAND
+    # ========================================================================
+    versions_parser = subparsers.add_parser(
+        "versions",
+        help="List project versions and view release reports",
+    )
+    versions_subparsers = versions_parser.add_subparsers(dest="versions_command", required=True)
+
+    # versions list
+    versions_list_parser = versions_subparsers.add_parser(
+        "list", help="List versions (releases) for a project"
+    )
+    versions_list_parser.add_argument("project", help="Project key (e.g., OSPRH) or project ID")
+    versions_list_parser.add_argument(
+        "--archived",
+        action="store_true",
+        help="Include archived versions",
+    )
+    versions_list_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # versions get
+    versions_get_parser = versions_subparsers.add_parser(
+        "get", help="Get version details with issue counts"
+    )
+    versions_get_parser.add_argument("version_id", help="Version ID (e.g., 106586)")
+    versions_get_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # versions issues
+    versions_issues_parser = versions_subparsers.add_parser(
+        "issues", help="Release report: list issues in a version grouped by status"
+    )
+    versions_issues_parser.add_argument("version_id", help="Version ID (e.g., 106586)")
+    versions_issues_parser.add_argument(
+        "--max-results",
+        type=int,
+        default=200,
+        help="Maximum number of issues (default: 200)",
+    )
+    versions_issues_parser.add_argument(
+        "--fields",
+        help="Comma-separated list of fields to include",
+    )
+    versions_issues_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     # Parse and dispatch
     args = parser.parse_args()
 
@@ -4508,6 +4901,8 @@ def main() -> int:
         return cmd_filter(args)
     elif args.command == "richfilter":
         return cmd_richfilter(args)
+    elif args.command == "versions":
+        return cmd_versions(args)
 
     return 1
 
