@@ -168,6 +168,32 @@ class TestKeyringFunctions:
         delete_credential("test-key")
         mock_keyring.delete_password.assert_called_once_with("agent-skills", "test-key")
 
+    def test_get_credential_no_backend(self):
+        """get_credential returns None when no keyring backend is available."""
+        import keyring
+
+        from skills.jira.scripts import jira as jira_mod
+
+        with patch.object(
+            jira_mod.keyring,
+            "get_password",
+            side_effect=keyring.errors.NoKeyringError("no backend"),
+        ):
+            assert get_credential("test-key") is None
+
+    def test_delete_credential_no_backend(self):
+        """delete_credential does not raise when no keyring backend is available."""
+        import keyring
+
+        from skills.jira.scripts import jira as jira_mod
+
+        with patch.object(
+            jira_mod.keyring,
+            "delete_password",
+            side_effect=keyring.errors.NoKeyringError("no backend"),
+        ):
+            delete_credential("test-key")  # should not raise
+
 
 class TestConfigManagement:
     """Tests for config file management."""
