@@ -24,3 +24,6 @@ enforce appropriate permission controls.
 | statuses | read | List available statuses |
 | user search | read | Search for Jira users |
 | collaboration epics | read | List collaboration epics |
+| versions list | read | List project versions (releases) |
+| versions get | read | Get version details and issue counts |
+| versions issues | read | Release report: issues in a version |

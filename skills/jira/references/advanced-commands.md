@@ -91,7 +91,7 @@ List and inspect Jira automation rules. Uses the Automation Rule Management API 
 $SKILL_DIR/scripts/jira.py automations list
 
 # List rules scoped to a specific project
-$SKILL_DIR/scripts/jira.py automations list --project OSPRH
+$SKILL_DIR/scripts/jira.py automations list --project DEMO
 
 # List only enabled rules
 $SKILL_DIR/scripts/jira.py automations list --state ENABLED
@@ -111,3 +111,41 @@ $SKILL_DIR/scripts/jira.py automations get <rule-uuid>
 The `get` command renders a markdown document describing the rule step by step: metadata, trigger, conditions, actions, branches, and external connections. Component types are translated to human-readable labels (e.g., `jira.issue.event.trigger:created` → "Issue created") and value configurations are summarised inline.
 
 **Note:** The automation API requires the Atlassian Cloud ID, which is fetched automatically from `_edge/tenant_info` and cached for the session.
+
+## versions
+
+List a project's versions (releases) and view release reports. A version's
+numeric ID is the number in a release URL such as
+`https://yourcompany.atlassian.net/projects/DEMO/versions/12345/tab/release-report-all-issues`
+(here the version ID is `12345`).
+
+```bash
+# List versions for a project (archived versions excluded by default)
+$SKILL_DIR/scripts/jira.py versions list DEMO
+
+# Include archived versions
+$SKILL_DIR/scripts/jira.py versions list DEMO --archived
+
+# Get details of a single version, with fixed/affected and unresolved counts
+$SKILL_DIR/scripts/jira.py versions get 12345
+
+# Release report: list issues in a version grouped by status category
+$SKILL_DIR/scripts/jira.py versions issues 12345
+$SKILL_DIR/scripts/jira.py versions issues 12345 --max-results 500
+```
+
+**Arguments for `versions list`:**
+- `project` (positional): Project key (e.g., DEMO) or numeric project ID
+- `--archived`: Include archived versions (excluded by default)
+
+**Arguments for `versions get`:**
+- `version_id` (positional): Numeric version ID (e.g., 12345)
+
+**Arguments for `versions issues`:**
+- `version_id` (positional): Numeric version ID (e.g., 12345)
+- `--max-results`: Maximum number of issues (default: 200)
+- `--fields`: Comma-separated list of fields to include
+
+The `issues` subcommand reproduces the Jira "Release report" by querying
+`fixVersion = <id>` and grouping the results by status category (To Do,
+In Progress, Done). Configured custom fields are included in the output.

@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.15.0"
+  version: "0.17.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -185,6 +185,7 @@ See [advanced-commands.md](references/advanced-commands.md) for full documentati
 - **user** — search users by email/name (returns accountId on Cloud)
 - **collaboration** — discover cross-team collaboration patterns in epics
 - **automations** — list and inspect Jira automation rules (Cloud-only)
+- **versions** — list project versions (releases) and view release reports
 
 ## JQL Reference
 
