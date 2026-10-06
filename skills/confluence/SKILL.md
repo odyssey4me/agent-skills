@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "2.6.2"
+  version: "2.6.3"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
