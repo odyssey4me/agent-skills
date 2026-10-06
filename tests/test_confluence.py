@@ -825,6 +825,34 @@ class TestCommandHandlers:
         result = cmd_check()
         assert result == 1
 
+    @pytest.mark.parametrize(
+        ("url", "cloud_guidance"),
+        [
+            ("https://example.atlassian.net", True),
+            ("https://EXAMPLE.ATLASSIAN.NET", True),
+            ("https://example.atlassian.net.", True),
+            ("https://atlassian.net", True),
+            ("https://confluence.example.org", False),
+            ("https://evil-atlassian.net", False),
+            ("https://example.atlassian.net.evil.org", False),
+            ("https://evil.org/atlassian.net", False),
+            ("https://evil.org?host=atlassian.net", False),
+            ("https://atlassian.net@evil.org", False),
+            ("https://[invalid", False),
+        ],
+    )
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_missing_token_cloud_guidance_uses_hostname(
+        self, mock_creds, url, cloud_guidance, capsys
+    ):
+        """Cloud-specific setup hints depend on the host, not URL substrings."""
+        mock_creds.return_value = Credentials(url=url)
+        assert confluence.cmd_check() == 1
+        assert (
+            "   - Also set: export CONFLUENCE_EMAIL=your-email@example.com"
+            in capsys.readouterr().out.splitlines()
+        ) is cloud_guidance
+
     @patch("skills.confluence.scripts.confluence.get_credentials")
     def test_cmd_check_url_with_wiki_suffix(self, mock_creds):
         """Test check command rejects URL with /wiki suffix."""
