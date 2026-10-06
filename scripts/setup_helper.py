@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Agent Skills setup helper for AI agents (Claude Code).
+"""Codex development setup helper for this Agent Skills repository.
 
 This script helps users configure their AI agent to discover and use installed
-agent skills by managing the CLAUDE.md configuration file.
+agent skills during Codex development by managing the AGENTS.md configuration file.
+Consumers can install skills with any compatible agent without this helper.
 
 Usage:
     python scripts/setup_helper.py
@@ -42,13 +43,13 @@ class SkillInfo:
     name: str  # e.g., "jira"
     path: Path  # Absolute path to skill directory
     skill_md: Path  # Path to SKILL.md
-    script: Path  # Path to skill.py script
+    script: Path | None  # Path to skill.py script
     description: str  # Parsed from SKILL.md
 
 
 @dataclass
-class ClaudeMdConfig:
-    """CLAUDE.md configuration state."""
+class AgentsMdConfig:
+    """AGENTS.md configuration state."""
 
     path: Path
     exists: bool
@@ -81,8 +82,9 @@ def get_search_locations(custom_paths: list[str] | None = None) -> list[Path]:
     if env_path:
         locations.append(Path(env_path).expanduser())
 
-    # 3. Claude Code default
-    locations.append(Path.home() / ".claude" / "skills")
+    # 3. Codex default
+    locations.append(Path.home() / ".agents" / "skills")
+    locations.append(Path.cwd() / ".agents" / "skills")
 
     # 4. XDG standard location
     locations.append(Path.home() / ".local" / "share" / "agent-skills" / "skills")
@@ -142,6 +144,7 @@ def find_skill_installations(
     """
     discovered: dict[Path, list[SkillInfo]] = {}
     locations = get_search_locations(custom_paths)
+    seen: set[Path] = set()
 
     for location in locations:
         if not location.exists() or not location.is_dir():
@@ -150,20 +153,26 @@ def find_skill_installations(
         skills = []
 
         # Find all SKILL.md files
-        for skill_md in location.rglob("SKILL.md"):
+        for skill_md in sorted(location.glob("*/SKILL.md")):
+            resolved = skill_md.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
             skill_dir = skill_md.parent
             skill_name = skill_dir.name
-            skill_script = skill_dir / f"{skill_name}.py"
+            skill_script = skill_dir / "scripts" / f"{skill_name}.py"
+            if not skill_script.exists():
+                skill_script = skill_dir / f"{skill_name}.py"
 
-            # Only include if the script exists
-            if skill_script.exists():
+            # Scripts are optional in the Agent Skills specification.
+            if skill_md.is_file():
                 description = parse_skill_description(skill_md)
                 skills.append(
                     SkillInfo(
                         name=skill_name,
                         path=skill_dir,
                         skill_md=skill_md,
-                        script=skill_script,
+                        script=skill_script if skill_script.exists() else None,
                         description=description,
                     )
                 )
@@ -175,21 +184,21 @@ def find_skill_installations(
 
 
 # ============================================================================
-# CLAUDE.md PARSING
+# AGENTS.md PARSING
 # ============================================================================
 
 
-def parse_claude_md(path: Path) -> ClaudeMdConfig:
-    """Parse existing CLAUDE.md to detect configured skills.
+def parse_agents_md(path: Path) -> AgentsMdConfig:
+    """Parse existing AGENTS.md to detect configured skills.
 
     Args:
-        path: Path to CLAUDE.md file.
+        path: Path to AGENTS.md file.
 
     Returns:
-        ClaudeMdConfig object with current state.
+        AgentsMdConfig object with current state.
     """
     if not path.exists():
-        return ClaudeMdConfig(
+        return AgentsMdConfig(
             path=path,
             exists=False,
             content="",
@@ -200,7 +209,7 @@ def parse_claude_md(path: Path) -> ClaudeMdConfig:
         content = path.read_text()
     except Exception as e:
         print(f"Warning: Could not read {path}: {e}", file=sys.stderr)
-        return ClaudeMdConfig(
+        return AgentsMdConfig(
             path=path,
             exists=True,
             content="",
@@ -216,7 +225,7 @@ def parse_claude_md(path: Path) -> ClaudeMdConfig:
         skill_name = match.group(1).lower()
         configured_skills.append(skill_name)
 
-    return ClaudeMdConfig(
+    return AgentsMdConfig(
         path=path,
         exists=True,
         content=content,
@@ -224,11 +233,11 @@ def parse_claude_md(path: Path) -> ClaudeMdConfig:
     )
 
 
-def validate_claude_md_content(content: str) -> list[str]:
-    """Validate CLAUDE.md content for outdated or problematic patterns.
+def validate_agents_md_content(content: str) -> list[str]:
+    """Validate AGENTS.md content for outdated or problematic patterns.
 
     Args:
-        content: CLAUDE.md file content to validate.
+        content: AGENTS.md file content to validate.
 
     Returns:
         List of warning messages (empty if no issues).
@@ -255,14 +264,7 @@ def validate_claude_md_content(content: str) -> list[str]:
     if re.search(r"cd\s+.*agent-skills.*&&", content):
         warnings.append(
             "Found 'cd' commands before running scripts. Scripts should be run "
-            "directly with absolute paths (e.g., 'python ~/.claude/skills/jira/jira.py check')."
-        )
-
-    # Check for scripts/ subdirectory references (old structure)
-    if re.search(r"skills/\w+/scripts/\w+\.py", content):
-        warnings.append(
-            "Found references to 'skills/*/scripts/*.py'. The new structure has "
-            "the main script directly in the skill directory (e.g., 'skills/jira/jira.py')."
+            "directly with absolute paths (e.g., 'python ~/.agents/skills/jira/scripts/jira.py check')."
         )
 
     # Check for expected patterns
@@ -276,19 +278,19 @@ def validate_claude_md_content(content: str) -> list[str]:
 
 
 # ============================================================================
-# CLAUDE.md GENERATION
+# AGENTS.md GENERATION
 # ============================================================================
 
 
-def generate_claude_md_content(base_path: Path, skills: list[SkillInfo]) -> str:
-    """Generate CLAUDE.md content for discovered skills.
+def generate_agents_md_content(base_path: Path, skills: list[SkillInfo]) -> str:
+    """Generate AGENTS.md content for discovered skills.
 
     Args:
         base_path: Base path where skills are installed.
         skills: List of SkillInfo objects.
 
     Returns:
-        Generated CLAUDE.md content as string.
+        Generated AGENTS.md content as string.
     """
     lines = [
         "# Global Agent Skills",
@@ -316,9 +318,10 @@ def generate_claude_md_content(base_path: Path, skills: list[SkillInfo]) -> str:
     )
 
     # Add example with first skill
-    if skills:
-        example_skill = skills[0]
-        lines.append(f"python {example_skill.script} check")
+    for example_skill in skills:
+        if example_skill.script is not None:
+            lines.append(f"python {example_skill.script} check")
+            break
 
     lines.extend(
         [
@@ -331,25 +334,25 @@ def generate_claude_md_content(base_path: Path, skills: list[SkillInfo]) -> str:
 
     # Add invocation examples
     for skill in sorted(skills, key=lambda s: s.name):
-        lines.append(f"Use `/{skill.name}` or describe naturally:")
+        lines.append(f"Use `${skill.name}` or describe naturally:")
         lines.append(f'- "Search {skill.name.title()} for open issues"')
         lines.append("")
 
     return "\n".join(lines)
 
 
-def update_claude_md_section(
+def update_agents_md_section(
     existing_content: str,
     skills: list[SkillInfo],
 ) -> str:
-    """Update the Available Skills section in existing CLAUDE.md.
+    """Update the Available Skills section in existing AGENTS.md.
 
     Args:
-        existing_content: Current CLAUDE.md content.
+        existing_content: Current AGENTS.md content.
         skills: List of SkillInfo objects.
 
     Returns:
-        Updated CLAUDE.md content.
+        Updated AGENTS.md content.
     """
     # Generate new skills section
     new_skills_section = []
@@ -376,48 +379,8 @@ def update_claude_md_section(
         )
         return updated
 
-    # If no Available Skills section exists, append it
-    # Try to insert after "# Global Agent Skills" section
-    if "# Global Agent Skills" in existing_content or "# Agent Skills" in existing_content:
-        lines = existing_content.split("\n")
-        result = []
-        inserted = False
-
-        for i, line in enumerate(lines):
-            result.append(line)
-
-            # Insert after the header and any immediate content
-            if (
-                not inserted
-                and line.strip().startswith("# ")
-                and ("Agent" in line and "Skills" in line)
-            ):
-                # Skip empty lines
-                j = i + 1
-                while j < len(lines) and not lines[j].strip():
-                    result.append(lines[j])
-                    j += 1
-
-                # Add the skills section
-                result.append("")
-                result.append(new_skills_text)
-                result.append("")
-                inserted = True
-
-                # Skip to next section or continue
-                while j < len(lines) and not lines[j].strip().startswith("##"):
-                    if lines[j].strip():  # Skip lines until next section
-                        result.append(lines[j])
-                    j += 1
-
-                # Continue from where we left off
-                lines = lines[: i + 1] + lines[j:]
-                break
-
-        return "\n".join(result)
-
-    # Fallback: Just append at the end
-    return existing_content + "\n\n" + new_skills_text
+    # Preserve all existing instructions when appending a new section.
+    return existing_content.rstrip() + "\n\n" + new_skills_text + "\n"
 
 
 # ============================================================================
@@ -427,26 +390,26 @@ def update_claude_md_section(
 
 def show_current_config(
     discovered: dict[Path, list[SkillInfo]],
-    config: ClaudeMdConfig,
+    config: AgentsMdConfig,
 ) -> None:
     """Display current configuration status.
 
     Args:
         discovered: Discovered skills by location.
-        config: Current CLAUDE.md configuration.
+        config: Current AGENTS.md configuration.
     """
     print("Current Configuration")
     print("=" * 70)
     print()
 
-    # CLAUDE.md status
+    # AGENTS.md status
     status = "exists" if config.exists else "not found"
-    print(f"CLAUDE.md: {config.path} ({status})")
+    print(f"AGENTS.md: {config.path} ({status})")
     print()
 
     # Validate existing content
     if config.exists and config.content:
-        validation_warnings = validate_claude_md_content(config.content)
+        validation_warnings = validate_agents_md_content(config.content)
         if validation_warnings:
             print("⚠️  Configuration Warnings:")
             for warning in validation_warnings:
@@ -479,16 +442,16 @@ def show_current_config(
         print()
 
 
-def update_claude_md(
-    config: ClaudeMdConfig,
+def update_agents_md(
+    config: AgentsMdConfig,
     skills: list[SkillInfo],
     dry_run: bool = False,
     auto: bool = False,
 ) -> bool:
-    """Create or update CLAUDE.md with skill references.
+    """Create or update AGENTS.md with skill references.
 
     Args:
-        config: Current CLAUDE.md configuration.
+        config: Current AGENTS.md configuration.
         skills: List of skills to configure.
         dry_run: If True, only show preview without writing.
         auto: If True, skip confirmation prompt.
@@ -505,9 +468,9 @@ def update_claude_md(
 
     # Generate content
     if not config.exists:
-        content = generate_claude_md_content(base_path, skills)
+        content = generate_agents_md_content(base_path, skills)
     else:
-        content = update_claude_md_section(config.content, skills)
+        content = update_agents_md_section(config.content, skills)
 
     # Show preview
     print()
@@ -541,7 +504,7 @@ def update_claude_md(
 
 def interactive_setup(
     custom_paths: list[str] | None = None,
-    claude_md_path: Path | None = None,
+    agents_md_path: Path | None = None,
     dry_run: bool = False,
     auto: bool = False,
 ) -> int:
@@ -549,7 +512,7 @@ def interactive_setup(
 
     Args:
         custom_paths: Optional custom skill paths.
-        claude_md_path: Optional custom CLAUDE.md path.
+        agents_md_path: Optional custom AGENTS.md path.
         dry_run: If True, preview only.
         auto: If True, skip confirmations.
 
@@ -567,15 +530,15 @@ def interactive_setup(
     if not discovered:
         print()
         print("No skills found in common locations:")
-        print("  - ~/.claude/skills/")
+        print("  - ~/.agents/skills/")
         print("  - ~/.local/share/agent-skills/skills/")
         print("  - ./skills/ (current directory)")
         print()
         print("Install skills first following: docs/user-guide.md")
         print()
         print("To install a skill:")
-        print("  mkdir -p ~/.claude/skills")
-        print("  cd ~/.claude/skills")
+        print("  mkdir -p ~/.agents/skills")
+        print("  cd ~/.agents/skills")
         print(
             "  curl -L https://github.com/odyssey4me/agent-skills/releases/latest/download/jira.tar.gz | tar xz"
         )
@@ -591,15 +554,17 @@ def interactive_setup(
             print(f"    - {skill.name}: {skill.description}")
             all_skills.append(skill)
 
-    # 3. Check CLAUDE.md
+    # 3. Check AGENTS.md
     print()
-    if claude_md_path is None:
-        claude_md_path = Path.home() / ".claude" / "CLAUDE.md"
+    if agents_md_path is None:
+        agents_md_path = (
+            Path(os.getenv("CODEX_HOME", str(Path.home() / ".codex"))).expanduser() / "AGENTS.md"
+        )
 
-    config = parse_claude_md(claude_md_path)
+    config = parse_agents_md(agents_md_path)
 
     if config.exists:
-        print(f"✓ CLAUDE.md exists: {claude_md_path}")
+        print(f"✓ AGENTS.md exists: {agents_md_path}")
         configured_str = ", ".join(config.configured_skills) if config.configured_skills else "none"
         print(f"  Currently configured skills: {configured_str}")
 
@@ -612,27 +577,27 @@ def interactive_setup(
             print()
 
             if not auto:
-                response = input("Update CLAUDE.md to include all skills? [Y/n]: ").strip().lower()
+                response = input("Update AGENTS.md to include all skills? [Y/n]: ").strip().lower()
                 if response not in ("", "y", "yes"):
                     print("Skipping update.")
                     return 0
 
-            success = update_claude_md(config, all_skills, dry_run, auto)
+            success = update_agents_md(config, all_skills, dry_run, auto)
             if not success:
                 return 1
         else:
             print("\n  ✓ All discovered skills are already configured!")
     else:
-        print(f"✗ CLAUDE.md not found: {claude_md_path}")
+        print(f"✗ AGENTS.md not found: {agents_md_path}")
         print()
 
         if not auto:
-            response = input("Create CLAUDE.md with discovered skills? [Y/n]: ").strip().lower()
+            response = input("Create AGENTS.md with discovered skills? [Y/n]: ").strip().lower()
             if response not in ("", "y", "yes"):
                 print("Cancelled.")
                 return 0
 
-        success = update_claude_md(config, all_skills, dry_run, auto)
+        success = update_agents_md(config, all_skills, dry_run, auto)
         if not success:
             return 1
 
@@ -642,7 +607,7 @@ def interactive_setup(
     print("Next Steps:")
     print()
     print("1. Verify each skill's setup by running its check command:")
-    for skill in all_skills[:3]:  # Show first 3 as examples
+    for skill in [s for s in all_skills if s.script is not None][:3]:  # Show first 3 as examples
         print(f"   python {skill.script} check")
     if len(all_skills) > 3:
         print(f"   ... and {len(all_skills) - 3} more")
@@ -651,7 +616,7 @@ def interactive_setup(
     print("   - Use environment variables (recommended)")
     print("   - Or follow skill-specific instructions in SKILL.md")
     print()
-    print("3. Start using skills with Claude Code!")
+    print("3. Start using skills with Codex!")
 
     return 0
 
@@ -664,7 +629,7 @@ def interactive_setup(
 def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Setup helper for Agent Skills with Claude Code",
+        description="Setup helper for Agent Skills with Codex",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -682,9 +647,9 @@ Examples:
     )
 
     parser.add_argument(
-        "--claude-md",
+        "--agents-md",
         type=Path,
-        help="Path to CLAUDE.md file (default: ~/.claude/CLAUDE.md)",
+        help="Path to AGENTS.md file (default: ~/.codex/AGENTS.md)",
     )
 
     parser.add_argument(
@@ -710,15 +675,18 @@ Examples:
     # Handle --show mode
     if args.show:
         discovered = find_skill_installations(args.skill_path)
-        claude_md_path = args.claude_md or Path.home() / ".claude" / "CLAUDE.md"
-        config = parse_claude_md(claude_md_path)
+        agents_md_path = (
+            args.agents_md
+            or Path(os.getenv("CODEX_HOME", str(Path.home() / ".codex"))).expanduser() / "AGENTS.md"
+        )
+        config = parse_agents_md(agents_md_path)
         show_current_config(discovered, config)
         return 0
 
     # Run interactive setup
     return interactive_setup(
         custom_paths=args.skill_path,
-        claude_md_path=args.claude_md,
+        agents_md_path=args.agents_md,
         dry_run=args.dry_run,
         auto=args.auto,
     )

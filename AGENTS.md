@@ -1,4 +1,4 @@
-# Claude Code Instructions
+# Codex Instructions
 
 Refer to [CONTRIBUTING.md](./CONTRIBUTING.md) for development guidelines.
 
@@ -43,13 +43,9 @@ Skills should include an **Error Handling** section in their SKILL.md that tells
 Pre-commit hooks are a failsafe, not a first pass. Always run checks before
 committing to avoid wasting tokens on hook failures and re-commits.
 
-Delegate pre-commit checks to a **haiku** subagent (via the Task tool with
-`model: "haiku"`) to minimise token cost. The subagent should:
-
-1. Run `scripts/pre_commit_checks.sh` (or `--skills` if only skills changed).
-2. Fix any issues found and report back.
-
-After the subagent completes, stage everything and commit.
+Run `scripts/pre_commit_checks.sh` (or `--skills` if only skills changed),
+fix any issues, and run `scripts/check_versions.sh` before committing.
+Stage only changes belonging to the requested task; preserve unrelated edits.
 
 ## Skill Versioning
 
@@ -63,8 +59,8 @@ Follow [Semantic Versioning](https://semver.org/) when updating it:
 - **Major** (0.2.0 → 1.0.0): Breaking changes — removed or renamed commands,
   changed default behaviour, restructured arguments.
 
-A Claude Code hook enforces this — commits with unbumped skill changes are
-blocked automatically. Run `scripts/check_versions.sh` to check manually.
+The pre-commit `skill-versions` hook enforces this once installed — commits
+with unbumped skill changes are blocked. Run `scripts/check_versions.sh` to check manually.
 
 ## Releasing
 
@@ -79,15 +75,38 @@ section heading too. Only pending work belongs in TODO.md.
 
 ## Maintenance
 
-Review this file quarterly and after major Claude model releases. Remove
+Review this file quarterly and after major Codex model releases. Remove
 rules that compensate for limitations the model or tooling no longer has —
 stale instructions can actively constrain newer models.
 
-Subdirectory CLAUDE.md files (e.g. `skills/CLAUDE.md`) follow the same
+Subdirectory AGENTS.md files (e.g. `skills/AGENTS.md`) follow the same
 refresh cadence — include them in quarterly reviews.
 
 ## Skill Invocation
 
-Use `/jira` to invoke the Jira skill, or describe what you want naturally:
+Use `$jira` to invoke the Jira skill, or describe what you want naturally:
 - "Search Jira for my open issues"
 - "Create a bug in PROJECT about login failures"
+
+Codex discovers this checkout's skills through `.agents/skills/` symlinks.
+Use the path of the loaded `SKILL.md` to resolve scripts and references.
+Skill metadata does not grant shell or network permissions; use the session's
+approval and sandbox controls when access is required.
+
+All service skills require network access for remote operations. Each `SKILL.md`
+documents its hosts and protocols. Request access through the session's approval
+mechanism when restricted; do not interpret network failures as expired credentials.
+
+## Portable Consumption, Codex Development
+
+Use Codex for repository development. Keep installable `SKILL.md` files,
+references, templates, and default installation instructions agent-agnostic.
+Describe required service access and authorization without assuming a particular
+agent tool, sandbox parameter, skill invocation syntax, or installation path.
+Agent-specific consumer examples must be clearly labeled and optional.
+
+For Codex development sessions with restricted network access, use the available
+session approval controls before remote commands. Where `exec_command` exposes
+sandbox escalation, request `sandbox_permissions="require_escalated"` for the
+needed command. Reuse existing authorization and report network failures without
+changing credentials.

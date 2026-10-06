@@ -8,12 +8,21 @@ metadata:
   tags: "{{TAGS}}"
   complexity: standard
 license: {{LICENSE}}
-allowed-tools: Bash($SKILL_DIR/scripts/{{SERVICE_NAME}}.py:*)
 ---
 
 # {{SKILL_NAME}}
 
 {{DESCRIPTION}}
+
+## Network access
+
+Document the service API, authentication, and repository endpoints and protocols this skill needs. Remote operations require outbound network access. If the agent environment restricts it, obtain access through that environment's approval or network controls before the first remote command, reusing authorization already granted. Local help and file processing do not need network access. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials to resolve them. If approved access also fails, stop and report it. Authentication and permission errors require user action.
+
+## Resolving script paths
+
+`SKILL_DIR` in the examples is the directory containing this loaded `SKILL.md`.
+Set it to that absolute path before running commands; do not assume the agent
+sets this shell variable. Quote the script path if it contains spaces.
 
 ## Installation
 

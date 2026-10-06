@@ -18,6 +18,10 @@ license: {{LICENSE}}
 
 This is a **workflow skill** -- it contains no scripts and instead guides the agent through a multi-step process using other skills.
 
+## Network access
+
+Document the service API, authentication, and repository endpoints and protocols this skill needs. Remote operations require outbound network access. If the agent environment restricts it, obtain access through that environment's approval or network controls before the first remote command, reusing authorization already granted. Local help and file processing do not need network access. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials to resolve them. If approved access also fails, stop and report it. Authentication and permission errors require user action.
+
 ## Authentication
 
 This skill delegates authentication to the underlying skills:

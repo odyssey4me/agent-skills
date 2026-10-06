@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run all pre-commit checks that Claude should execute before committing.
+# Run all pre-commit checks that Codex should execute before committing.
 #
 # Usage:
 #   scripts/pre_commit_checks.sh           # run all checks

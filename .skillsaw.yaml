@@ -1,7 +1,10 @@
 version: "0.14.0"
 
 exclude:
-  - ".claude/**"
+  - "AGENTS.md"
+  - "skills/AGENTS.md"
+  - ".agents/**"
+  - ".codex/**"
   - "templates/**"
   - "tests/**"
 

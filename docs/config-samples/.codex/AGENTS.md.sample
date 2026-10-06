@@ -1,0 +1,28 @@
+# Global Agent Skills
+
+Skills are available at ~/.agents/skills
+
+## Available Skills
+
+- **Confluence**: Interact with Confluence for content search, viewing pages, and space management. - read ~/.agents/skills/confluence/SKILL.md
+- **Jira**: Interact with Jira for issue tracking, search, and workflow management. - read ~/.agents/skills/jira/SKILL.md
+
+## Running Scripts
+
+```bash
+python ~/.agents/skills/jira/scripts/jira.py search "project = DEMO"
+python ~/.agents/skills/confluence/scripts/confluence.py search "space = DEV"
+```
+
+## Skill Invocation
+
+Use `$jira` or `$confluence` to invoke skills, or describe naturally:
+- "Search Jira for my open issues"
+- "Create a bug in PROJECT about login failures"
+- "Find Confluence pages about authentication"
+
+## Network access
+
+All service skills require outbound network access for remote operations. Read the
+skill's Network access section and use the session's approval mechanism when
+restricted. Report connection failures without resetting credentials.
