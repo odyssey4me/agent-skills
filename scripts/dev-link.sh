@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# dev-link.sh - Redirect Claude Code skill symlinks to a local repo checkout
+# dev-link.sh - Redirect Codex skill symlinks to a local repo checkout
 #
 # Usage:
 #   ./scripts/dev-link.sh link [skill-name]    # Link all or one skill to local repo
@@ -9,8 +9,8 @@
 #
 set -euo pipefail
 
-CLAUDE_SKILLS_DIR="${HOME}/.claude/skills"
-BACKUP_DIR="${CLAUDE_SKILLS_DIR}/.dev-link-backup"
+CODEX_SKILLS_DIR="${CODEX_SKILLS_DIR:-${HOME}/.agents/skills}"
+BACKUP_DIR="${CODEX_SKILLS_DIR}/.dev-link-backup"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_SKILLS_DIR="${REPO_ROOT}/skills"
 
@@ -59,13 +59,13 @@ cmd_link() {
     local linked=0
     local skipped=0
     while IFS= read -r skill; do
-        local claude_skill="${CLAUDE_SKILLS_DIR}/${skill}"
+        local codex_skill="${CODEX_SKILLS_DIR}/${skill}"
         local local_skill="${REPO_SKILLS_DIR}/${skill}"
 
         # Check if already linked to local repo
-        if [[ -L "${claude_skill}" ]]; then
+        if [[ -L "${codex_skill}" ]]; then
             local current_target
-            current_target="$(readlink "${claude_skill}")"
+            current_target="$(readlink "${codex_skill}")"
             if [[ "${current_target}" == "${local_skill}" ]]; then
                 echo "  skip: ${skill} (already linked to local repo)"
                 skipped=$((skipped + 1))
@@ -74,22 +74,21 @@ cmd_link() {
         fi
 
         # Back up the original symlink target (or note if it doesn't exist)
-        if [[ -L "${claude_skill}" ]]; then
-            readlink "${claude_skill}" > "${BACKUP_DIR}/${skill}"
-        elif [[ -d "${claude_skill}" ]]; then
+        if [[ -L "${codex_skill}" ]]; then
+            readlink "${codex_skill}" > "${BACKUP_DIR}/${skill}"
+        elif [[ -d "${codex_skill}" ]]; then
             # It's a real directory, not a symlink - record this
-            echo "__directory__" > "${BACKUP_DIR}/${skill}"
-            echo "  warn: ${skill} at ${claude_skill} is a directory, not a symlink; skipping" >&2
+            echo "  warn: ${skill} at ${codex_skill} is a directory, not a symlink; skipping" >&2
             skipped=$((skipped + 1))
             continue
-        elif [[ ! -e "${claude_skill}" ]]; then
+        elif [[ ! -e "${codex_skill}" ]]; then
             # Doesn't exist yet - record this so unlink knows to remove it
             echo "__created__" > "${BACKUP_DIR}/${skill}"
         fi
 
         # Remove existing and create new symlink
-        rm -f "${claude_skill}"
-        ln -s "${local_skill}" "${claude_skill}"
+        rm -f "${codex_skill}"
+        ln -s "${local_skill}" "${codex_skill}"
         echo "  link: ${skill} -> ${local_skill}"
         linked=$((linked + 1))
     done <<< "${skills}"
@@ -97,7 +96,7 @@ cmd_link() {
     echo ""
     echo "Linked ${linked} skill(s), skipped ${skipped}."
     if [[ ${linked} -gt 0 ]]; then
-        echo "Start a new Claude Code conversation to use local versions."
+        echo "Start a new Codex conversation to use local versions."
     fi
 }
 
@@ -109,7 +108,7 @@ cmd_unlink() {
     local restored=0
     local skipped=0
     while IFS= read -r skill; do
-        local claude_skill="${CLAUDE_SKILLS_DIR}/${skill}"
+        local codex_skill="${CODEX_SKILLS_DIR}/${skill}"
         local backup_file="${BACKUP_DIR}/${skill}"
 
         if [[ ! -f "${backup_file}" ]]; then
@@ -121,14 +120,19 @@ cmd_unlink() {
         local original_target
         original_target="$(cat "${backup_file}")"
 
-        if [[ "${original_target}" == "__created__" ]]; then
+        if [[ "${original_target}" == "__directory__" ]]; then
+            echo "  skip: ${skill} (original installation is a directory)"
+            rm -f "${backup_file}"
+            skipped=$((skipped + 1))
+            continue
+        elif [[ "${original_target}" == "__created__" ]]; then
             # Was created by dev-link, just remove it
-            rm -f "${claude_skill}"
+            rm -f "${codex_skill}"
             echo "  remove: ${skill} (was not installed before dev-link)"
         else
             # Restore the original symlink
-            rm -f "${claude_skill}"
-            ln -s "${original_target}" "${claude_skill}"
+            rm -f "${codex_skill}"
+            ln -s "${original_target}" "${codex_skill}"
             echo "  restore: ${skill} -> ${original_target}"
         fi
 
@@ -153,19 +157,19 @@ cmd_status() {
     echo ""
 
     while IFS= read -r skill; do
-        local claude_skill="${CLAUDE_SKILLS_DIR}/${skill}"
+        local codex_skill="${CODEX_SKILLS_DIR}/${skill}"
 
-        if [[ -L "${claude_skill}" ]]; then
+        if [[ -L "${codex_skill}" ]]; then
             local target
-            target="$(readlink "${claude_skill}")"
+            target="$(readlink "${codex_skill}")"
             if [[ "${target}" == "${REPO_SKILLS_DIR}/"* ]]; then
                 echo "  ${skill}: LOCAL (${target})"
             else
                 echo "  ${skill}: installed (${target})"
             fi
-        elif [[ -d "${claude_skill}" ]]; then
+        elif [[ -d "${codex_skill}" ]]; then
             echo "  ${skill}: installed (directory)"
-        elif [[ ! -e "${claude_skill}" ]]; then
+        elif [[ ! -e "${codex_skill}" ]]; then
             echo "  ${skill}: not installed"
         fi
     done <<< "${skills}"
