@@ -50,6 +50,27 @@ python confluence.py page create --space DEMO --title "Design Doc" \
 python confluence.py page update 123456 --body-file docs/design.md
 ```
 
+## Page Metadata and Link Conversion
+
+**Frontmatter support:** Markdown files can include YAML frontmatter with page metadata. CLI flags take precedence over frontmatter values. Supported fields: `title`, `space`, `labels`, `parent`, `toc`.
+
+```yaml
+---
+title: API Documentation
+space: DEMO
+labels: docs, api
+parent: 123456
+toc: true
+---
+
+# Introduction
+...
+```
+
+**Table of contents:** Use `--toc` (or `toc: true` in frontmatter) to prepend a TOC macro.
+
+**Internal link conversion:** Links pointing to pages on the same Confluence instance are automatically converted to native Confluence links during markdown conversion. The linked page is validated before conversion — invalid links are left as-is.
+
 ## Creating Pages
 
 ### Basic Page Creation

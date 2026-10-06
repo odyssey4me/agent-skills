@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "2.6.0"
+  version: "2.6.1"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -88,17 +88,7 @@ See [permissions.md](references/permissions.md) for read/write classification of
 
 ### check
 
-Verify configuration and connectivity.
-
-```bash
-$SKILL_DIR/scripts/confluence.py check
-```
-
-This validates:
-- Python dependencies are installed
-- Authentication is configured
-- Can connect to Confluence
-- API connectivity is working
+See [Setup Verification](#setup-verification) for dependency, authentication, and connectivity checks.
 
 ### search
 
@@ -176,42 +166,14 @@ $SKILL_DIR/scripts/confluence.py page history 123456 --max-results 10
 
 ### page create / update
 
-For creating and updating pages with Markdown support, see [references/creating-content.md](references/creating-content.md).
+Read [references/creating-content.md](references/creating-content.md) when creating or
+updating pages for Markdown, images, frontmatter, table of contents, and internal links.
 
-Quick examples:
 ```bash
-# Create page from Markdown file
 $SKILL_DIR/scripts/confluence.py page create --space DEMO --title "Documentation" \
   --body-file README.md
-
-# Create page with table of contents
-$SKILL_DIR/scripts/confluence.py page create --space DEMO --title "Guide" \
-  --body-file guide.md --toc
-
-# Update page from file
 $SKILL_DIR/scripts/confluence.py page update 123456 --body-file updated.md
 ```
-
-**Images:** When using `--body-file`, local image references in markdown (`![alt](path/to/image.png)`) are automatically uploaded as page attachments and embedded inline. Paths are resolved relative to the markdown file's directory.
-
-**Frontmatter support:** Markdown files can include YAML frontmatter with page metadata. CLI flags take precedence over frontmatter values. Supported fields: `title`, `space`, `labels`, `parent`, `toc`.
-
-```yaml
----
-title: API Documentation
-space: DEMO
-labels: docs, api
-parent: 123456
-toc: true
----
-
-# Introduction
-...
-```
-
-**Table of contents:** Use `--toc` (or `toc: true` in frontmatter) to prepend a TOC macro.
-
-**Internal link conversion:** Links pointing to pages on the same Confluence instance are automatically converted to native Confluence links during markdown conversion. The linked page is validated before conversion — invalid links are left as-is.
 
 ### page move
 
@@ -319,34 +281,9 @@ $SKILL_DIR/scripts/confluence.py search "type=page AND space=DEMO ORDER BY creat
 
 ## Examples
 
-Common Confluence tasks:
-
-**Search and read:**
-```bash
-# Search for pages about authentication
-confluence search "type=page AND text~authentication" --space DOCS
-
-# Get a page's content
-confluence page get "Installation Guide"
-```
-
-**Create and update:**
-```bash
-# Create a page from Markdown
-confluence page create --space DOCS --title "API Reference" --body-file api.md --toc
-
-# Update an existing page
-confluence page update 123456 --body-file updated-api.md
-```
-
-**Manage spaces:**
-```bash
-# List all spaces
-confluence space list
-
-# Get space details
-confluence space get DOCS
-```
+Use the examples under [search](#search), [page get](#page-get), and
+[space](#space) for common read operations. For page creation, updates, and
+batch workflows, see [Creating Content](references/creating-content.md#advanced-examples).
 
 ## Model Guidance
 
