@@ -2019,7 +2019,7 @@ class TestCommandHandlers:
 
         assert result == 0
         captured = capsys.readouterr()
-        assert "https://example.atlassian.net" in captured.out
+        assert "  URL: https://example.atlassian.net" in captured.out.splitlines()
         assert "test@example.com" in captured.out
 
     @patch("skills.jira.scripts.jira.update_issue")
