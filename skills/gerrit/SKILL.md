@@ -3,17 +3,26 @@ name: gerrit
 description: Submit, amend, and review Gerrit changes using git-review CLI. Use when asked to submit a patchset, download a change, rebase a change request, check CR status, or manage code reviews in Gerrit.
 metadata:
   author: odyssey4me
-  version: "0.3.0"
+  version: "0.3.1"
   category: code-hosting
   tags: "code-review, patches"
   complexity: lightweight
 license: MIT
-allowed-tools: Bash($SKILL_DIR/scripts/gerrit.py:*)
 ---
 
 # Gerrit Skill
 
 This skill provides Gerrit code review integration using `git-review` with a Python wrapper for markdown-formatted query output on read/view operations. Action commands (submit, review, abandon) should use `git-review` or SSH commands directly.
+
+## Network access
+
+Gerrit commands require outbound HTTPS to the configured Gerrit REST API. Git fetch/push and git-review require HTTPS or SSH to the configured review and repository hosts. Remote operations require outbound network access. If the agent environment restricts it, obtain access through that environment's approval or network controls before the first remote command, reusing authorization already granted. Local help and file processing do not need network access. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials to resolve them. If approved access also fails, stop and report it. Authentication and permission errors require user action.
+
+## Resolving script paths
+
+`SKILL_DIR` in the examples is the directory containing this loaded `SKILL.md`.
+Set it to that absolute path before running commands; do not assume the agent
+sets this shell variable. Quote the script path if it contains spaces.
 
 ## Prerequisites
 

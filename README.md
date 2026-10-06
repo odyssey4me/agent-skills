@@ -14,7 +14,7 @@ npx skills add odyssey4me/agent-skills
 npx skills add odyssey4me/agent-skills --skill google --skill jira
 ```
 
-For manual installation or other AI agents (Cursor, OpenCode, etc.), see the [User Guide](docs/user-guide.md#installation).
+For manual installation and agent-specific options, see the [User Guide](docs/user-guide.md#installation).
 
 ## Available Skills
 
@@ -39,3 +39,10 @@ Browse install counts on [skills.sh](https://skills.sh/odyssey4me/agent-skills).
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) for details.
+
+These skills are agent-agnostic. Install them with any compatible agent and
+invoke them using natural language or that agent's skill selection interface.
+
+Repository development uses Codex. Development instructions are in
+[AGENTS.md](AGENTS.md); this checkout's skills are discoverable through
+`.agents/skills` for local development.
