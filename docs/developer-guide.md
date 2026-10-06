@@ -2,6 +2,10 @@
 
 Complete guide for developing agent skills and contributing to this repository.
 
+Development uses Codex and the repository's `AGENTS.md` instructions. Published
+skills remain agent-agnostic: keep agent-specific tooling and sandbox guidance
+in development instructions, and use portable service requirements in skills.
+
 ## Table of Contents
 
 - [Architecture](#architecture)
@@ -144,7 +148,7 @@ agent-skills/
 ├── docs/                      # Documentation
 │   ├── user-guide.md          # User installation and setup guide
 │   └── developer-guide.md (this file)
-├── CLAUDE.md                  # Instructions for AI coding assistants
+├── AGENTS.md                  # Instructions for AI coding assistants
 ├── CONTRIBUTING.md            # Contribution guidelines
 └── README.md                  # Project overview
 ```
@@ -574,13 +578,13 @@ skills/myskill/scripts/myskill.py operation arg
 
 ### Testing with Local Dev Links
 
-Use `dev-link.sh` to redirect Claude Code's skill symlinks to your local checkout so you can test changes without pushing to GitHub:
+Use `dev-link.sh` to redirect Codex's skill symlinks to your local checkout so you can test changes without pushing to GitHub:
 
 ```bash
 # Link your skill to the local repo
 ./scripts/dev-link.sh link myskill
 
-# Start a new Claude Code conversation - it reads local files now
+# Start a new Codex conversation - it reads local files now
 
 # Check current link state
 ./scripts/dev-link.sh status
@@ -603,7 +607,7 @@ npx skills add odyssey4me/agent-skills --list
 npx skills add odyssey4me/agent-skills --skill myskill
 
 # Verify installation (path varies by agent)
-ls ~/.claude/skills/myskill
+ls ~/.agents/skills/myskill
 ```
 
 ## Releasing
@@ -612,8 +616,7 @@ Follow these steps to cut a release.
 
 ### 1. Validate versions
 
-Delegate to a **haiku** subagent (via the Task tool with `model: "haiku"`).
-The subagent should — in a single invocation:
+Run these checks before releasing:
 
 1. Run `scripts/check_versions.sh` and report which skills need a bump.
 2. For skills that already have a bump, validate the bump level by reviewing

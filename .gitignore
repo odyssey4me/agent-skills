@@ -33,7 +33,7 @@ env/
 *.swo
 *~
 
-# AI agents (only Claude Code is currently supported)
+# Local AI agent state
 .cursor/
 .continue/
 .continuerules
@@ -75,3 +75,8 @@ token.json
 
 # Config files with secrets
 ~/.config/agent-skills/
+
+# Codex local overrides and session state
+.codex/*
+!.codex/config.toml
+AGENTS.override.md

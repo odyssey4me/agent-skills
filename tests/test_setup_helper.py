@@ -2,15 +2,54 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from scripts.setup_helper import (
-    ClaudeMdConfig,
+    AgentsMdConfig,
     SkillInfo,
     find_skill_installations,
-    generate_claude_md_content,
-    parse_claude_md,
+    generate_agents_md_content,
+    parse_agents_md,
     parse_skill_description,
-    update_claude_md_section,
+    update_agents_md_section,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path, monkeypatch):
+    """Keep discovery independent of the developer's installed skills."""
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.delenv("AGENT_SKILLS_PATH", raising=False)
+    monkeypatch.delenv("CODEX_HOME", raising=False)
+
+
+def test_discover_current_layout_and_symlink(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    skill = tmp_path / "source" / "jira"
+    (skill / "scripts").mkdir(parents=True)
+    (skill / "SKILL.md").write_text("# Jira\n\nIssue tracking.")
+    (skill / "scripts" / "jira.py").write_text("# script")
+    installed = tmp_path / ".agents" / "skills"
+    installed.mkdir(parents=True)
+    (installed / "jira").symlink_to(skill, target_is_directory=True)
+    found = find_skill_installations()
+    assert found[installed][0].script == installed / "jira" / "scripts" / "jira.py"
+
+
+def test_generate_documentation_only_skill(tmp_path):
+    skill = SkillInfo("google", tmp_path, tmp_path / "SKILL.md", None, "Google CLI")
+    content = generate_agents_md_content(tmp_path, [skill])
+    assert "python None" not in content
+    assert "Use `$google`" in content
+
+
+def test_append_preserves_following_sections(tmp_path):
+    original = "# Global Agent Skills\n\nIntro.\n\n## Custom\n\nKeep this.\n"
+    skill = SkillInfo("google", tmp_path, tmp_path / "SKILL.md", None, "Google CLI")
+    updated = update_agents_md_section(original, [skill])
+    assert original.rstrip() in updated
 
 
 class TestSkillInfo:
@@ -38,21 +77,21 @@ class TestSkillInfo:
         assert skill_info.description == "Jira integration"
 
 
-class TestClaudeMdConfig:
-    """Tests for ClaudeMdConfig dataclass."""
+class TestAgentsMdConfig:
+    """Tests for AgentsMdConfig dataclass."""
 
-    def test_claude_md_config_creation(self, tmp_path):
-        """Test creating a ClaudeMdConfig instance."""
-        claude_md = tmp_path / "CLAUDE.md"
+    def test_agents_md_config_creation(self, tmp_path):
+        """Test creating a AgentsMdConfig instance."""
+        agents_md = tmp_path / "AGENTS.md"
 
-        config = ClaudeMdConfig(
-            path=claude_md,
+        config = AgentsMdConfig(
+            path=agents_md,
             exists=True,
             content="# Global Agent Skills",
             configured_skills=["jira"],
         )
 
-        assert config.path == claude_md
+        assert config.path == agents_md
         assert config.exists is True
         assert "Global Agent Skills" in config.content
         assert "jira" in config.configured_skills
@@ -182,7 +221,7 @@ class TestFindSkillInstallations:
         assert skill_names == {"jira", "github"}
 
     def test_find_skill_missing_script(self, tmp_path, monkeypatch):
-        """Test that skills without scripts are skipped."""
+        """Test that documentation-only skills are discovered."""
         # Change to tmp_path so ./skills/ doesn't interfere
         monkeypatch.chdir(tmp_path)
 
@@ -197,10 +236,10 @@ class TestFindSkillInstallations:
         discovered = find_skill_installations([str(skills_dir)])
 
         # Should not find the incomplete skill
-        assert len(discovered) == 0
+        assert discovered[skills_dir][0].script is None
 
     def test_find_skill_wrong_script_name(self, tmp_path, monkeypatch):
-        """Test that skills with wrong script name are skipped."""
+        """Test that unrelated Python files are not used as entrypoints."""
         # Change to tmp_path so ./skills/ doesn't interfere
         monkeypatch.chdir(tmp_path)
 
@@ -215,64 +254,64 @@ class TestFindSkillInstallations:
 
         discovered = find_skill_installations([str(skills_dir)])
 
-        assert len(discovered) == 0
+        assert discovered[skills_dir][0].script is None
 
 
-class TestParseClaudeMd:
-    """Tests for parse_claude_md function."""
+class TestParseAgentsMd:
+    """Tests for parse_agents_md function."""
 
     def test_parse_nonexistent_file(self, tmp_path):
-        """Test parsing non-existent CLAUDE.md."""
-        claude_md = tmp_path / "CLAUDE.md"
+        """Test parsing non-existent AGENTS.md."""
+        agents_md = tmp_path / "AGENTS.md"
 
-        config = parse_claude_md(claude_md)
+        config = parse_agents_md(agents_md)
 
-        assert config.path == claude_md
+        assert config.path == agents_md
         assert config.exists is False
         assert config.content == ""
         assert config.configured_skills == []
 
     def test_parse_permission_error(self, tmp_path):
         """Test parsing when file cannot be read."""
-        claude_md = tmp_path / "CLAUDE.md"
-        claude_md.write_text("content")
-        claude_md.chmod(0o000)  # Remove all permissions
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("content")
+        agents_md.chmod(0o000)  # Remove all permissions
 
         try:
-            config = parse_claude_md(claude_md)
+            config = parse_agents_md(agents_md)
 
             # Should handle permission error gracefully
             assert config.exists is True
             assert config.content == ""
             assert config.configured_skills == []
         finally:
-            claude_md.chmod(0o644)  # Restore permissions for cleanup
+            agents_md.chmod(0o644)  # Restore permissions for cleanup
 
     def test_parse_empty_file(self, tmp_path):
-        """Test parsing empty CLAUDE.md."""
-        claude_md = tmp_path / "CLAUDE.md"
-        claude_md.write_text("")
+        """Test parsing empty AGENTS.md."""
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("")
 
-        config = parse_claude_md(claude_md)
+        config = parse_agents_md(agents_md)
 
         assert config.exists is True
         assert config.content == ""
         assert config.configured_skills == []
 
     def test_parse_with_skills(self, tmp_path):
-        """Test parsing CLAUDE.md with configured skills."""
-        claude_md = tmp_path / "CLAUDE.md"
-        claude_md.write_text(
+        """Test parsing AGENTS.md with configured skills."""
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(
             """# Global Agent Skills
 
 ## Available Skills
 
-- **Jira**: Issue tracking - read ~/.claude/skills/jira/SKILL.md
-- **GitHub**: Repository management - read ~/.claude/skills/github/SKILL.md
+- **Jira**: Issue tracking - read ~/.agents/skills/jira/SKILL.md
+- **GitHub**: Repository management - read ~/.agents/skills/github/SKILL.md
 """
         )
 
-        config = parse_claude_md(claude_md)
+        config = parse_agents_md(agents_md)
 
         assert config.exists is True
         assert len(config.configured_skills) == 2
@@ -281,22 +320,22 @@ class TestParseClaudeMd:
 
     def test_parse_case_insensitive(self, tmp_path):
         """Test that parsing is case-insensitive."""
-        claude_md = tmp_path / "CLAUDE.md"
-        claude_md.write_text(
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(
             """# Skills
 
-- **JIRA**: Issue tracking - READ ~/.claude/skills/jira/skill.md
+- **JIRA**: Issue tracking - READ ~/.agents/skills/jira/skill.md
 """
         )
 
-        config = parse_claude_md(claude_md)
+        config = parse_agents_md(agents_md)
 
         assert "jira" in config.configured_skills
 
     def test_parse_with_varied_formatting(self, tmp_path):
         """Test parsing with different formatting variations."""
-        claude_md = tmp_path / "CLAUDE.md"
-        claude_md.write_text(
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(
             """# Skills
 
 - **Jira**: Description - read /path/to/SKILL.md
@@ -304,19 +343,19 @@ class TestParseClaudeMd:
 """
         )
 
-        config = parse_claude_md(claude_md)
+        config = parse_agents_md(agents_md)
 
         assert len(config.configured_skills) == 2
         assert "jira" in config.configured_skills
         assert "github" in config.configured_skills
 
 
-class TestValidateClaudeMdContent:
-    """Tests for validate_claude_md_content function."""
+class TestValidateAgentsMdContent:
+    """Tests for validate_agents_md_content function."""
 
     def test_validate_venv_activation(self):
         """Test detection of venv activation patterns."""
-        from scripts.setup_helper import validate_claude_md_content
+        from scripts.setup_helper import validate_agents_md_content
 
         content = """# Skills
 
@@ -327,14 +366,14 @@ source .venv/bin/activate
 python skills/jira/jira.py check
 ```
 """
-        warnings = validate_claude_md_content(content)
+        warnings = validate_agents_md_content(content)
 
         assert len(warnings) > 0
         assert any("venv activation" in w for w in warnings)
 
     def test_validate_cd_commands(self):
         """Test detection of cd commands."""
-        from scripts.setup_helper import validate_claude_md_content
+        from scripts.setup_helper import validate_agents_md_content
 
         content = """# Skills
 
@@ -344,14 +383,14 @@ python skills/jira/jira.py check
 cd /path/to/agent-skills && python skills/jira/jira.py
 ```
 """
-        warnings = validate_claude_md_content(content)
+        warnings = validate_agents_md_content(content)
 
         assert len(warnings) > 0
         assert any("'cd' commands" in w for w in warnings)
 
     def test_validate_scripts_subdirectory(self):
         """Test detection of old scripts/ subdirectory structure."""
-        from scripts.setup_helper import validate_claude_md_content
+        from scripts.setup_helper import validate_agents_md_content
 
         content = """# Skills
 
@@ -359,14 +398,13 @@ cd /path/to/agent-skills && python skills/jira/jira.py
 python skills/jira/scripts/search.py
 ```
 """
-        warnings = validate_claude_md_content(content)
+        warnings = validate_agents_md_content(content)
 
-        assert len(warnings) > 0
-        assert any("scripts/" in w for w in warnings)
+        assert warnings == []
 
     def test_validate_missing_guidance(self):
         """Test detection of missing 'run directly' guidance."""
-        from scripts.setup_helper import validate_claude_md_content
+        from scripts.setup_helper import validate_agents_md_content
 
         content = """# Skills
 
@@ -374,43 +412,43 @@ python skills/jira/scripts/search.py
 
 Some other instructions here.
 """
-        warnings = validate_claude_md_content(content)
+        warnings = validate_agents_md_content(content)
 
         assert len(warnings) > 0
         assert any("Always run skill scripts directly" in w for w in warnings)
 
     def test_validate_correct_content(self):
         """Test that correct content has no warnings."""
-        from scripts.setup_helper import validate_claude_md_content
+        from scripts.setup_helper import validate_agents_md_content
 
         content = """# Global Agent Skills
 
-Skills are available at ~/.claude/skills
+Skills are available at ~/.agents/skills
 
 ## Available Skills
 
-- **Jira**: Issue tracking - read ~/.claude/skills/jira/SKILL.md
+- **Jira**: Issue tracking - read ~/.agents/skills/jira/SKILL.md
 
 ## Running Scripts
 
 Always run skill scripts directly:
 
 ```bash
-python ~/.claude/skills/jira/jira.py check
+python ~/.agents/skills/jira/jira.py check
 ```
 
 ## Skill Invocation
 
-Use `/jira` or describe naturally:
+Use `$jira` or describe naturally:
 - "Search Jira for my open issues"
 """
-        warnings = validate_claude_md_content(content)
+        warnings = validate_agents_md_content(content)
 
         assert len(warnings) == 0
 
     def test_validate_multiple_issues(self):
         """Test detection of multiple issues."""
-        from scripts.setup_helper import validate_claude_md_content
+        from scripts.setup_helper import validate_agents_md_content
 
         content = """# Skills
 
@@ -421,18 +459,18 @@ cd /home/user/agent-skills && source .venv/bin/activate
 python skills/jira/scripts/search.py
 ```
 """
-        warnings = validate_claude_md_content(content)
+        warnings = validate_agents_md_content(content)
 
         # Should catch venv, cd, and scripts/ subdirectory
-        assert len(warnings) >= 3
+        assert len(warnings) >= 2
 
 
-class TestGenerateClaudeMdContent:
-    """Tests for generate_claude_md_content function."""
+class TestGenerateAgentsMdContent:
+    """Tests for generate_agents_md_content function."""
 
     def test_generate_empty_skills(self, tmp_path):
         """Test generating content with no skills."""
-        content = generate_claude_md_content(tmp_path, [])
+        content = generate_agents_md_content(tmp_path, [])
 
         assert "# Global Agent Skills" in content
         assert f"Skills are available at {tmp_path}" in content
@@ -448,14 +486,14 @@ class TestGenerateClaudeMdContent:
             description="Jira integration skill",
         )
 
-        content = generate_claude_md_content(tmp_path, [skill_info])
+        content = generate_agents_md_content(tmp_path, [skill_info])
 
         assert "# Global Agent Skills" in content
         assert "## Available Skills" in content
         assert "**Jira**: Jira integration skill" in content
         assert "## Running Scripts" in content
         assert "## Skill Invocation" in content
-        assert "Use `/jira`" in content
+        assert "Use `$jira`" in content
 
     def test_generate_multiple_skills_sorted(self, tmp_path):
         """Test that skills are sorted alphabetically."""
@@ -483,7 +521,7 @@ class TestGenerateClaudeMdContent:
             ),
         ]
 
-        content = generate_claude_md_content(tmp_path, skills)
+        content = generate_agents_md_content(tmp_path, skills)
 
         # Check that skills appear in alphabetical order
         lines = content.split("\n")
@@ -495,8 +533,8 @@ class TestGenerateClaudeMdContent:
         assert "**Jira**" in skill_lines[2]
 
 
-class TestUpdateClaudeMdSection:
-    """Tests for update_claude_md_section function."""
+class TestUpdateAgentsMdSection:
+    """Tests for update_agents_md_section function."""
 
     def test_update_existing_section(self, tmp_path):
         """Test updating existing Available Skills section."""
@@ -519,7 +557,7 @@ Some content here.
             description="New skill",
         )
 
-        updated = update_claude_md_section(existing_content, [skill_info])
+        updated = update_agents_md_section(existing_content, [skill_info])
 
         assert "**Jira**: New skill" in updated
         assert "**OldSkill**" not in updated
@@ -545,7 +583,7 @@ Content.
             description="Jira skill",
         )
 
-        updated = update_claude_md_section(existing_content, [skill_info])
+        updated = update_agents_md_section(existing_content, [skill_info])
 
         assert "## Available Skills" in updated
         assert "**Jira**: Jira skill" in updated
@@ -575,7 +613,7 @@ Important content.
             description="New skill",
         )
 
-        updated = update_claude_md_section(existing_content, [skill_info])
+        updated = update_agents_md_section(existing_content, [skill_info])
 
         # New skill should be present
         assert "**New**: New skill" in updated
@@ -601,7 +639,7 @@ Some random content.
             description="Jira skill",
         )
 
-        updated = update_claude_md_section(existing_content, [skill_info])
+        updated = update_agents_md_section(existing_content, [skill_info])
 
         # Should append skills section at the end
         assert "## Available Skills" in updated
@@ -616,9 +654,9 @@ class TestShowCurrentConfig:
         """Test showing config when no skills are found."""
         from scripts.setup_helper import show_current_config
 
-        claude_md = tmp_path / "CLAUDE.md"
-        config = ClaudeMdConfig(
-            path=claude_md,
+        agents_md = tmp_path / "AGENTS.md"
+        config = AgentsMdConfig(
+            path=agents_md,
             exists=False,
             content="",
             configured_skills=[],
@@ -632,10 +670,10 @@ class TestShowCurrentConfig:
         assert "No skills found" in captured.out
 
     def test_show_with_skills_and_config(self, tmp_path, capsys):
-        """Test showing config with skills and CLAUDE.md."""
+        """Test showing config with skills and AGENTS.md."""
         from scripts.setup_helper import show_current_config
 
-        claude_md = tmp_path / "CLAUDE.md"
+        agents_md = tmp_path / "AGENTS.md"
         skill_info = SkillInfo(
             name="jira",
             path=tmp_path / "jira",
@@ -644,8 +682,8 @@ class TestShowCurrentConfig:
             description="Jira skill",
         )
 
-        config = ClaudeMdConfig(
-            path=claude_md,
+        config = AgentsMdConfig(
+            path=agents_md,
             exists=True,
             content="# Skills",
             configured_skills=["jira"],
@@ -662,21 +700,21 @@ class TestShowCurrentConfig:
         assert "✓" in captured.out  # Checkmark for configured skill
 
 
-class TestUpdateClaudeMd:
-    """Tests for update_claude_md function."""
+class TestUpdateAgentsMd:
+    """Tests for update_agents_md function."""
 
     def test_update_with_no_skills(self, tmp_path, capsys):
         """Test updating with no skills."""
-        from scripts.setup_helper import update_claude_md
+        from scripts.setup_helper import update_agents_md
 
-        config = ClaudeMdConfig(
-            path=tmp_path / "CLAUDE.md",
+        config = AgentsMdConfig(
+            path=tmp_path / "AGENTS.md",
             exists=False,
             content="",
             configured_skills=[],
         )
 
-        result = update_claude_md(config, [], dry_run=True)
+        result = update_agents_md(config, [], dry_run=True)
 
         assert result is False
         captured = capsys.readouterr()
@@ -684,7 +722,7 @@ class TestUpdateClaudeMd:
 
     def test_update_dry_run(self, tmp_path, capsys):
         """Test update in dry-run mode."""
-        from scripts.setup_helper import update_claude_md
+        from scripts.setup_helper import update_agents_md
 
         skill_info = SkillInfo(
             name="jira",
@@ -694,25 +732,25 @@ class TestUpdateClaudeMd:
             description="Jira skill",
         )
 
-        config = ClaudeMdConfig(
-            path=tmp_path / "CLAUDE.md",
+        config = AgentsMdConfig(
+            path=tmp_path / "AGENTS.md",
             exists=False,
             content="",
             configured_skills=[],
         )
 
-        result = update_claude_md(config, [skill_info], dry_run=True)
+        result = update_agents_md(config, [skill_info], dry_run=True)
 
         assert result is True
         captured = capsys.readouterr()
         assert "Dry run" in captured.out
         assert "would write to" in captured.out
         # File should not actually be created
-        assert not (tmp_path / "CLAUDE.md").exists()
+        assert not (tmp_path / "AGENTS.md").exists()
 
     def test_update_auto_mode(self, tmp_path, capsys):
         """Test update in auto mode (no confirmation)."""
-        from scripts.setup_helper import update_claude_md
+        from scripts.setup_helper import update_agents_md
 
         skill_info = SkillInfo(
             name="jira",
@@ -722,26 +760,26 @@ class TestUpdateClaudeMd:
             description="Jira skill",
         )
 
-        config = ClaudeMdConfig(
-            path=tmp_path / "CLAUDE.md",
+        config = AgentsMdConfig(
+            path=tmp_path / "AGENTS.md",
             exists=False,
             content="",
             configured_skills=[],
         )
 
-        result = update_claude_md(config, [skill_info], auto=True)
+        result = update_agents_md(config, [skill_info], auto=True)
 
         assert result is True
         captured = capsys.readouterr()
         assert "Written to" in captured.out
         # File should be created
-        assert (tmp_path / "CLAUDE.md").exists()
-        content = (tmp_path / "CLAUDE.md").read_text()
+        assert (tmp_path / "AGENTS.md").exists()
+        content = (tmp_path / "AGENTS.md").read_text()
         assert "**Jira**" in content
 
     def test_update_permission_error(self, tmp_path, capsys):
         """Test update when file cannot be written."""
-        from scripts.setup_helper import update_claude_md
+        from scripts.setup_helper import update_agents_md
 
         skill_info = SkillInfo(
             name="jira",
@@ -756,15 +794,15 @@ class TestUpdateClaudeMd:
         readonly_dir.mkdir()
         readonly_dir.chmod(0o444)
 
-        config = ClaudeMdConfig(
-            path=readonly_dir / "CLAUDE.md",
+        config = AgentsMdConfig(
+            path=readonly_dir / "AGENTS.md",
             exists=False,
             content="",
             configured_skills=[],
         )
 
         try:
-            result = update_claude_md(config, [skill_info], auto=True)
+            result = update_agents_md(config, [skill_info], auto=True)
 
             assert result is False
             captured = capsys.readouterr()
@@ -806,9 +844,9 @@ class TestInteractiveSetup:
         (jira_dir / "SKILL.md").write_text("# Jira\n\nJira skill.")
         (jira_dir / "jira.py").write_text("# Script")
 
-        # Create CLAUDE.md with skill already configured
-        claude_md = tmp_path / "test_claude.md"
-        claude_md.write_text(
+        # Create AGENTS.md with skill already configured
+        agents_md = tmp_path / "test_agents.md"
+        agents_md.write_text(
             """# Global Agent Skills
 
 ## Available Skills
@@ -819,7 +857,7 @@ class TestInteractiveSetup:
 
         result = interactive_setup(
             custom_paths=[str(skills_dir)],
-            claude_md_path=claude_md,
+            agents_md_path=agents_md,
         )
 
         assert result == 0
@@ -859,7 +897,7 @@ class TestGetSearchLocations:
         locations = get_search_locations()
 
         # Should have standard locations
-        assert any(".claude/skills" in str(loc) for loc in locations)
+        assert any(".agents/skills" in str(loc) for loc in locations)
         assert any(".local/share/agent-skills/skills" in str(loc) for loc in locations)
 
 
@@ -886,9 +924,9 @@ class TestIntegration:
         assert len(discovered) == 1
         assert len(discovered[skills_dir]) == 1
 
-        # Generate CLAUDE.md content
+        # Generate AGENTS.md content
         skills = discovered[skills_dir]
-        content = generate_claude_md_content(skills_dir, skills)
+        content = generate_agents_md_content(skills_dir, skills)
 
         # Verify generated content
         assert "# Global Agent Skills" in content
@@ -896,10 +934,10 @@ class TestIntegration:
         assert str(jira_dir / "SKILL.md") in content
 
     def test_parse_and_update_workflow(self, tmp_path):
-        """Test parsing existing CLAUDE.md and updating it."""
-        # Create existing CLAUDE.md
-        claude_md = tmp_path / "CLAUDE.md"
-        claude_md.write_text(
+        """Test parsing existing AGENTS.md and updating it."""
+        # Create existing AGENTS.md
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(
             """# Global Agent Skills
 
 ## Available Skills
@@ -913,7 +951,7 @@ Keep this content.
         )
 
         # Parse existing
-        config = parse_claude_md(claude_md)
+        config = parse_agents_md(agents_md)
         assert "jira" in config.configured_skills
 
         # Create new skill info
@@ -926,7 +964,7 @@ Keep this content.
         )
 
         # Update content
-        updated = update_claude_md_section(config.content, [new_skill])
+        updated = update_agents_md_section(config.content, [new_skill])
 
         # Verify update
         assert "Updated Jira skill" in updated

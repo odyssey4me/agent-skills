@@ -65,8 +65,7 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
-      # Also enforced by a Claude Code hook, but that only covers commits Claude
-      # makes — this covers every commit, whoever makes it.
+      # Enforce version bumps for every agent and human contributor.
       - id: skill-versions
         name: skill versions bumped
         entry: scripts/check_versions.sh

@@ -121,7 +121,7 @@ itself passes on 3.15rc1. It's an early warning, not a gate.
 
 ## Local Skill Testing
 
-When developing skills locally, use `dev-link.sh` to redirect Claude Code's skill symlinks to your repo checkout instead of the installed copies:
+When developing skills locally, use `dev-link.sh` to redirect Codex's skill symlinks to your repo checkout instead of the installed copies:
 
 ```bash
 # Link all skills to local repo
@@ -137,11 +137,11 @@ When developing skills locally, use `dev-link.sh` to redirect Claude Code's skil
 ./scripts/dev-link.sh unlink
 ```
 
-Start a new Claude Code conversation after linking to pick up local changes. Run `unlink` when done to restore the installed versions.
+Start a new Codex conversation after linking to pick up local changes. Run `unlink` when done to restore the installed versions.
 
 ## Creating a New Skill
 
-**Important**: Before creating a new skill, check if an official CLI tool exists for the service. See [CLAUDE.md - Development Principles](CLAUDE.md#development-principles) for guidance on preferring official CLIs over custom scripts.
+**Important**: Before creating a new skill, check if an official CLI tool exists for the service. See [AGENTS.md - Development Principles](AGENTS.md#development-principles) for guidance on preferring official CLIs over custom scripts.
 
 See the [Developer Guide - Creating New Skills](docs/developer-guide.md#creating-new-skills) for complete instructions, structure requirements, and design guidelines.
 
@@ -177,4 +177,4 @@ By contributing, you agree that your contributions will be licensed under the Ap
 - **[Developer Guide](docs/developer-guide.md)** - Comprehensive development documentation
 - **[User Guide](docs/user-guide.md)** - Installation and usage
 - **[Agent Skills Specification](https://agentskills.io/specification)** - Standard we implement
-- **[CLAUDE.md](CLAUDE.md)** - Instructions for AI coding assistants
+- **[AGENTS.md](AGENTS.md)** - Instructions for AI coding assistants
