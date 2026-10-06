@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from datetime import UTC
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 # ============================================================================
 # DEPENDENCY CHECKS
@@ -1902,7 +1903,11 @@ def cmd_check() -> int:
         print("   ERROR: No API token configured")
         print("\n   Configure using one of these methods:")
         print("   - Environment: export CONFLUENCE_API_TOKEN=your-token-here")
-        if "atlassian.net" in creds.url:
+        try:
+            hostname = (urlsplit(creds.url).hostname or "").rstrip(".")
+        except ValueError:
+            hostname = ""
+        if hostname == "atlassian.net" or hostname.endswith(".atlassian.net"):
             print("   - Also set: export CONFLUENCE_EMAIL=your-email@example.com")
         print("   - Config file: ~/.config/agent-skills/confluence.yaml")
         print("   - Keyring: Use a setup script to store in system keyring")
