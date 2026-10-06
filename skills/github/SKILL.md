@@ -3,17 +3,26 @@ name: github
 description: Create and manage GitHub issues, pull requests, workflows, and repositories using the gh CLI. Use when asked to open a PR, merge a pull request, check repo actions, list issues, create a branch, or manage GitHub projects.
 metadata:
   author: odyssey4me
-  version: "0.2.1"
+  version: "0.2.2"
   category: code-hosting
   tags: "issues, pull-requests, workflows"
   complexity: lightweight
 license: MIT
-allowed-tools: Bash($SKILL_DIR/scripts/github.py:*)
 ---
 
 # GitHub Skill
 
 This skill provides GitHub integration using the official `gh` CLI tool. A Python wrapper script produces markdown-formatted output for read/view operations. Action commands (create, merge, close, comment) should use `gh` directly.
+
+## Network access
+
+GitHub commands (`gh` and the Python wrapper) require outbound HTTPS to GitHub API and authentication endpoints, or the configured GitHub Enterprise host. Git fetch/push requires HTTPS or SSH to the repository host. Remote operations require outbound network access. If the agent environment restricts it, obtain access through that environment's approval or network controls before the first remote command, reusing authorization already granted. Local help and file processing do not need network access. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials to resolve them. If approved access also fails, stop and report it. Authentication and permission errors require user action.
+
+## Resolving script paths
+
+`SKILL_DIR` in the examples is the directory containing this loaded `SKILL.md`.
+Set it to that absolute path before running commands; do not assume the agent
+sets this shell variable. Quote the script path if it contains spaces.
 
 ## Prerequisites
 

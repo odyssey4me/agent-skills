@@ -1,36 +1,20 @@
-# Sample Configuration Files
+# Optional agent configuration samples
 
-This directory contains sample configuration files for Claude Code.
+Skills use the Agent Skills specification and can be consumed by any compatible
+agent. Install using `npx skills add odyssey4me/agent-skills` and use your agent's
+skill interface or natural language. No particular agent configuration is required
+by these skills.
 
-> **Note**: These samples are for Claude Code. Skills work with [multiple AI agents](https://github.com/vercel-labs/skills#supported-agents) via the Agent Skills specification. See [../user-guide.md](../user-guide.md) for multi-agent installation.
+The following optional examples show how to add instructions for specific agents:
 
-## Available Samples
+- [Codex](.codex/AGENTS.md.sample): merge into `${CODEX_HOME:-~/.codex}/AGENTS.md`.
+- [Claude Code](.claude/CLAUDE.md.sample): merge into `~/.claude/CLAUDE.md`.
 
-### Claude Code
-- [`.claude/CLAUDE.md.sample`](.claude/CLAUDE.md.sample) - Global configuration file
-- **Install to**: `~/.claude/CLAUDE.md`
+Adjust paths for your installation and preserve existing instructions. Other
+agents can use the same guidance in their own instruction files.
 
-## When to Use This
+The repository's `scripts/setup_helper.py` is a Codex development convenience,
+not a requirement for consuming skills. Use `--dry-run` to preview changes or
+`--agents-md /path/to/AGENTS.md` to choose a development instruction file.
 
-After installing skills with `npx skills add odyssey4me/agent-skills`, you may want to configure Claude Code to make skills easier to discover and use. (These config samples are Claude Code-specific, but skills work with multiple AI agents.) The sample configuration:
-
-1. Documents which skills are available
-2. Shows how to invoke skills (via `/jira` commands or natural language)
-3. Provides example script commands
-
-## Installation
-
-1. Copy the sample file to its destination:
-   ```bash
-   cp docs/config-samples/.claude/CLAUDE.md.sample ~/.claude/CLAUDE.md
-   ```
-
-2. Adjust paths if you installed skills to a different location (default is `~/.claude/skills`)
-
-3. Restart Claude Code if needed
-
-## Notes
-
-- The sample assumes skills were installed with `npx skills add` to `~/.claude/skills`
-- If you installed to a custom location, update the paths in CLAUDE.md
-- See [../user-guide.md](../user-guide.md) for complete installation instructions
+See the [user guide](../user-guide.md) for agent-neutral installation and usage.

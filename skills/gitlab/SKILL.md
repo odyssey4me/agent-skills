@@ -3,17 +3,26 @@ name: gitlab
 description: Create and manage GitLab issues, merge requests, pipelines, and repositories using the glab CLI. Use when asked to open an MR, review a merge request, check CI/CD pipelines, list issues, or manage code review on GitLab.
 metadata:
   author: odyssey4me
-  version: "0.2.1"
+  version: "0.2.2"
   category: code-hosting
   tags: "issues, merge-requests, pipelines"
   complexity: lightweight
 license: MIT
-allowed-tools: Bash($SKILL_DIR/scripts/gitlab.py:*)
 ---
 
 # GitLab Skill
 
 This skill provides GitLab integration using the official `glab` CLI tool. A Python wrapper script produces markdown-formatted output for read/view operations. Action commands (create, merge, close, comment) should use `glab` directly.
+
+## Network access
+
+GitLab commands (`glab` and the Python wrapper) require outbound HTTPS to GitLab API and authentication endpoints, or the configured self-managed GitLab host. Git fetch/push requires HTTPS or SSH to the repository host. Remote operations require outbound network access. If the agent environment restricts it, obtain access through that environment's approval or network controls before the first remote command, reusing authorization already granted. Local help and file processing do not need network access. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials to resolve them. If approved access also fails, stop and report it. Authentication and permission errors require user action.
+
+## Resolving script paths
+
+`SKILL_DIR` in the examples is the directory containing this loaded `SKILL.md`.
+Set it to that absolute path before running commands; do not assume the agent
+sets this shell variable. Quote the script path if it contains spaces.
 
 ## Prerequisites
 

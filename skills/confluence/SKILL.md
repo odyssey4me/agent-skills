@@ -3,12 +3,11 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "2.6.1"
+  version: "2.6.2"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
 license: MIT
-allowed-tools: Bash($SKILL_DIR/scripts/confluence.py:*)
 ---
 
 # Confluence
@@ -16,6 +15,16 @@ allowed-tools: Bash($SKILL_DIR/scripts/confluence.py:*)
 Interact with Confluence for content search, viewing pages, and space management.
 
 > **Creating/Updating Content?** See [references/creating-content.md](references/creating-content.md) for page creation and updates with Markdown.
+
+## Network access
+
+Confluence API commands require outbound HTTPS to the configured Confluence host. Remote operations require outbound network access. If the agent environment restricts it, obtain access through that environment's approval or network controls before the first remote command, reusing authorization already granted. Local help and file processing do not need network access. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials to resolve them. If approved access also fails, stop and report it. Authentication and permission errors require user action.
+
+## Resolving script paths
+
+`SKILL_DIR` in the examples is the directory containing this loaded `SKILL.md`.
+Set it to that absolute path before running commands; do not assume the agent
+sets this shell variable. Quote the script path if it contains spaces.
 
 ## Installation
 

@@ -37,7 +37,7 @@ podman run --rm \
 
 ### MCP server
 
-Run gog as an MCP server for Claude Code:
+Run gog as an MCP server for any MCP-compatible agent:
 
 ```bash
 # Read-only (default)
@@ -50,18 +50,10 @@ gog mcp --allow-write
 gog mcp --allow-tool "gmail.*,calendar.*"
 ```
 
-To configure as a Claude Code MCP server, add to your settings:
-
-```json
-{
-  "mcpServers": {
-    "google": {
-      "command": "gog",
-      "args": ["mcp"]
-    }
-  }
-}
-```
+Register a stdio MCP server in your agent's MCP configuration with command
+`gog` and arguments `["mcp"]`. Configuration syntax and location depend on the
+agent; use its documented MCP setup. Add `--allow-write` only when write access
+is authorized.
 
 Default MCP tools (read-only):
 

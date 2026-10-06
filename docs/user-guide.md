@@ -1,6 +1,6 @@
 # User Guide
 
-Complete guide for installing and using agent skills with Claude Code and other AI assistants.
+Complete guide for installing and using agent skills with compatible AI assistants.
 
 ## What Are Agent Skills?
 
@@ -34,7 +34,7 @@ npx skills add odyssey4me/agent-skills --skill jira
 npx skills add odyssey4me/agent-skills --skill google --skill confluence
 
 # Target a specific agent
-npx skills add odyssey4me/agent-skills --skill jira -a cursor
+npx skills add odyssey4me/agent-skills --skill jira -a codex
 
 # Install globally (available across all projects)
 npx skills add odyssey4me/agent-skills --skill jira -g
@@ -52,14 +52,16 @@ Download a skill from [Releases](https://github.com/odyssey4me/agent-skills/rele
 
 | Agent | Global path |
 |-------|------------|
+| Codex | `~/.agents/skills/` |
 | Claude Code | `~/.claude/skills/` |
 | Cursor | `~/.cursor/skills/` |
 | OpenCode | `~/.config/opencode/skills/` |
 | Continue.dev | `~/.continue/skills/` |
 
 ```bash
-mkdir -p ~/.claude/skills  # or your agent's path
-cd ~/.claude/skills
+SKILLS_DIR="/absolute/path/to/your/agent/skills"  # use your agent's path above
+mkdir -p "$SKILLS_DIR"
+cd "$SKILLS_DIR"
 curl -L https://github.com/odyssey4me/agent-skills/releases/latest/download/jira.tar.gz | tar xz
 ```
 
@@ -142,18 +144,18 @@ For complete setup instructions, see:
      client_id: your-client-id.apps.googleusercontent.com
      client_secret: your-client-secret
    ```
-3. Verify with `python ~/.claude/skills/google/scripts/google.py check`
+3. Follow the [Google skill setup](../skills/google/SKILL.md) and verify with `gog auth status`.
 
 On first run, your browser opens for OAuth authorization. After granting access, tokens are stored securely in your system keyring.
 
 ### Verify Authentication
 
-Each skill includes a `check` command to verify setup. Run it from your agent's skills directory:
+Use each skill's setup verification command. Set `SKILLS_DIR` to your agent's installation directory (as in [Manual Installation](#option-2-manual-installation)):
 
 ```bash
-python ~/.claude/skills/jira/scripts/jira.py check
-python ~/.claude/skills/confluence/scripts/confluence.py check
-python ~/.claude/skills/google/scripts/google.py check
+python "$SKILLS_DIR/jira/scripts/jira.py" check
+python "$SKILLS_DIR/confluence/scripts/confluence.py" check
+gog auth status
 ```
 
 The check command verifies dependencies, authentication, and service connectivity.
@@ -162,7 +164,7 @@ The check command verifies dependencies, authentication, and service connectivit
 
 Once installed and configured, skills are automatically available to your AI coding assistant.
 
-Skills work with [multiple AI coding assistants](https://github.com/vercel-labs/skills#supported-agents). The examples below use Claude Code, but the same patterns apply to other agents like Cursor, Continue.dev, and GitHub Copilot.
+The examples below use natural language and apply across compatible agents. Explicit invocation syntax depends on your agent.
 
 ### Natural Language Invocation
 
@@ -180,17 +182,17 @@ Simply describe what you want in natural language:
 "Share the document with colleague@example.com"
 ```
 
-Claude Code will automatically use the appropriate skill to fulfill your request.
+Your agent can select the appropriate skill from its description. You can also select it explicitly using your agent's skill interface.
 
 ### Best Practices for Agent Behaviour
 
-Add these guidelines to your project's `CLAUDE.md` (or equivalent agent instructions file) to ensure agents use skills correctly:
+Add these guidelines to your agent's project instructions file to ensure agents use skills correctly:
 
-1. **Always invoke skills via the Skill tool** — don't bypass them with direct CLI calls to underlying scripts. The Skill tool loads the skill's SKILL.md which documents defaults, conventions, and correct usage.
+1. **Load skill instructions before running commands** — select the skill using your agent's skill interface or natural language and read its `SKILL.md`, which documents defaults, conventions, and correct usage.
 
 2. **Trust skill defaults** — don't add post-processing, format flags, or output transformations unless there's a specific reason. Skills default to markdown output; use it as-is.
 
-3. **Subagents follow the same rules** — when spawning agents via the Task tool, instruct them to use skills by name (e.g. "Use the google skill to search for..."). The agent will invoke the Skill tool, which loads the correct documentation and conventions. Agents should not construct raw API calls or CLI commands that replicate what a skill already provides.
+3. **Subagents follow the same rules** — when delegating supported work to another agent, instruct them to use skills by name (e.g. "Use the google skill to search for..."). The agent should read the skill's `SKILL.md` for the correct documentation and conventions. Agents should not construct raw API calls or CLI commands that replicate what a skill already provides.
 
 4. **Describe what, not how** — tell agents what information to gather, not which commands to run. The skills evolve independently; hardcoding their implementation details creates coupling that breaks when skills change.
 
@@ -221,7 +223,7 @@ You can also invoke skills directly with specific commands. See individual skill
 
 1. Run the check command first:
    ```bash
-   python ~/.claude/skills/jira/scripts/jira.py check
+   python "$SKILLS_DIR/jira/scripts/jira.py" check
    ```
 
 2. The check command will tell you exactly what's missing
@@ -253,8 +255,16 @@ pip install --user requests keyring pyyaml
 3. For corporate networks, check if you need a proxy
 4. Run the check command to diagnose:
    ```bash
-   python ~/.claude/skills/jira/scripts/jira.py check
+   python "$SKILLS_DIR/jira/scripts/jira.py" check
    ```
+
+### Network Access
+
+All service skills need outbound network access for remote operations. Each
+`SKILL.md` documents the service endpoints and protocols required. Use your
+agent environment's network and approval controls when access is restricted.
+Skill instructions do not grant permission. Connection failures should be
+reported without resetting credentials; local help can run without network access.
 
 ### Permission Errors
 
@@ -268,7 +278,7 @@ pip install --user requests keyring pyyaml
 
 1. Verify skills are in the correct location for your agent (see [Installation](#installation) for paths):
    ```bash
-   ls ~/.claude/skills/  # Claude Code
+   ls ~/.agents/skills/  # Codex
    ls ~/.cursor/skills/  # Cursor
    ```
 
@@ -320,8 +330,8 @@ CLI arguments always override config defaults.
 Python-based skills provide built-in help:
 
 ```bash
-python ~/.claude/skills/jira/scripts/jira.py --help
-python ~/.claude/skills/jira/scripts/jira.py search --help
+python "$SKILLS_DIR/jira/scripts/jira.py" --help
+python "$SKILLS_DIR/jira/scripts/jira.py" search --help
 ```
 
 ### Documentation
@@ -345,7 +355,7 @@ Found a bug or have a feature request? [Open an issue on GitHub](https://github.
 
 - **Configure authentication** for the skills you want to use
 - **Run the check command** to verify everything works
-- **Try natural language** to invoke skills with Claude Code
+- **Try natural language** to invoke skills with your agent
 - **Read skill documentation** for advanced features and examples
 
 For developers interested in creating skills, see the [Developer Guide](developer-guide.md).

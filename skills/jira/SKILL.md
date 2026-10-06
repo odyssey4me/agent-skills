@@ -3,17 +3,22 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.17.0"
+  version: "0.17.1"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
 license: MIT
-allowed-tools: Bash($SKILL_DIR/scripts/jira.py:*)
 ---
 
 # Jira
 
 Interact with Jira for issue tracking, search, and workflow management.
+
+## Resolving script paths
+
+`SKILL_DIR` in the examples is the directory containing this loaded `SKILL.md`.
+Set it to that absolute path before running commands; do not assume the agent
+sets this shell variable. Quote the script path if it contains spaces.
 
 ## Installation
 
@@ -38,6 +43,10 @@ This will check:
 - Connectivity to Jira
 
 If anything is missing, the check command will provide setup instructions.
+
+## Network access
+
+Jira API commands require outbound HTTPS to the configured Jira host. Remote operations require outbound network access. If the agent environment restricts it, obtain access through that environment's approval or network controls before the first remote command, reusing authorization already granted. Local help and file processing do not need network access. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials to resolve them. If approved access also fails, stop and report it. Authentication and permission errors require user action.
 
 ## Authentication
 

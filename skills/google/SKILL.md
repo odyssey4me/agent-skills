@@ -6,14 +6,13 @@ description: >-
   files, edit documents, update spreadsheets, or create presentations.
 metadata:
   author: odyssey4me
-  version: "1.2.1"
+  version: "1.2.2"
   category: productivity
   tags: "gmail, calendar, drive, docs, sheets, slides"
   complexity: lightweight
   gogcli-version: "0.42.0"
   gogcli-repository: openclaw/gogcli
 license: MIT
-allowed-tools: Bash(gog:*)
 ---
 
 # Google Workspace Skill
@@ -34,6 +33,10 @@ mv gog ~/.local/bin/
 ```
 
 See [configuration.md](references/configuration.md) for container and MCP server alternatives.
+
+## Network access
+
+Google Workspace commands require outbound HTTPS to Google API and OAuth endpoints, including authentication and token refresh. Remote operations require outbound network access. If the agent environment restricts it, obtain access through that environment's approval or network controls before the first remote command, reusing authorization already granted. Local help and file processing do not need network access. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials to resolve them. If approved access also fails, stop and report it. Authentication and permission errors require user action.
 
 ## Authentication
 
