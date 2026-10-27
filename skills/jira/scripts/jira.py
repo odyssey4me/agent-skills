@@ -2449,19 +2449,37 @@ def search_by_contributor(
 # ============================================================================
 
 
-def _build_epic_children_jql(epic_key: str) -> str:
-    """Build JQL to find children of an epic.
+def _build_children_jql(issue_key: str) -> str:
+    """Build JQL to find the children of an issue.
 
-    Covers classic company-managed projects ("Epic Link") and team-managed
-    or new-hierarchy projects (parent).
+    Covers classic company-managed projects ("Epic Link"), team-managed
+    projects and new-hierarchy parents, and subtasks (parent).
 
     Args:
-        epic_key: The epic issue key.
+        issue_key: The parent or epic issue key.
 
     Returns:
         JQL query string.
     """
-    return f'"Epic Link" = {epic_key} OR parent = {epic_key}'
+    return f'"Epic Link" = {issue_key} OR parent = {issue_key}'
+
+
+def get_issue_children(
+    issue_key: str,
+    max_results: int = 100,
+    fields: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Get the children of an issue.
+
+    Args:
+        issue_key: The parent or epic issue key.
+        max_results: Maximum number of children to return.
+        fields: Optional list of fields to include.
+
+    Returns:
+        List of child issue dictionaries.
+    """
+    return search_issues(_build_children_jql(issue_key), max_results=max_results, fields=fields)
 
 
 def get_epic_children(epic_key: str, fields: list[str] | None = None) -> list[dict[str, Any]]:
@@ -2474,8 +2492,7 @@ def get_epic_children(epic_key: str, fields: list[str] | None = None) -> list[di
     Returns:
         List of child issue dictionaries.
     """
-    jql = _build_epic_children_jql(epic_key)
-    return search_issues(jql, max_results=200, fields=fields)
+    return get_issue_children(epic_key, max_results=200, fields=fields)
 
 
 def _validated_date(value: str, flag: str) -> str:
@@ -3364,6 +3381,20 @@ def cmd_issue(args: argparse.Namespace) -> int:
             else:
                 print(format_comments(comments, args.issue_key))
 
+        elif args.issue_command == "children":
+            max_results = getattr(args, "max_results", 100) or 100
+            defaults = get_jira_defaults()
+            custom_fields = defaults.custom_fields or {}
+            children = get_issue_children(
+                args.issue_key,
+                max_results=max_results,
+                fields=["summary", "issuetype", "status", "resolution", "assignee"],
+            )
+            if args.json:
+                print(format_json(children))
+            else:
+                print(format_issues_list(children, custom_fields=custom_fields))
+
         elif args.issue_command == "create":
             # Load --from-file if provided
             result = _load_from_file(args)
@@ -4169,6 +4200,19 @@ def main() -> int:
         help="Maximum number of comments (default: 50)",
     )
     comments_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Children subcommand
+    children_parser = issue_subparsers.add_parser(
+        "children", help="List child issues and subtasks of an issue"
+    )
+    children_parser.add_argument("issue_key", help="Parent or epic issue key (e.g., EPIC-123)")
+    children_parser.add_argument(
+        "--max-results",
+        type=int,
+        default=100,
+        help="Maximum number of children (default: 100)",
+    )
+    children_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Create subcommand
     create_parser = issue_subparsers.add_parser("create", help="Create new issue")

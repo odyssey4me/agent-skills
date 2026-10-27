@@ -14,7 +14,7 @@ from skills.jira.scripts.jira import (
     JiraDefaults,
     ProjectDefaults,
     _adf_to_markdown,
-    _build_epic_children_jql,
+    _build_children_jql,
     _cloud_id_cache,
     _format_component,
     _format_scope_ari,
@@ -80,6 +80,7 @@ from skills.jira.scripts.jira import (
     get_epic_children,
     get_filter,
     get_issue,
+    get_issue_children,
     get_jira_defaults,
     get_link_types,
     get_project_defaults,
@@ -3568,9 +3569,9 @@ class TestContributorSearch:
 class TestCollaborativeEpics:
     """Tests for collaborative epics discovery."""
 
-    def test_build_epic_children_jql(self):
+    def test_build_children_jql(self):
         """Test epic children JQL covers Epic Link and parent."""
-        jql = _build_epic_children_jql("EPIC-1")
+        jql = _build_children_jql("EPIC-1")
 
         assert '"Epic Link" = EPIC-1' in jql
         assert "parent = EPIC-1" in jql
@@ -3584,6 +3585,50 @@ class TestCollaborativeEpics:
 
         assert len(result) == 2
         mock_search.assert_called_once()
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_get_issue_children(self, mock_search):
+        """Children of any issue cover subtasks and epic children."""
+        mock_search.return_value = [{"key": "TASK-1"}]
+
+        result = get_issue_children("STORY-1", max_results=25)
+
+        assert result == [{"key": "TASK-1"}]
+        jql = mock_search.call_args[0][0]
+        assert "parent = STORY-1" in jql
+        assert '"Epic Link" = STORY-1' in jql
+        assert mock_search.call_args.kwargs["max_results"] == 25
+
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.get_issue_children")
+    def test_cmd_issue_children(self, mock_children, mock_defaults, capsys):
+        """issue children prints a formatted list."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_children.return_value = [
+            {
+                "key": "TASK-1",
+                "fields": {
+                    "summary": "Child one",
+                    "issuetype": {"name": "Story"},
+                    "status": {"name": "Open"},
+                    "assignee": {"displayName": "Alice"},
+                },
+            }
+        ]
+
+        args = argparse.Namespace(
+            issue_command="children",
+            issue_key="EPIC-1",
+            max_results=100,
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "TASK-1: Child one" in captured.out
+        assert "Alice" in captured.out
 
     @patch("skills.jira.scripts.jira.get_epic_children")
     @patch("skills.jira.scripts.jira.search_issues")
