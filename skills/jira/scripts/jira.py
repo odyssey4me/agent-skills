@@ -2478,43 +2478,88 @@ def get_epic_children(epic_key: str, fields: list[str] | None = None) -> list[di
     return search_issues(jql, max_results=200, fields=fields)
 
 
+def _validated_date(value: str, flag: str) -> str:
+    """Validate a YYYY-MM-DD date argument.
+
+    Args:
+        value: Date string supplied on the command line.
+        flag: Flag name, used in the error message.
+
+    Returns:
+        The unchanged date string.
+
+    Raises:
+        ValueError: If the value is not a YYYY-MM-DD date.
+    """
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        raise ValueError(f"{flag} must be a date in YYYY-MM-DD format")
+    return value
+
+
 def find_collaborative_epics(
     project: str | None = None,
     min_contributors: int = 2,
     max_results: int = 50,
+    contributor: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Find epics with multiple contributors (assignees of child issues).
+    """Find epics with multiple contributors.
+
+    Contributors are the epic's reporter and assignee plus the assignees of
+    its child issues.
 
     Args:
         project: Optional project key to scope the search.
-        min_contributors: Minimum number of unique assignees required.
+        min_contributors: Minimum number of unique contributors required.
         max_results: Maximum number of epics to check.
+        contributor: Optional user whose epics to return. Resolved to an
+            accountId before matching.
+        since: Optional inclusive lower bound (YYYY-MM-DD) on epic updated.
+        until: Optional inclusive upper bound (YYYY-MM-DD) on epic updated.
 
     Returns:
         List of dicts with keys: epic, children_count, contributors.
     """
+    contributor_id = resolve_user_for_jql(contributor) if contributor else None
+
     jql = "issuetype = Epic AND statusCategory != Done"
     if project:
         jql = f"project = {project} AND {jql}"
+    if since:
+        jql += f' AND updated >= "{_validated_date(since, "--since")}"'
+    if until:
+        jql += f' AND updated <= "{_validated_date(until, "--until")} 23:59"'
     jql += " ORDER BY updated DESC"
 
-    epics = search_issues(jql, max_results, ["summary", "status", "assignee"])
+    epics = search_issues(jql, max_results, ["summary", "status", "assignee", "reporter"])
 
     results = []
     for epic in epics:
+        epic_fields = epic.get("fields", {})
         epic_key = epic.get("key", "")
         children = get_epic_children(epic_key, fields=["assignee"])
-        assignees: set[str] = set()
+
+        contributors: dict[str, str] = {}
+        for role in ("reporter", "assignee"):
+            person = epic_fields.get(role)
+            if person and person.get("displayName"):
+                contributors[person.get("accountId", person["displayName"])] = person["displayName"]
         for child in children:
             child_assignee = child.get("fields", {}).get("assignee")
             if child_assignee and child_assignee.get("displayName"):
-                assignees.add(child_assignee["displayName"])
-        if len(assignees) >= min_contributors:
+                contributors[child_assignee.get("accountId", child_assignee["displayName"])] = (
+                    child_assignee["displayName"]
+                )
+
+        if contributor_id and contributor_id not in contributors:
+            continue
+        if len(contributors) >= min_contributors:
             results.append(
                 {
                     "epic": epic,
                     "children_count": len(children),
-                    "contributors": sorted(assignees),
+                    "contributors": sorted(contributors.values()),
                 }
             )
 
@@ -3792,26 +3837,23 @@ def cmd_collaboration(args: argparse.Namespace) -> int:
     try:
         if args.collaboration_command == "epics":
             project = getattr(args, "project", None)
-            min_contributors = getattr(args, "min_contributors", 2)
+            contributor = getattr(args, "contributor", None)
+            min_contributors = getattr(args, "min_contributors", None)
+            if min_contributors is None:
+                min_contributors = 1 if contributor else 2
             max_results = getattr(args, "max_results", 50) or 50
 
             results = find_collaborative_epics(
                 project=project,
                 min_contributors=min_contributors,
                 max_results=max_results,
+                contributor=contributor,
+                since=getattr(args, "since", None),
+                until=getattr(args, "until", None),
             )
 
             if args.json:
-                json_results = []
-                for r in results:
-                    json_results.append(
-                        {
-                            "epic": r["epic"],
-                            "children_count": r["children_count"],
-                            "contributors": r["contributors"],
-                        }
-                    )
-                print(format_json(json_results))
+                print(format_json(results))
             else:
                 print(format_collaborative_epics(results))
 
@@ -4342,10 +4384,25 @@ def main() -> int:
     )
     epics_parser.add_argument("--project", help="Project key to scope the search")
     epics_parser.add_argument(
+        "--contributor",
+        help=(
+            "Only epics this user contributed to (epic reporter/assignee or child "
+            "assignee); supplies peer contributors"
+        ),
+    )
+    epics_parser.add_argument(
+        "--since",
+        help="Only epics updated on or after this date (YYYY-MM-DD)",
+    )
+    epics_parser.add_argument(
+        "--until",
+        help="Only epics updated on or before this date (YYYY-MM-DD)",
+    )
+    epics_parser.add_argument(
         "--min-contributors",
         type=int,
-        default=2,
-        help="Minimum number of unique assignees (default: 2)",
+        default=None,
+        help="Minimum number of unique contributors (default: 2, or 1 with --contributor)",
     )
     epics_parser.add_argument(
         "--max-results",

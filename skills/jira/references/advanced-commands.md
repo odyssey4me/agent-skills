@@ -65,11 +65,15 @@ $SKILL_DIR/scripts/jira.py user search "Jane Doe"
 Discover collaboration patterns across issues and epics.
 
 ```bash
-# Find epics with multiple contributors (assignees)
+# Find epics with multiple contributors
 $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO
 
 # Require at least 3 contributors
 $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO --min-contributors 3
+
+# Which epics a person drove this quarter, with their peers
+$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO \
+  --contributor "jane@example.com" --since 2026-07-01 --until 2026-09-30
 
 # Limit number of epics checked
 $SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
@@ -77,8 +81,17 @@ $SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
 
 **Arguments:**
 - `--project`: Project key to scope the search
-- `--min-contributors`: Minimum unique assignees to qualify (default: 2)
+- `--contributor`: Only epics this user contributed to (epic reporter or assignee,
+  or assignee of a child issue). Email and display name are resolved to an
+  accountId. Peer contributors are still listed.
+- `--since` / `--until`: Inclusive `YYYY-MM-DD` bounds on the epic's `updated`
+  date. An epic counts as active in the range when the epic itself was updated.
+- `--min-contributors`: Minimum unique contributors to qualify (default: 2, or
+  1 when `--contributor` is used, so epics the person drove alone are kept)
 - `--max-results`: Maximum epics to check (default: 50)
+
+Contributors are the epic's reporter and assignee plus the assignees of its
+child issues.
 
 **Note:** This makes N+1 API calls (1 for epics + 1 per epic for children). Use `--max-results` to control cost.
 
