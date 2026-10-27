@@ -2210,12 +2210,14 @@ def _adf_extract_text(node: Any) -> str:
     return " ".join(part for part in parts if part)
 
 
-def get_comments(issue_key: str, max_results: int = 50) -> list[dict[str, Any]]:
+def get_comments(issue_key: str, max_results: int | None = 50) -> list[dict[str, Any]]:
     """Get comments on an issue with automatic pagination.
 
     Args:
         issue_key: The issue key (e.g., DEMO-123).
-        max_results: Maximum number of comments to return.
+        max_results: Maximum number of comments to return, or None to fetch
+            every comment. Contributor extraction uses None so that a
+            commenter late in a long thread is not missed.
 
     Returns:
         List of comment dictionaries.
@@ -2223,8 +2225,8 @@ def get_comments(issue_key: str, max_results: int = 50) -> list[dict[str, Any]]:
     all_comments: list[dict[str, Any]] = []
     start_at = 0
 
-    while len(all_comments) < max_results:
-        page_size = min(max_results - len(all_comments), 100)
+    while max_results is None or len(all_comments) < max_results:
+        page_size = 100 if max_results is None else min(max_results - len(all_comments), 100)
         response = get(
             "jira",
             api_path(f"issue/{issue_key}/comment"),
@@ -2243,6 +2245,8 @@ def get_comments(issue_key: str, max_results: int = 50) -> list[dict[str, Any]]:
 
         start_at += len(comments)
 
+    if max_results is None:
+        return all_comments
     return all_comments[:max_results]
 
 
@@ -3351,7 +3355,7 @@ def cmd_issue(args: argparse.Namespace) -> int:
             remote_links = get_remote_links(args.issue_key)
 
             if getattr(args, "contributors", False):
-                comments = get_comments(args.issue_key)
+                comments = get_comments(args.issue_key, max_results=None)
                 contributors = extract_contributors(issue, comments)
                 if args.json:
                     issue["_contributors"] = [

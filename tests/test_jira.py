@@ -2721,6 +2721,39 @@ class TestComments:
         assert result[1]["body"] == "Second"
         assert mock_get.call_count == 2
 
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_comments_all(self, mock_get, mock_api_path):
+        """max_results=None fetches every comment across pages."""
+        mock_api_path.return_value = "/rest/api/3/issue/DEMO-123/comment"
+        page_one = [{"id": str(i)} for i in range(100)]
+        page_two = [{"id": str(i)} for i in range(100, 150)]
+        mock_get.side_effect = [
+            {"comments": page_one, "total": 150},
+            {"comments": page_two, "total": 150},
+        ]
+
+        result = get_comments("DEMO-123", max_results=None)
+
+        assert len(result) == 150
+        assert mock_get.call_count == 2
+        assert mock_get.call_args_list[1].kwargs["params"]["startAt"] == 100
+
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_comments_default_cap(self, mock_get, mock_api_path):
+        """The default still caps at 50 comments."""
+        mock_api_path.return_value = "/rest/api/3/issue/DEMO-123/comment"
+        mock_get.return_value = {
+            "comments": [{"id": str(i)} for i in range(60)],
+            "total": 60,
+        }
+
+        result = get_comments("DEMO-123")
+
+        assert len(result) == 50
+        assert mock_get.call_args.kwargs["params"]["maxResults"] == 50
+
     def test_adf_to_markdown_plain_string(self):
         """Test ADF conversion with a plain text string (DC format)."""
         assert _adf_to_markdown("Hello world") == "Hello world"
@@ -3333,6 +3366,7 @@ class TestContributors:
         assert "Alice (reporter)" in captured.out
         assert "Bob (assignee)" in captured.out
         assert "Charlie (commenter)" in captured.out
+        mock_comments.assert_called_once_with("DEMO-123", max_results=None)
 
     @patch("skills.jira.scripts.jira.get_remote_links")
     @patch("skills.jira.scripts.jira.get_comments")
