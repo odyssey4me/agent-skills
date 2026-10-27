@@ -109,6 +109,11 @@ reporter or assignee.
 Contributors are the epic's reporter and assignee plus the assignees of its
 child issues.
 
+With `--json`, each epic carries `summary`, `status`, `issuetype`, `parent`,
+`assignee`, `reporter`, `created` and `resolutiondate`. Level, provenance and
+hierarchy therefore come from the same query, with no follow-up search over
+the returned keys.
+
 **Note:** This makes N+1 API calls (1 for epics + 1 per epic for children). Use `--max-results` to control cost.
 
 ## automations
