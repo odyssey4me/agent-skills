@@ -1631,6 +1631,7 @@ class TestHTTPWrappers:
 
         result = make_request("confluence", "GET", "/rest/api/space")
         assert result == {"result": "success"}
+        assert mock_request.call_args[1]["auth"] == ("test@example.com", "test123")
 
     @patch("skills.confluence.scripts.confluence.get_credentials")
     def test_make_request_invalid_credentials(self, mock_creds):
@@ -3258,7 +3259,7 @@ class TestDownloadAttachmentAuth:
 
         call_kwargs = mock_get.call_args
         assert call_kwargs[1]["auth"] == ("user@example.com", "token123")
-        assert "Authorization" not in call_kwargs[1]["headers"]
+        assert "headers" not in call_kwargs[1]
 
 
 class TestCmdPageGetErrorBranches:
