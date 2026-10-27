@@ -56,6 +56,7 @@ from skills.jira.scripts.jira import (
     ensure_field_included,
     extract_contributors,
     find_collaborative_epics,
+    find_removed_jql_functions,
     format_automation_detail,
     format_automation_summary,
     format_collaborative_epics,
@@ -113,7 +114,6 @@ from skills.jira.scripts.jira import (
     set_credential,
     update_issue,
     validate_custom_fields,
-    validate_jql_for_scriptrunner,
 )
 
 
@@ -1225,11 +1225,10 @@ class TestJiraDefaultsBackwardCompat:
 class TestApiOperations:
     """Tests for API operations."""
 
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_cloud(self, mock_api_path, mock_post, mock_is_cloud, mock_scriptrunner):
+    def test_search_issues_cloud(self, mock_api_path, mock_post, mock_is_cloud):
         """Test searching issues on Cloud (POST /search/jql)."""
         mock_api_path.return_value = "rest/api/3/search/jql"
         mock_is_cloud.return_value = True
@@ -1238,20 +1237,16 @@ class TestApiOperations:
                 {"key": "DEMO-1", "fields": {"summary": "Test"}},
             ]
         }
-        mock_scriptrunner.return_value = {"available": False}
 
         result = search_issues("project = DEMO", max_results=10)
 
         assert len(result) == 1
         assert result[0]["key"] == "DEMO-1"
 
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_datacenter(
-        self, mock_api_path, mock_get, mock_is_cloud, mock_scriptrunner
-    ):
+    def test_search_issues_datacenter(self, mock_api_path, mock_get, mock_is_cloud):
         """Test searching issues on Data Center (GET /search)."""
         mock_api_path.return_value = "rest/api/2/search"
         mock_is_cloud.return_value = False
@@ -1260,24 +1255,19 @@ class TestApiOperations:
                 {"key": "DEMO-1", "fields": {"summary": "Test"}},
             ]
         }
-        mock_scriptrunner.return_value = {"available": False}
 
         result = search_issues("project = DEMO", max_results=10)
 
         assert len(result) == 1
         assert result[0]["key"] == "DEMO-1"
 
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_cloud_pagination(
-        self, mock_api_path, mock_post, mock_is_cloud, mock_scriptrunner
-    ):
+    def test_search_issues_cloud_pagination(self, mock_api_path, mock_post, mock_is_cloud):
         """Test Cloud search paginates using nextPageToken."""
         mock_api_path.return_value = "rest/api/3/search/jql"
         mock_is_cloud.return_value = True
-        mock_scriptrunner.return_value = {"available": False}
         mock_post.side_effect = [
             {
                 "issues": [{"key": "DEMO-1", "fields": {"summary": "First"}}],
@@ -1294,34 +1284,26 @@ class TestApiOperations:
         assert result[0]["key"] == "DEMO-1"
         assert result[1]["key"] == "DEMO-2"
 
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_cloud_non_dict_response(
-        self, mock_api_path, mock_post, mock_is_cloud, mock_scriptrunner
-    ):
+    def test_search_issues_cloud_non_dict_response(self, mock_api_path, mock_post, mock_is_cloud):
         """Test Cloud search handles non-dict response."""
         mock_api_path.return_value = "rest/api/3/search/jql"
         mock_is_cloud.return_value = True
-        mock_scriptrunner.return_value = {"available": False}
         mock_post.return_value = "unexpected"
 
         result = search_issues("project = DEMO", max_results=10)
 
         assert result == []
 
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_datacenter_pagination(
-        self, mock_api_path, mock_get, mock_is_cloud, mock_scriptrunner
-    ):
+    def test_search_issues_datacenter_pagination(self, mock_api_path, mock_get, mock_is_cloud):
         """Test Data Center search paginates using startAt/total."""
         mock_api_path.return_value = "rest/api/2/search"
         mock_is_cloud.return_value = False
-        mock_scriptrunner.return_value = {"available": False}
         mock_get.side_effect = [
             {
                 "issues": [{"key": "DEMO-1", "fields": {"summary": "First"}}],
@@ -1338,17 +1320,15 @@ class TestApiOperations:
         assert len(result) == 2
         assert result[1]["key"] == "DEMO-2"
 
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
     def test_search_issues_cloud_truncation_warning(
-        self, mock_api_path, mock_post, mock_is_cloud, mock_scriptrunner, capsys
+        self, mock_api_path, mock_post, mock_is_cloud, capsys
     ):
         """Test Cloud search warns when results are truncated at API limit."""
         mock_api_path.return_value = "rest/api/3/search/jql"
         mock_is_cloud.return_value = True
-        mock_scriptrunner.return_value = {"available": False}
         batch = [{"key": f"DEMO-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(100)]
         mock_post.side_effect = [
             {"issues": batch, "nextPageToken": f"token{p}"} for p in range(10)
@@ -1361,17 +1341,15 @@ class TestApiOperations:
         assert "Results may be truncated" in captured.err
         assert "1000 results returned" in captured.err
 
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.api_path")
     def test_search_issues_datacenter_truncation_warning(
-        self, mock_api_path, mock_get, mock_is_cloud, mock_scriptrunner, capsys
+        self, mock_api_path, mock_get, mock_is_cloud, capsys
     ):
         """Test Data Center search warns when results are truncated at API limit."""
         mock_api_path.return_value = "rest/api/2/search"
         mock_is_cloud.return_value = False
-        mock_scriptrunner.return_value = {"available": False}
         batch = [{"key": f"DEMO-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(100)]
         mock_get.side_effect = [{"issues": batch, "total": 1500} for _ in range(10)]
 
@@ -1725,14 +1703,12 @@ class TestCommandHandlers:
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.get")
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.get_cloud_id")
     @patch("skills.jira.scripts.jira.automation_path")
     def test_cmd_check_success(
         self,
         mock_auto_path,
         mock_cloud_id,
-        mock_scriptrunner,
         mock_get,
         mock_post,
         mock_is_cloud,
@@ -1751,12 +1727,6 @@ class TestCommandHandlers:
         mock_api_version.return_value = "3"
         mock_is_cloud.return_value = True
         mock_post.return_value = {"issues": []}
-        mock_scriptrunner.return_value = {
-            "available": False,
-            "version": None,
-            "type": "cloud",
-            "enhanced_search": False,
-        }
         mock_cloud_id.return_value = "cloud-123"
         mock_auto_path.return_value = "gateway/path"
 
@@ -2459,7 +2429,6 @@ class TestCommandHandlers:
         assert "NAME=VALUE" in captured.err
 
     @patch("skills.jira.scripts.jira.validate_custom_fields")
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.get_api_version")
@@ -2474,7 +2443,6 @@ class TestCommandHandlers:
         mock_api_version,
         mock_is_cloud,
         mock_post,
-        mock_scriptrunner,
         mock_validate,
         capsys,
     ):
@@ -2490,7 +2458,6 @@ class TestCommandHandlers:
         mock_api_version.return_value = "2"
         mock_is_cloud.return_value = True
         mock_post.return_value = {"issues": []}
-        mock_scriptrunner.return_value = {"available": False}
         mock_validate.return_value = []
 
         result = cmd_check()
@@ -3802,12 +3769,10 @@ class TestContributorSearch:
     """Tests for contributor search."""
 
     @patch("skills.jira.scripts.jira.resolve_user_for_jql")
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.search_issues")
-    def test_search_by_contributor_with_scriptrunner(self, mock_search, mock_sr, mock_resolve):
-        """Test contributor search with ScriptRunner available."""
+    def test_search_by_contributor(self, mock_search, mock_resolve):
+        """Test contributor search builds JQL covering all contributor fields."""
         mock_resolve.return_value = "jsmith"
-        mock_sr.return_value = {"available": True, "enhanced_search": True}
         mock_search.return_value = [{"key": "DEMO-1"}]
 
         result = search_by_contributor("jsmith")
@@ -3816,33 +3781,13 @@ class TestContributorSearch:
         jql = mock_search.call_args[0][0]
         assert 'reporter = "jsmith"' in jql
         assert 'assignee = "jsmith"' in jql
-        assert 'commentedByUser("jsmith")' in jql
+        assert 'issue in updatedBy("jsmith")' in jql
 
     @patch("skills.jira.scripts.jira.resolve_user_for_jql")
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.search_issues")
-    def test_search_by_contributor_without_scriptrunner(
-        self, mock_search, mock_sr, mock_resolve, capsys
-    ):
-        """Test contributor search without ScriptRunner."""
-        mock_resolve.return_value = "jsmith"
-        mock_sr.return_value = {"available": False, "enhanced_search": False}
-        mock_search.return_value = []
-
-        search_by_contributor("jsmith")
-
-        captured = capsys.readouterr()
-        assert "ScriptRunner" in captured.err
-        jql = mock_search.call_args[0][0]
-        assert "commentedByUser" not in jql
-
-    @patch("skills.jira.scripts.jira.resolve_user_for_jql")
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
-    @patch("skills.jira.scripts.jira.search_issues")
-    def test_search_by_contributor_with_project(self, mock_search, mock_sr, mock_resolve):
+    def test_search_by_contributor_with_project(self, mock_search, mock_resolve):
         """Test contributor search scoped to a project."""
         mock_resolve.return_value = "jsmith"
-        mock_sr.return_value = {"available": False, "enhanced_search": False}
         mock_search.return_value = []
 
         search_by_contributor("jsmith", project="DEMO")
@@ -3851,12 +3796,10 @@ class TestContributorSearch:
         assert "project = DEMO" in jql
 
     @patch("skills.jira.scripts.jira.resolve_user_for_jql")
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
     @patch("skills.jira.scripts.jira.search_issues")
-    def test_search_by_contributor_resolves_email(self, mock_search, mock_sr, mock_resolve):
+    def test_search_by_contributor_resolves_email(self, mock_search, mock_resolve):
         """Test contributor search resolves email to accountId on Cloud."""
         mock_resolve.return_value = "abc123"
-        mock_sr.return_value = {"available": False, "enhanced_search": False}
         mock_search.return_value = []
 
         search_by_contributor("jdoe@example.com")
@@ -4224,101 +4167,41 @@ class TestCmdUser:
         assert "API error" in captured.err
 
 
-class TestScriptRunnerQueryGating:
-    """Tests for ScriptRunner query rejection behavior."""
+class TestRemovedJqlFunctions:
+    """Tests for removed ScriptRunner JQL function detection."""
 
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_search_rejects_scriptrunner_on_cloud(self, mock_is_cloud, mock_scriptrunner, capsys):
-        """ScriptRunner queries on Cloud should be rejected with a clear error."""
-        mock_is_cloud.return_value = True
-        mock_scriptrunner.return_value = {
-            "available": False,
-            "enhanced_search": False,
-            "type": "cloud",
-        }
+    def test_detects_removed_function(self):
+        """A removed function used in JQL is detected by name."""
+        result = find_removed_jql_functions('issue in linkedIssuesOf("DEMO-1")')
+        assert result == ["linkedIssuesOf"]
 
-        result = search_issues('issue in linkedIssuesOf("DEMO-123")', max_results=10)
+    def test_ignores_function_inside_quoted_string(self):
+        """Function names inside quoted literals are not detected."""
+        result = find_removed_jql_functions('summary ~ "hasLinks()"')
+        assert result == []
+
+    def test_native_jql_not_flagged(self):
+        """Cloud-native JQL constructs are not flagged as removed functions."""
+        assert find_removed_jql_functions('status CHANGED FROM "In Progress" TO Done') == []
+        assert find_removed_jql_functions("parentEpic in (A-1, B-2)") == []
+
+    def test_search_issues_rejects_removed_functions(self, capsys):
+        """Queries using removed functions return [] with guidance on stderr."""
+        result = search_issues("issue in hasLinks()")
 
         assert result == []
         captured = capsys.readouterr()
-        assert "not supported on Jira Cloud" in captured.err
-        assert "linkedIssuesOf" in captured.err
+        assert "no longer supported" in captured.err
+        assert "hasLinks" in captured.err
 
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    @patch("skills.jira.scripts.jira.get")
-    @patch("skills.jira.scripts.jira.api_path")
-    def test_search_allows_scriptrunner_on_dc_with_plugin(
-        self, mock_api_path, mock_get, mock_is_cloud, mock_scriptrunner
-    ):
-        """ScriptRunner queries on DC with plugin installed should proceed."""
-        mock_is_cloud.return_value = False
-        mock_scriptrunner.return_value = {
-            "available": True,
-            "enhanced_search": True,
-            "type": "datacenter",
-        }
-        mock_api_path.return_value = "rest/api/2/search"
-        mock_get.return_value = {
-            "issues": [{"key": "DEMO-1", "fields": {"summary": "Test"}}],
-            "total": 1,
-        }
-
-        result = search_issues('issue in linkedIssuesOf("DEMO-123")', max_results=10)
-
-        assert len(result) == 1
-        assert result[0]["key"] == "DEMO-1"
-
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_search_rejects_scriptrunner_on_dc_without_plugin(
-        self, mock_is_cloud, mock_scriptrunner, capsys
-    ):
-        """ScriptRunner queries on DC without plugin should be rejected."""
-        mock_is_cloud.return_value = False
-        mock_scriptrunner.return_value = {
-            "available": False,
-            "enhanced_search": False,
-            "type": "datacenter",
-        }
-
-        result = search_issues('issue in subtasksOf("DEMO-456")', max_results=10)
+    def test_search_issues_names_cloud_replacement(self, capsys):
+        """The rejection message names the Cloud-native replacement."""
+        result = search_issues('issue in linkedIssuesOf("DEMO-1")')
 
         assert result == []
         captured = capsys.readouterr()
-        assert "not available on this instance" in captured.err
-        assert "subtasksOf" in captured.err
-
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
-    def test_validate_jql_no_scriptrunner_functions(self, mock_scriptrunner):
-        """Standard JQL should not trigger ScriptRunner validation."""
-        mock_scriptrunner.return_value = {
-            "available": False,
-            "enhanced_search": False,
-            "type": "cloud",
-        }
-
-        result = validate_jql_for_scriptrunner("project = DEMO AND status = Open")
-
-        assert result["uses_scriptrunner"] is False
-        assert result["functions_detected"] == []
-
-    @patch("skills.jira.scripts.jira.detect_scriptrunner_support")
-    def test_validate_jql_warning_does_not_recommend_install(self, mock_scriptrunner):
-        """Warning message should not recommend installing ScriptRunner."""
-        mock_scriptrunner.return_value = {
-            "available": False,
-            "enhanced_search": False,
-            "type": "datacenter",
-        }
-
-        result = validate_jql_for_scriptrunner('issue in linkedIssuesOf("DEMO-123")')
-
-        assert result["uses_scriptrunner"] is True
-        assert not result["supported"]
-        assert "Install" not in (result["warning"] or "")
-        assert "Marketplace" not in (result["warning"] or "")
+        assert "no longer supported" in captured.err
+        assert "linkedWorkItems" in captured.err
 
 
 class TestParseIssueFile:
