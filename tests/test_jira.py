@@ -12,16 +12,14 @@ from skills.jira.scripts.jira import (
     APIError,
     Credentials,
     JiraDefaults,
-    JiraDetectionError,
     ProjectDefaults,
     _adf_to_markdown,
     _build_epic_children_jql,
-    _deployment_cache,
+    _cloud_id_cache,
     _format_component,
     _format_scope_ari,
     _format_timestamp,
     _humanise_component_type,
-    _make_detection_request,
     _parse_inline,
     _parse_link_args,
     _parse_markdown_to_adf,
@@ -50,7 +48,6 @@ from skills.jira.scripts.jira import (
     create_link,
     delete_credential,
     delete_link,
-    detect_deployment_type,
     discover_custom_field,
     do_transition,
     ensure_field_included,
@@ -72,7 +69,6 @@ from skills.jira.scripts.jira import (
     format_version,
     format_version_report,
     format_versions_list,
-    get_api_version,
     get_automation_rule,
     get_cloud_id,
     get_comments,
@@ -92,7 +88,6 @@ from skills.jira.scripts.jira import (
     get_version_issue_counts,
     get_version_issues,
     get_version_unresolved_count,
-    is_cloud,
     list_automation_rules,
     list_dashboards,
     list_fields,
@@ -121,16 +116,11 @@ class TestCredentials:
     """Tests for Credentials dataclass."""
 
     def test_is_valid_with_token(self):
-        """Test is_valid with token authentication."""
-        creds = Credentials(url="https://example.atlassian.net", token="token123")
-        assert creds.is_valid()
-
-    def test_is_valid_with_username_password(self):
-        """Test is_valid with username/password authentication."""
+        """Test is_valid with url, email and token."""
         creds = Credentials(
             url="https://example.atlassian.net",
-            username="user",
-            password="pass",
+            email="test@example.com",
+            token="token123",
         )
         assert creds.is_valid()
 
@@ -139,9 +129,9 @@ class TestCredentials:
         creds = Credentials(token="token123")
         assert not creds.is_valid()
 
-    def test_is_valid_missing_token_and_password(self):
-        """Test is_valid fails without token or password."""
-        creds = Credentials(url="https://example.atlassian.net", username="user")
+    def test_is_valid_missing_token(self):
+        """Test is_valid fails without token."""
+        creds = Credentials(url="https://example.atlassian.net", email="test@example.com")
         assert not creds.is_valid()
 
 
@@ -333,93 +323,14 @@ class TestDefaultsManagement:
         assert defaults.priority == "High"
 
 
-class TestDeploymentDetection:
-    """Tests for deployment type detection."""
-
-    def test_detect_deployment_type_cloud(self):
-        """Test detecting Cloud deployment."""
-        with patch("skills.jira.scripts.jira._make_detection_request") as mock_request:
-            mock_request.return_value = {"deploymentType": "Cloud"}
-
-            with patch("skills.jira.scripts.jira.get_credentials") as mock_creds:
-                mock_creds.return_value = Credentials(
-                    url="https://example.atlassian.net",
-                    email="test@example.com",
-                    token="token",
-                )
-
-                clear_cache()
-                deployment_type = detect_deployment_type()
-
-                assert deployment_type == "Cloud"
-                assert _deployment_cache["https://example.atlassian.net"] == {
-                    "deployment_type": "Cloud",
-                    "api_version": "3",
-                }
-
-    def test_detect_deployment_type_server(self):
-        """Test detecting Server deployment."""
-        with patch("skills.jira.scripts.jira._make_detection_request") as mock_request:
-            mock_request.return_value = {"deploymentType": "Server"}
-
-            with patch("skills.jira.scripts.jira.get_credentials") as mock_creds:
-                mock_creds.return_value = Credentials(
-                    url="https://jira.example.com",
-                    username="user",
-                    password="pass",
-                )
-
-                clear_cache()
-                deployment_type = detect_deployment_type()
-
-                assert deployment_type == "Server"
-                assert _deployment_cache["https://jira.example.com"] == {
-                    "deployment_type": "Server",
-                    "api_version": "2",
-                }
-
-    def test_detect_deployment_type_no_url(self):
-        """Test detection fails when no URL configured."""
-        with patch("skills.jira.scripts.jira.get_credentials") as mock_creds:
-            mock_creds.return_value = Credentials()
-
-            clear_cache()
-
-            with pytest.raises(JiraDetectionError, match="No Jira URL configured"):
-                detect_deployment_type()
-
-    def test_get_api_version_cloud(self):
-        """Test getting API version for Cloud."""
-        with patch("skills.jira.scripts.jira.detect_deployment_type") as mock_detect:
-            mock_detect.return_value = "Cloud"
-
-            with patch("skills.jira.scripts.jira.get_credentials") as mock_creds:
-                mock_creds.return_value = Credentials(url="https://example.atlassian.net")
-
-                clear_cache()
-                _deployment_cache["https://example.atlassian.net"] = {
-                    "deployment_type": "Cloud",
-                    "api_version": "3",
-                }
-
-                version = get_api_version()
-                assert version == "3"
-
-    def test_is_cloud(self):
-        """Test is_cloud helper."""
-        with patch("skills.jira.scripts.jira.detect_deployment_type") as mock_detect:
-            mock_detect.return_value = "Cloud"
-            assert is_cloud() is True
-
-            mock_detect.return_value = "Server"
-            clear_cache()
-            assert is_cloud() is False
+class TestCloudOnlyAssumptions:
+    """Tests for the Cloud-only assumptions baked into the module."""
 
     def test_clear_cache(self):
-        """Test clearing deployment cache."""
-        _deployment_cache["https://example.com"] = {"deployment_type": "Cloud"}
+        """Test clearing the Cloud ID cache."""
+        _cloud_id_cache["https://example.com"] = {"cloud_id": "abc-123"}
         clear_cache()
-        assert len(_deployment_cache) == 0
+        assert len(_cloud_id_cache) == 0
 
 
 class TestApiHelpers:
@@ -427,126 +338,96 @@ class TestApiHelpers:
 
     def test_api_path(self):
         """Test API path construction."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            assert api_path("search") == "rest/api/3/search"
-            assert api_path("/issue/DEMO-123") == "rest/api/3/issue/DEMO-123"
+        assert api_path("search") == "rest/api/3/search"
+        assert api_path("/issue/DEMO-123") == "rest/api/3/issue/DEMO-123"
 
-    def test_format_rich_text_cloud(self):
-        """Test formatting rich text for Cloud (ADF)."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            result = format_rich_text("Hello world")
+    def test_format_rich_text(self):
+        """Test formatting rich text as ADF."""
+        result = format_rich_text("Hello world")
 
-            assert result["type"] == "doc"
-            assert result["version"] == 1
-            assert result["content"][0]["type"] == "paragraph"
-            assert result["content"][0]["content"][0]["text"] == "Hello world"
-
-    def test_format_rich_text_server(self):
-        """Test formatting rich text for Server (plain text)."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "2"
-            result = format_rich_text("Hello world")
-
-            assert result == "Hello world"
+        assert result["type"] == "doc"
+        assert result["version"] == 1
+        assert result["content"][0]["type"] == "paragraph"
+        assert result["content"][0]["content"][0]["text"] == "Hello world"
 
     def test_format_rich_text_heading(self):
         """Test heading markdown produces ADF heading node."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            result = format_rich_text("## My Title")
+        result = format_rich_text("## My Title")
 
-            node = result["content"][0]
-            assert node["type"] == "heading"
-            assert node["attrs"]["level"] == 2
-            assert node["content"][0]["text"] == "My Title"
+        node = result["content"][0]
+        assert node["type"] == "heading"
+        assert node["attrs"]["level"] == 2
+        assert node["content"][0]["text"] == "My Title"
 
     def test_format_rich_text_bold(self):
         """Test bold markdown produces text node with strong mark."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            result = format_rich_text("Some **bold** text")
+        result = format_rich_text("Some **bold** text")
 
-            content = result["content"][0]["content"]
-            assert len(content) == 3
-            assert content[0] == {"type": "text", "text": "Some "}
-            assert content[1]["text"] == "bold"
-            assert content[1]["marks"] == [{"type": "strong"}]
-            assert content[2] == {"type": "text", "text": " text"}
+        content = result["content"][0]["content"]
+        assert len(content) == 3
+        assert content[0] == {"type": "text", "text": "Some "}
+        assert content[1]["text"] == "bold"
+        assert content[1]["marks"] == [{"type": "strong"}]
+        assert content[2] == {"type": "text", "text": " text"}
 
     def test_format_rich_text_link(self):
         """Test link markdown produces text node with link mark."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            result = format_rich_text("Click [here](https://example.com)")
+        result = format_rich_text("Click [here](https://example.com)")
 
-            content = result["content"][0]["content"]
-            assert len(content) == 2
-            assert content[0] == {"type": "text", "text": "Click "}
-            assert content[1]["text"] == "here"
-            assert content[1]["marks"] == [
-                {"type": "link", "attrs": {"href": "https://example.com"}}
-            ]
+        content = result["content"][0]["content"]
+        assert len(content) == 2
+        assert content[0] == {"type": "text", "text": "Click "}
+        assert content[1]["text"] == "here"
+        assert content[1]["marks"] == [{"type": "link", "attrs": {"href": "https://example.com"}}]
 
     def test_format_rich_text_bullet_list(self):
         """Test bullet list markdown produces ADF bulletList."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            result = format_rich_text("- one\n- two\n- three")
+        result = format_rich_text("- one\n- two\n- three")
 
-            node = result["content"][0]
-            assert node["type"] == "bulletList"
-            assert len(node["content"]) == 3
-            assert node["content"][0]["type"] == "listItem"
-            para = node["content"][0]["content"][0]
-            assert para["content"][0]["text"] == "one"
+        node = result["content"][0]
+        assert node["type"] == "bulletList"
+        assert len(node["content"]) == 3
+        assert node["content"][0]["type"] == "listItem"
+        para = node["content"][0]["content"][0]
+        assert para["content"][0]["text"] == "one"
 
     def test_format_rich_text_horizontal_rule(self):
         """Test horizontal rule produces ADF rule node."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            result = format_rich_text("above\n---\nbelow")
+        result = format_rich_text("above\n---\nbelow")
 
-            assert result["content"][0]["type"] == "paragraph"
-            assert result["content"][1]["type"] == "rule"
-            assert result["content"][2]["type"] == "paragraph"
+        assert result["content"][0]["type"] == "paragraph"
+        assert result["content"][1]["type"] == "rule"
+        assert result["content"][2]["type"] == "paragraph"
 
     def test_format_rich_text_table(self):
         """Test Jira wiki table syntax produces ADF table."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            result = format_rich_text("|| H1 || H2 ||\n| c1 | c2 |")
+        result = format_rich_text("|| H1 || H2 ||\n| c1 | c2 |")
 
-            table = result["content"][0]
-            assert table["type"] == "table"
-            assert len(table["content"]) == 2
-            header_row = table["content"][0]
-            assert header_row["content"][0]["type"] == "tableHeader"
-            body_row = table["content"][1]
-            assert body_row["content"][0]["type"] == "tableCell"
+        table = result["content"][0]
+        assert table["type"] == "table"
+        assert len(table["content"]) == 2
+        header_row = table["content"][0]
+        assert header_row["content"][0]["type"] == "tableHeader"
+        body_row = table["content"][1]
+        assert body_row["content"][0]["type"] == "tableCell"
 
     def test_format_rich_text_paragraphs(self):
         """Test blank lines separate paragraphs."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            result = format_rich_text("para one\n\npara two")
+        result = format_rich_text("para one\n\npara two")
 
-            assert len(result["content"]) == 2
-            assert result["content"][0]["type"] == "paragraph"
-            assert result["content"][0]["content"][0]["text"] == "para one"
-            assert result["content"][1]["type"] == "paragraph"
-            assert result["content"][1]["content"][0]["text"] == "para two"
+        assert len(result["content"]) == 2
+        assert result["content"][0]["type"] == "paragraph"
+        assert result["content"][0]["content"][0]["text"] == "para one"
+        assert result["content"][1]["type"] == "paragraph"
+        assert result["content"][1]["content"][0]["text"] == "para two"
 
     def test_format_rich_text_mixed(self):
         """Test mixed markdown produces correct sequence of ADF nodes."""
-        with patch("skills.jira.scripts.jira.get_api_version") as mock_version:
-            mock_version.return_value = "3"
-            result = format_rich_text("## Heading\n\nSome text\n\n- item one\n- item two")
+        result = format_rich_text("## Heading\n\nSome text\n\n- item one\n- item two")
 
-            assert result["content"][0]["type"] == "heading"
-            assert result["content"][1]["type"] == "paragraph"
-            assert result["content"][2]["type"] == "bulletList"
+        assert result["content"][0]["type"] == "heading"
+        assert result["content"][1]["type"] == "paragraph"
+        assert result["content"][2]["type"] == "bulletList"
 
     def test_parse_inline_plain(self):
         """Test parse_inline with no formatting."""
@@ -1168,14 +1049,12 @@ class TestCoerceFieldValue:
         result = coerce_field_value("customfield_00000", "whatever")
         assert result == "whatever"
 
-    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.list_fields")
-    def test_user_field_cloud(self, mock_list_fields, mock_is_cloud):
-        """Test user field wraps as accountId on Cloud."""
+    def test_user_field(self, mock_list_fields):
+        """Test user field wraps as accountId."""
         mock_list_fields.return_value = [
             {"id": "customfield_22222", "schema": {"type": "user"}},
         ]
-        mock_is_cloud.return_value = True
         result = coerce_field_value("customfield_22222", "abc123")
         assert result == {"accountId": "abc123"}
 
@@ -1225,13 +1104,11 @@ class TestJiraDefaultsBackwardCompat:
 class TestApiOperations:
     """Tests for API operations."""
 
-    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_cloud(self, mock_api_path, mock_post, mock_is_cloud):
-        """Test searching issues on Cloud (POST /search/jql)."""
+    def test_search_issues_cloud(self, mock_api_path, mock_post):
+        """Test searching issues via POST /search/jql."""
         mock_api_path.return_value = "rest/api/3/search/jql"
-        mock_is_cloud.return_value = True
         mock_post.return_value = {
             "issues": [
                 {"key": "DEMO-1", "fields": {"summary": "Test"}},
@@ -1243,31 +1120,11 @@ class TestApiOperations:
         assert len(result) == 1
         assert result[0]["key"] == "DEMO-1"
 
-    @patch("skills.jira.scripts.jira.is_cloud")
-    @patch("skills.jira.scripts.jira.get")
-    @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_datacenter(self, mock_api_path, mock_get, mock_is_cloud):
-        """Test searching issues on Data Center (GET /search)."""
-        mock_api_path.return_value = "rest/api/2/search"
-        mock_is_cloud.return_value = False
-        mock_get.return_value = {
-            "issues": [
-                {"key": "DEMO-1", "fields": {"summary": "Test"}},
-            ]
-        }
-
-        result = search_issues("project = DEMO", max_results=10)
-
-        assert len(result) == 1
-        assert result[0]["key"] == "DEMO-1"
-
-    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_cloud_pagination(self, mock_api_path, mock_post, mock_is_cloud):
-        """Test Cloud search paginates using nextPageToken."""
+    def test_search_issues_cloud_pagination(self, mock_api_path, mock_post):
+        """Test search paginates using nextPageToken."""
         mock_api_path.return_value = "rest/api/3/search/jql"
-        mock_is_cloud.return_value = True
         mock_post.side_effect = [
             {
                 "issues": [{"key": "DEMO-1", "fields": {"summary": "First"}}],
@@ -1284,74 +1141,26 @@ class TestApiOperations:
         assert result[0]["key"] == "DEMO-1"
         assert result[1]["key"] == "DEMO-2"
 
-    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_cloud_non_dict_response(self, mock_api_path, mock_post, mock_is_cloud):
-        """Test Cloud search handles non-dict response."""
+    def test_search_issues_cloud_non_dict_response(self, mock_api_path, mock_post):
+        """Test search handles non-dict response."""
         mock_api_path.return_value = "rest/api/3/search/jql"
-        mock_is_cloud.return_value = True
         mock_post.return_value = "unexpected"
 
         result = search_issues("project = DEMO", max_results=10)
 
         assert result == []
 
-    @patch("skills.jira.scripts.jira.is_cloud")
-    @patch("skills.jira.scripts.jira.get")
-    @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_datacenter_pagination(self, mock_api_path, mock_get, mock_is_cloud):
-        """Test Data Center search paginates using startAt/total."""
-        mock_api_path.return_value = "rest/api/2/search"
-        mock_is_cloud.return_value = False
-        mock_get.side_effect = [
-            {
-                "issues": [{"key": "DEMO-1", "fields": {"summary": "First"}}],
-                "total": 2,
-            },
-            {
-                "issues": [{"key": "DEMO-2", "fields": {"summary": "Second"}}],
-                "total": 2,
-            },
-        ]
-
-        result = search_issues("project = DEMO", max_results=10)
-
-        assert len(result) == 2
-        assert result[1]["key"] == "DEMO-2"
-
-    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_cloud_truncation_warning(
-        self, mock_api_path, mock_post, mock_is_cloud, capsys
-    ):
-        """Test Cloud search warns when results are truncated at API limit."""
+    def test_search_issues_cloud_truncation_warning(self, mock_api_path, mock_post, capsys):
+        """Test search warns when results are truncated at API limit."""
         mock_api_path.return_value = "rest/api/3/search/jql"
-        mock_is_cloud.return_value = True
         batch = [{"key": f"DEMO-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(100)]
         mock_post.side_effect = [
             {"issues": batch, "nextPageToken": f"token{p}"} for p in range(10)
         ] + [{"issues": batch, "nextPageToken": "more"}]
-
-        result = search_issues("project = DEMO", max_results=1000)
-
-        assert len(result) == 1000
-        captured = capsys.readouterr()
-        assert "Results may be truncated" in captured.err
-        assert "1000 results returned" in captured.err
-
-    @patch("skills.jira.scripts.jira.is_cloud")
-    @patch("skills.jira.scripts.jira.get")
-    @patch("skills.jira.scripts.jira.api_path")
-    def test_search_issues_datacenter_truncation_warning(
-        self, mock_api_path, mock_get, mock_is_cloud, capsys
-    ):
-        """Test Data Center search warns when results are truncated at API limit."""
-        mock_api_path.return_value = "rest/api/2/search"
-        mock_is_cloud.return_value = False
-        batch = [{"key": f"DEMO-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(100)]
-        mock_get.side_effect = [{"issues": batch, "total": 1500} for _ in range(10)]
 
         result = search_issues("project = DEMO", max_results=1000)
 
@@ -1510,76 +1319,12 @@ class TestApiOperations:
 class TestHttpRequests:
     """Tests for HTTP request functions."""
 
-    @patch("skills.jira.scripts.jira.requests.get")
-    @patch("skills.jira.scripts.jira.get_credentials")
-    def test_make_detection_request_success(self, mock_creds, mock_get):
-        """Test successful detection request."""
-        mock_creds.return_value = Credentials(
-            url="https://example.atlassian.net",
-            token="token",
-            email="test@example.com",
-        )
-        mock_response = Mock()
-        mock_response.ok = True
-        mock_response.json.return_value = {"deploymentType": "Cloud"}
-        mock_get.return_value = mock_response
-
-        result = _make_detection_request(
-            "https://example.atlassian.net",
-            "rest/api/2/serverInfo",
-            email="test@example.com",
-            token="token",
-        )
-
-        assert result["deploymentType"] == "Cloud"
-
-    @patch("skills.jira.scripts.jira.requests.get")
-    @patch("skills.jira.scripts.jira.time.sleep")
-    def test_make_detection_request_rate_limit(self, mock_sleep, mock_get):
-        """Test detection request with rate limiting."""
-        # First two attempts return 429, third succeeds
-        response_429 = Mock()
-        response_429.status_code = 429
-        response_429.ok = False
-        response_429.headers = {"Retry-After": "1"}
-
-        response_ok = Mock()
-        response_ok.ok = True
-        response_ok.status_code = 200
-        response_ok.json.return_value = {"deploymentType": "Cloud"}
-
-        mock_get.side_effect = [response_429, response_429, response_ok]
-
-        result = _make_detection_request(
-            "https://example.atlassian.net",
-            "rest/api/2/serverInfo",
-        )
-
-        assert result["deploymentType"] == "Cloud"
-        assert mock_sleep.call_count == 2
-
-    @patch("skills.jira.scripts.jira.requests.get")
-    @patch("skills.jira.scripts.jira.time.sleep")
-    def test_make_detection_request_failure(self, _mock_sleep, mock_get):
-        """Test detection request failure."""
-        import requests
-
-        mock_get.side_effect = requests.RequestException("Network error")
-
-        with pytest.raises(JiraDetectionError, match="Request failed"):
-            _make_detection_request(
-                "https://example.atlassian.net",
-                "rest/api/2/serverInfo",
-            )
-
     @patch("skills.jira.scripts.jira.requests.request")
     @patch("skills.jira.scripts.jira.get_credentials")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_make_request_cloud(self, mock_is_cloud, mock_creds, mock_request):
-        """Test making a request to Cloud."""
+    def test_make_request_cloud(self, mock_creds, mock_request):
+        """Test making a request with Cloud credentials."""
         from skills.jira.scripts.jira import make_request
 
-        mock_is_cloud.return_value = True
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net",
             email="test@example.com",
@@ -1607,14 +1352,13 @@ class TestHttpRequests:
 
     @patch("skills.jira.scripts.jira.requests.request")
     @patch("skills.jira.scripts.jira.get_credentials")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_make_request_error(self, mock_is_cloud, mock_creds, mock_request):
+    def test_make_request_error(self, mock_creds, mock_request):
         """Test making a request that fails."""
         from skills.jira.scripts.jira import make_request
 
-        mock_is_cloud.return_value = False
         mock_creds.return_value = Credentials(
             url="https://example.com",
+            email="test@example.com",
             token="token",
         )
         mock_response = Mock()
@@ -1624,16 +1368,14 @@ class TestHttpRequests:
         mock_request.return_value = mock_response
 
         with pytest.raises(APIError, match="failed: 404 Not Found"):
-            make_request("jira", "GET", "rest/api/2/issue/MISSING")
+            make_request("jira", "GET", "rest/api/3/issue/MISSING")
 
     @patch("skills.jira.scripts.jira.requests.request")
     @patch("skills.jira.scripts.jira.get_credentials")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_make_request_204_no_content(self, mock_is_cloud, mock_creds, mock_request):
+    def test_make_request_204_no_content(self, mock_creds, mock_request):
         """Test making a request that returns 204 No Content."""
         from skills.jira.scripts.jira import make_request
 
-        mock_is_cloud.return_value = True
         mock_creds.return_value = Credentials(
             url="https://example.com",
             email="test@example.com",
@@ -1698,9 +1440,6 @@ class TestCommandHandlers:
     """Tests for command handlers."""
 
     @patch("skills.jira.scripts.jira.get_credentials")
-    @patch("skills.jira.scripts.jira.detect_deployment_type")
-    @patch("skills.jira.scripts.jira.get_api_version")
-    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.get_cloud_id")
@@ -1711,9 +1450,6 @@ class TestCommandHandlers:
         mock_cloud_id,
         mock_get,
         mock_post,
-        mock_is_cloud,
-        mock_api_version,
-        mock_detect,
         mock_creds,
         capsys,
     ):
@@ -1723,9 +1459,6 @@ class TestCommandHandlers:
             email="test@example.com",
             token="secret",
         )
-        mock_detect.return_value = "Cloud"
-        mock_api_version.return_value = "3"
-        mock_is_cloud.return_value = True
         mock_post.return_value = {"issues": []}
         mock_cloud_id.return_value = "cloud-123"
         mock_auto_path.return_value = "gateway/path"
@@ -1748,31 +1481,6 @@ class TestCommandHandlers:
         assert "Automation API: OK" in captured.out
 
     @patch("skills.jira.scripts.jira.get_credentials")
-    @patch("skills.jira.scripts.jira.detect_deployment_type")
-    @patch("skills.jira.scripts.jira.get_api_version")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    @patch("skills.jira.scripts.jira.get")
-    def test_cmd_check_success_datacenter(
-        self, mock_get, mock_is_cloud, mock_api_version, mock_detect, mock_creds, capsys
-    ):
-        """Test check command success on Data Center (GET /search)."""
-        mock_creds.return_value = Credentials(
-            url="https://jira.example.com",
-            token="secret",
-        )
-        mock_detect.return_value = "DataCenter"
-        mock_api_version.return_value = "2"
-        mock_is_cloud.return_value = False
-        mock_get.return_value = {"issues": []}
-
-        result = cmd_check()
-
-        assert result == 0
-        captured = capsys.readouterr()
-        assert "All checks passed" in captured.out
-        assert "rest/api/2/search" in captured.out
-
-    @patch("skills.jira.scripts.jira.get_credentials")
     def test_cmd_check_no_url(self, mock_creds, capsys):
         """Test check command with no URL."""
         mock_creds.return_value = Credentials()
@@ -1783,12 +1491,10 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "No Jira URL configured" in captured.out
 
-    @patch("skills.jira.scripts.jira.detect_deployment_type")
     @patch("skills.jira.scripts.jira.get_credentials")
-    def test_cmd_check_no_token(self, mock_creds, mock_detect, capsys):
+    def test_cmd_check_no_token(self, mock_creds, capsys):
         """Test check command with no token."""
         mock_creds.return_value = Credentials(url="https://example.atlassian.net")
-        mock_detect.return_value = "Cloud"
 
         result = cmd_check()
 
@@ -1797,37 +1503,25 @@ class TestCommandHandlers:
         assert "No API token configured" in captured.out
 
     @patch("skills.jira.scripts.jira.get_credentials")
-    @patch("skills.jira.scripts.jira.detect_deployment_type")
-    def test_cmd_check_connection_error(self, mock_detect, mock_creds, capsys):
-        """Test check command with connection error."""
-        mock_creds.return_value = Credentials(
-            url="https://example.atlassian.net",
-            token="token",
-        )
-        mock_detect.side_effect = JiraDetectionError("Connection failed")
+    def test_cmd_check_no_email(self, mock_creds, capsys):
+        """Test check command with no email."""
+        mock_creds.return_value = Credentials(url="https://example.atlassian.net", token="token")
 
         result = cmd_check()
 
         assert result == 1
         captured = capsys.readouterr()
-        assert "Connection failed" in captured.out
+        assert "No email configured" in captured.out
 
     @patch("skills.jira.scripts.jira.get_credentials")
-    @patch("skills.jira.scripts.jira.detect_deployment_type")
-    @patch("skills.jira.scripts.jira.get_api_version")
-    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.post")
-    def test_cmd_check_api_error(
-        self, mock_post, mock_is_cloud, mock_api_version, mock_detect, mock_creds, capsys
-    ):
+    def test_cmd_check_api_error(self, mock_post, mock_creds, capsys):
         """Test check command with API error."""
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net",
+            email="test@example.com",
             token="token",
         )
-        mock_detect.return_value = "Cloud"
-        mock_api_version.return_value = "3"
-        mock_is_cloud.return_value = True
         mock_post.side_effect = APIError("API call failed")
 
         result = cmd_check()
@@ -2430,18 +2124,12 @@ class TestCommandHandlers:
 
     @patch("skills.jira.scripts.jira.validate_custom_fields")
     @patch("skills.jira.scripts.jira.post")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    @patch("skills.jira.scripts.jira.get_api_version")
-    @patch("skills.jira.scripts.jira.detect_deployment_type")
     @patch("skills.jira.scripts.jira.get_credentials")
     @patch("skills.jira.scripts.jira.get_jira_defaults")
     def test_cmd_check_custom_fields_ok(
         self,
         mock_defaults,
         mock_creds,
-        mock_detect,
-        mock_api_version,
-        mock_is_cloud,
         mock_post,
         mock_validate,
         capsys,
@@ -2454,9 +2142,6 @@ class TestCommandHandlers:
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net", email="test@test.com", token="tok"
         )
-        mock_detect.return_value = ("cloud", "3")
-        mock_api_version.return_value = "2"
-        mock_is_cloud.return_value = True
         mock_post.return_value = {"issues": []}
         mock_validate.return_value = []
 
@@ -3609,12 +3294,10 @@ class TestContributors:
 class TestUserResolution:
     """Tests for user resolution functions."""
 
-    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_resolve_user_cloud(self, mock_api_path, mock_get, mock_is_cloud):
-        """Test resolving user on Cloud."""
-        mock_is_cloud.return_value = True
+    def test_resolve_user_cloud(self, mock_api_path, mock_get):
+        """Test resolving user via the Cloud user/search API."""
         mock_api_path.return_value = "rest/api/3/user/search"
         mock_get.return_value = [
             {
@@ -3631,37 +3314,15 @@ class TestUserResolution:
         assert result[0]["accountId"] == "abc123"
         assert result[0]["emailAddress"] == "jdoe@example.com"
 
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_resolve_user_datacenter(self, mock_is_cloud):
-        """Test resolving user on Data Center (passthrough)."""
-        mock_is_cloud.return_value = False
-
-        result = resolve_user("jsmith")
-
-        assert len(result) == 1
-        assert result[0]["username"] == "jsmith"
-
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_resolve_user_for_jql_datacenter(self, mock_is_cloud):
-        """Test JQL resolution on Data Center returns input unchanged."""
-        mock_is_cloud.return_value = False
-
-        assert resolve_user_for_jql("jsmith") == "jsmith"
-
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_resolve_user_for_jql_accountid_passthrough(self, mock_is_cloud):
+    def test_resolve_user_for_jql_accountid_passthrough(self):
         """Test JQL resolution with an accountId passes through."""
-        mock_is_cloud.return_value = True
-
         result = resolve_user_for_jql("5ecff4d72490cf0c09e48bd5")
 
         assert result == "5ecff4d72490cf0c09e48bd5"
 
     @patch("skills.jira.scripts.jira.resolve_user")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_resolve_user_for_jql_email(self, mock_is_cloud, mock_resolve):
-        """Test JQL resolution resolves email to accountId on Cloud."""
-        mock_is_cloud.return_value = True
+    def test_resolve_user_for_jql_email(self, mock_resolve):
+        """Test JQL resolution resolves email to accountId."""
         mock_resolve.return_value = [
             {
                 "accountId": "abc123",
@@ -3676,20 +3337,16 @@ class TestUserResolution:
         assert result == "abc123"
 
     @patch("skills.jira.scripts.jira.resolve_user")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_resolve_user_for_jql_not_found(self, mock_is_cloud, mock_resolve):
+    def test_resolve_user_for_jql_not_found(self, mock_resolve):
         """Test JQL resolution raises ValueError when user not found."""
-        mock_is_cloud.return_value = True
         mock_resolve.return_value = []
 
         with pytest.raises(ValueError, match="Could not find Jira Cloud user"):
             resolve_user_for_jql("nobody@example.com")
 
     @patch("skills.jira.scripts.jira.resolve_user")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_resolve_user_for_jql_prefers_email_match(self, mock_is_cloud, mock_resolve):
+    def test_resolve_user_for_jql_prefers_email_match(self, mock_resolve):
         """Test JQL resolution prefers exact email match."""
-        mock_is_cloud.return_value = True
         mock_resolve.return_value = [
             {
                 "accountId": "other",
@@ -3710,10 +3367,8 @@ class TestUserResolution:
         assert result == "exact"
 
     @patch("skills.jira.scripts.jira.resolve_user")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_resolve_user_for_jql_falls_back_to_active(self, mock_is_cloud, mock_resolve):
+    def test_resolve_user_for_jql_falls_back_to_active(self, mock_resolve):
         """Test JQL resolution falls back to first active user when no email match."""
-        mock_is_cloud.return_value = True
         mock_resolve.return_value = [
             {
                 "accountId": "inactive1",
@@ -3734,10 +3389,8 @@ class TestUserResolution:
         assert result == "active1"
 
     @patch("skills.jira.scripts.jira.resolve_user")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_resolve_user_for_jql_falls_back_to_first(self, mock_is_cloud, mock_resolve):
+    def test_resolve_user_for_jql_falls_back_to_first(self, mock_resolve):
         """Test JQL resolution falls back to first user when none active."""
-        mock_is_cloud.return_value = True
         mock_resolve.return_value = [
             {
                 "accountId": "only1",
@@ -3751,12 +3404,10 @@ class TestUserResolution:
 
         assert result == "only1"
 
-    @patch("skills.jira.scripts.jira.is_cloud")
     @patch("skills.jira.scripts.jira.get")
     @patch("skills.jira.scripts.jira.api_path")
-    def test_resolve_user_cloud_empty_response(self, mock_api_path, mock_get, mock_is_cloud):
+    def test_resolve_user_cloud_empty_response(self, mock_api_path, mock_get):
         """Test resolve_user returns empty list when API returns non-list."""
-        mock_is_cloud.return_value = True
         mock_api_path.return_value = "rest/api/3/user/search"
         mock_get.return_value = {}
 
@@ -3863,31 +3514,16 @@ class TestContributorSearch:
 class TestCollaborativeEpics:
     """Tests for collaborative epics discovery."""
 
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_build_epic_children_jql_cloud(self, mock_cloud):
-        """Test epic children JQL for Cloud."""
-        mock_cloud.return_value = True
-
+    def test_build_epic_children_jql(self):
+        """Test epic children JQL covers Epic Link and parent."""
         jql = _build_epic_children_jql("EPIC-1")
 
         assert '"Epic Link" = EPIC-1' in jql
         assert "parent = EPIC-1" in jql
 
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_build_epic_children_jql_dc(self, mock_cloud):
-        """Test epic children JQL for Data Center."""
-        mock_cloud.return_value = False
-
-        jql = _build_epic_children_jql("EPIC-1")
-
-        assert '"Epic Link" = EPIC-1' in jql
-        assert "parent" not in jql
-
     @patch("skills.jira.scripts.jira.search_issues")
-    @patch("skills.jira.scripts.jira.is_cloud")
-    def test_get_epic_children(self, mock_cloud, mock_search):
+    def test_get_epic_children(self, mock_search):
         """Test fetching epic children."""
-        mock_cloud.return_value = False
         mock_search.return_value = [{"key": "TASK-1"}, {"key": "TASK-2"}]
 
         result = get_epic_children("EPIC-1", fields=["assignee"])
@@ -5314,9 +4950,8 @@ class TestGetCloudId:
     """Tests for get_cloud_id function."""
 
     @patch("skills.jira.scripts.jira.requests.get")
-    @patch("skills.jira.scripts.jira.is_cloud", return_value=True)
     @patch("skills.jira.scripts.jira.get_credentials")
-    def test_fetches_and_caches_cloud_id(self, mock_creds, _mock_is_cloud, mock_get):
+    def test_fetches_and_caches_cloud_id(self, mock_creds, mock_get):
         """Test successful Cloud ID fetch and caching."""
         mock_creds.return_value = Credentials(
             url="https://test.atlassian.net", token="tok", email="a@b.com"
@@ -5339,16 +4974,9 @@ class TestGetCloudId:
         mock_get.assert_not_called()
         clear_cache()
 
-    @patch("skills.jira.scripts.jira.is_cloud", return_value=False)
-    def test_raises_on_dc(self, _mock_is_cloud):
-        """Test that DC/Server raises APIError."""
-        with pytest.raises(APIError, match="only available on Jira Cloud"):
-            get_cloud_id()
-
     @patch("skills.jira.scripts.jira.requests.get")
-    @patch("skills.jira.scripts.jira.is_cloud", return_value=True)
     @patch("skills.jira.scripts.jira.get_credentials")
-    def test_raises_on_http_error(self, mock_creds, _mock_is_cloud, mock_get):
+    def test_raises_on_http_error(self, mock_creds, mock_get):
         """Test HTTP error raises APIError."""
         mock_creds.return_value = Credentials(
             url="https://test.atlassian.net", token="tok", email="a@b.com"
@@ -5937,9 +5565,8 @@ class TestSummariseValueEdgeCases:
 class TestGetCloudIdNoUrl:
     """Test get_cloud_id when no URL is configured."""
 
-    @patch("skills.jira.scripts.jira.is_cloud", return_value=True)
     @patch("skills.jira.scripts.jira.get_credentials")
-    def test_raises_no_url(self, mock_creds, _mock_is_cloud):
+    def test_raises_no_url(self, mock_creds):
         """Test error when no URL is configured."""
         mock_creds.return_value = Credentials()
 
@@ -5948,9 +5575,8 @@ class TestGetCloudIdNoUrl:
             get_cloud_id()
 
     @patch("skills.jira.scripts.jira.requests.get")
-    @patch("skills.jira.scripts.jira.is_cloud", return_value=True)
     @patch("skills.jira.scripts.jira.get_credentials")
-    def test_raises_no_cloud_id_in_response(self, mock_creds, _mock_is_cloud, mock_get):
+    def test_raises_no_cloud_id_in_response(self, mock_creds, mock_get):
         """Test error when tenant_info returns no cloudId."""
         mock_creds.return_value = Credentials(
             url="https://test.atlassian.net", token="tok", email="a@b.com"

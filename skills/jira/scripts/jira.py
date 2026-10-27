@@ -23,7 +23,6 @@ import json
 import os
 import re
 import sys
-import time
 from dataclasses import dataclass
 from datetime import UTC
 from pathlib import Path
@@ -119,16 +118,10 @@ class Credentials:
     url: str | None = None
     email: str | None = None
     token: str | None = None
-    username: str | None = None
-    password: str | None = None
 
     def is_valid(self) -> bool:
-        """Check if credentials are sufficient for authentication."""
-        # Token-based auth
-        if self.token and self.url:
-            return True
-        # Username/password auth
-        return bool(self.username and self.password and self.url)
+        """Check if credentials are sufficient for Jira Cloud authentication."""
+        return bool(self.token and self.email and self.url)
 
 
 @dataclass
@@ -216,8 +209,6 @@ def get_credentials(service: str) -> Credentials:
     creds.url = get_credential(f"{service}-url")
     creds.email = get_credential(f"{service}-email")
     creds.token = get_credential(f"{service}-token")
-    creds.username = get_credential(f"{service}-username")
-    creds.password = get_credential(f"{service}-password")
 
     # 2. Fall back to environment variables
     prefix = service.upper().replace("-", "_")
@@ -229,10 +220,6 @@ def get_credentials(service: str) -> Credentials:
     if not creds.token:
         # Support both SERVICE_API_TOKEN and SERVICE_TOKEN (common for Jira)
         creds.token = os.environ.get(f"{prefix}_API_TOKEN") or os.environ.get(f"{prefix}_TOKEN")
-    if not creds.username:
-        creds.username = os.environ.get(f"{prefix}_USERNAME")
-    if not creds.password:
-        creds.password = os.environ.get(f"{prefix}_PASSWORD")
 
     # 3. Fall back to config file
     config = load_config(service)
@@ -243,10 +230,6 @@ def get_credentials(service: str) -> Credentials:
             creds.email = config.get("email")
         if not creds.token:
             creds.token = config.get("token")
-        if not creds.username:
-            creds.username = config.get("username")
-        if not creds.password:
-            creds.password = config.get("password")
 
     return creds
 
@@ -336,198 +319,24 @@ def merge_jql_with_scope(user_jql: str, scope: str | None) -> str:
 # JIRA API HELPERS
 # ============================================================================
 
-# Module-level cache for deployment type detection
-# Key: Jira URL, Value: {"deployment_type": str, "api_version": str}
-_deployment_cache: dict[str, dict[str, str | bool]] = {}
+# Jira Cloud is the only supported deployment.
+API_VERSION = "3"
 
-# Rate limit retry configuration
-MAX_RETRIES = 3
-INITIAL_RETRY_DELAY = 1.0  # seconds
-RETRY_BACKOFF_MULTIPLIER = 2.0
-
-
-class JiraDetectionError(Exception):
-    """Exception raised when Jira deployment type detection fails."""
-
-    pass
-
-
-def _make_detection_request(
-    url: str,
-    endpoint: str,
-    email: str | None = None,
-    token: str | None = None,
-    username: str | None = None,
-    password: str | None = None,
-    timeout: int = 10,
-) -> dict[str, Any]:
-    """Make a request to Jira for deployment detection with rate limit handling.
-
-    Tries unauthenticated first (serverInfo is often public), then falls back
-    to authenticated if needed.
-
-    Args:
-        url: Base Jira URL.
-        endpoint: API endpoint.
-        email: User email for Cloud auth.
-        token: API token.
-        username: Username for basic auth.
-        password: Password for basic auth.
-        timeout: Request timeout.
-
-    Returns:
-        Parsed JSON response.
-
-    Raises:
-        JiraDetectionError: If request fails after retries.
-    """
-    full_url = f"{url.rstrip('/')}/{endpoint.lstrip('/')}"
-    headers = {"Accept": "application/json"}
-
-    # Build auth tuple for fallback
-    auth = None
-    if token and email:
-        auth = (email, token)
-    elif username and password:
-        auth = (username, password)
-
-    retry_delay = INITIAL_RETRY_DELAY
-
-    # Try unauthenticated first (serverInfo is typically public)
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = requests.get(
-                full_url,
-                headers=headers,
-                timeout=timeout,
-            )
-
-            # If unauthenticated fails with 401/403, try with auth
-            if response.status_code in (401, 403) and auth:
-                response = requests.get(
-                    full_url,
-                    headers=headers,
-                    auth=auth,
-                    timeout=timeout,
-                )
-
-            # Handle rate limiting (429 Too Many Requests)
-            if response.status_code == 429:
-                retry_after = response.headers.get("Retry-After")
-                if retry_after:
-                    wait_time = float(retry_after)
-                else:
-                    wait_time = retry_delay
-                    retry_delay *= RETRY_BACKOFF_MULTIPLIER
-
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    raise JiraDetectionError(f"Rate limited after {MAX_RETRIES} attempts")
-
-            if not response.ok:
-                raise JiraDetectionError(
-                    f"Request failed: {response.status_code} {response.reason}"
-                )
-
-            return response.json()
-
-        except requests.RequestException as e:
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(retry_delay)
-                retry_delay *= RETRY_BACKOFF_MULTIPLIER
-                continue
-            raise JiraDetectionError(f"Request failed: {e}") from e
-
-    raise JiraDetectionError("Request failed after all retries")
-
-
-def detect_deployment_type(force_refresh: bool = False) -> str:
-    """Detect the Jira deployment type (Cloud, DataCenter, or Server).
-
-    Uses /rest/api/2/serverInfo which works on all Jira versions.
-    Results are cached per-session to avoid repeated API calls.
-
-    Args:
-        force_refresh: If True, bypass the cache and make a new request.
-
-    Returns:
-        Deployment type string: "Cloud", "DataCenter", or "Server".
-
-    Raises:
-        JiraDetectionError: If detection fails.
-    """
-    creds = get_credentials("jira")
-    if not creds.url:
-        raise JiraDetectionError("No Jira URL configured")
-
-    # Check cache unless force refresh requested
-    if not force_refresh and creds.url in _deployment_cache:
-        return _deployment_cache[creds.url]["deployment_type"]
-
-    try:
-        server_info = _make_detection_request(
-            url=creds.url,
-            endpoint="rest/api/2/serverInfo",
-            email=creds.email,
-            token=creds.token,
-            username=creds.username,
-            password=creds.password,
-        )
-
-        # Extract deployment type from response
-        # Cloud: {"deploymentType": "Cloud", ...}
-        # DC:    {"deploymentType": "DataCenter", ...}
-        # Server: {"deploymentType": "Server", ...}
-        deployment_type = server_info.get("deploymentType", "Server")
-
-        # Determine API version
-        api_version = "3" if deployment_type == "Cloud" else "2"
-
-        # Cache the result
-        _deployment_cache[creds.url] = {
-            "deployment_type": deployment_type,
-            "api_version": api_version,
-        }
-
-        return deployment_type
-
-    except Exception as e:
-        raise JiraDetectionError(f"Failed to detect deployment type: {e}") from e
-
-
-def get_api_version() -> str:
-    """Get the appropriate API version for the current Jira instance.
-
-    Returns:
-        "3" for Cloud, "2" for DataCenter/Server.
-    """
-    creds = get_credentials("jira")
-    if creds.url and creds.url in _deployment_cache:
-        return _deployment_cache[creds.url]["api_version"]
-
-    # Trigger detection to populate cache
-    detect_deployment_type()
-
-    if creds.url and creds.url in _deployment_cache:
-        return _deployment_cache[creds.url]["api_version"]
-
-    # Default to v2 if detection fails (more compatible)
-    return "2"
+# Module-level cache for the Cloud ID used by the Automation API.
+# Key: Jira URL, Value: {"cloud_id": str}
+_cloud_id_cache: dict[str, dict[str, str]] = {}
 
 
 def api_path(endpoint: str) -> str:
-    """Construct the full API path with the correct version.
+    """Construct the full Jira Cloud API path.
 
     Args:
         endpoint: API endpoint without version prefix (e.g., "search", "issue/DEMO-123").
 
     Returns:
-        Full path with version (e.g., "rest/api/3/search" or "rest/api/2/search").
+        Full path with version (e.g., "rest/api/3/search").
     """
-    version = get_api_version()
-    return f"rest/api/{version}/{endpoint.lstrip('/')}"
+    return f"rest/api/{API_VERSION}/{endpoint.lstrip('/')}"
 
 
 def automation_path(endpoint: str) -> str:
@@ -737,73 +546,50 @@ def _parse_markdown_to_adf(text: str) -> list[dict[str, Any]]:
     return blocks or [{"type": "paragraph", "content": [{"type": "text", "text": ""}]}]
 
 
-def format_rich_text(text: str) -> dict[str, Any] | str:
-    """Format text for the appropriate Jira API version.
+def format_rich_text(text: str) -> dict[str, Any]:
+    """Format text as Atlassian Document Format (ADF).
 
-    Cloud API (v3) requires Atlassian Document Format (ADF).
-    Parses markdown (headings, bold, links, lists, tables, rules)
-    into proper ADF nodes.
-
-    Data Center/Server API (v2) uses plain text.
+    Parses markdown (headings, bold, links, lists, tables, rules) into
+    proper ADF nodes, as required by the Jira Cloud API.
 
     Args:
         text: Markdown or plain text content.
 
     Returns:
-        ADF document dict for Cloud, plain string for DC/Server.
+        ADF document dict.
     """
-    version = get_api_version()
-
-    if version == "3":
-        return {
-            "type": "doc",
-            "version": 1,
-            "content": _parse_markdown_to_adf(text),
-        }
-    else:
-        return text
-
-
-def is_cloud() -> bool:
-    """Check if the current Jira instance is Cloud.
-
-    Returns:
-        True if Cloud, False otherwise.
-    """
-    try:
-        return detect_deployment_type() == "Cloud"
-    except JiraDetectionError:
-        return False
+    return {
+        "type": "doc",
+        "version": 1,
+        "content": _parse_markdown_to_adf(text),
+    }
 
 
 def clear_cache() -> None:
-    """Clear the deployment type cache.
+    """Clear the Cloud ID cache.
 
     Useful for testing or when switching between Jira instances.
     """
-    _deployment_cache.clear()
+    _cloud_id_cache.clear()
 
 
 def get_cloud_id() -> str:
     """Get the Atlassian Cloud ID for the current Jira instance.
 
     Fetches from ``{base_url}/_edge/tenant_info`` and caches the result
-    in ``_deployment_cache``.
+    in ``_cloud_id_cache``.
 
     Returns:
         The Cloud ID string.
 
     Raises:
-        APIError: If the instance is not Cloud or the request fails.
+        APIError: If the request fails.
     """
-    if not is_cloud():
-        raise APIError("Automation rules are only available on Jira Cloud")
-
     creds = get_credentials("jira")
     if not creds.url:
         raise APIError("No Jira URL configured")
 
-    cached = _deployment_cache.get(creds.url, {})
+    cached = _cloud_id_cache.get(creds.url, {})
     if "cloud_id" in cached:
         return cached["cloud_id"]
 
@@ -820,7 +606,7 @@ def get_cloud_id() -> str:
     if not cloud_id:
         raise APIError("Could not determine Cloud ID from tenant info")
 
-    _deployment_cache.setdefault(creds.url, {})["cloud_id"] = cloud_id
+    _cloud_id_cache.setdefault(creds.url, {})["cloud_id"] = cloud_id
     return cloud_id
 
 
@@ -917,10 +703,9 @@ class APIError(Exception):
 
 
 def _get_jira_auth_method(creds: Credentials) -> tuple[tuple[str, str] | None, dict[str, str]]:
-    """Determine the appropriate Jira authentication method.
+    """Build Jira Cloud basic authentication.
 
-    Cloud uses email + API token as basic auth.
-    Data Center/Server uses Bearer token authentication.
+    Jira Cloud authenticates with an email address and API token.
 
     Args:
         creds: Credentials object with token and email.
@@ -930,15 +715,8 @@ def _get_jira_auth_method(creds: Credentials) -> tuple[tuple[str, str] | None, d
     """
     headers: dict[str, str] = {}
     auth = None
-
-    if is_cloud():
-        # Cloud: email + API token as basic auth
-        if creds.email and creds.token:
-            auth = (creds.email, creds.token)
-    else:
-        # DC/Server: Bearer token
-        if creds.token:
-            headers["Authorization"] = f"Bearer {creds.token}"
+    if creds.email and creds.token:
+        auth = (creds.email, creds.token)
 
     return auth, headers
 
@@ -981,21 +759,9 @@ def make_request(
     request_headers.setdefault("Content-Type", "application/json")
     request_headers.setdefault("Accept", "application/json")
 
-    # Add authentication based on service type
-    auth = None
-    if service == "jira" and creds.token:
-        # Use Jira-specific auth detection
-        auth, auth_headers = _get_jira_auth_method(creds)
-        request_headers.update(auth_headers)
-    elif creds.token:
-        if creds.email:
-            # Generic: email + API token as basic auth
-            auth = (creds.email, creds.token)
-        else:
-            # Bearer token style
-            request_headers["Authorization"] = f"Bearer {creds.token}"
-    elif creds.username and creds.password:
-        auth = (creds.username, creds.password)
+    # Add Jira authentication
+    auth, auth_headers = _get_jira_auth_method(creds)
+    request_headers.update(auth_headers)
 
     response = requests.request(
         method=method.upper(),
@@ -1318,9 +1084,7 @@ def _coerce_by_type(field_type: str, value: str, items_type: str = "") -> Any:
     if field_type == "array" and items_type == "option":
         return [{"value": v.strip()} for v in value.split(",")]
     if field_type == "user":
-        if is_cloud():
-            return {"accountId": value}
-        return {"name": value}
+        return {"accountId": value}
     return value
 
 
@@ -1984,9 +1748,7 @@ def search_issues(
         print(removed_function_message(removed), file=sys.stderr)
         return []
 
-    if is_cloud():
-        return _search_issues_cloud(jql, max_results, fields)
-    return _search_issues_datacenter(jql, max_results, fields)
+    return _search_issues_cloud(jql, max_results, fields)
 
 
 def _warn_truncated_results(count: int) -> None:
@@ -2033,47 +1795,6 @@ def _search_issues_cloud(
 
     result = all_issues[:max_results]
     if len(result) >= 1000 and next_page_token:
-        _warn_truncated_results(len(result))
-    return result
-
-
-def _search_issues_datacenter(
-    jql: str,
-    max_results: int,
-    fields: list[str],
-) -> list[dict[str, Any]]:
-    """Search with pagination for Jira Data Center (uses startAt/total)."""
-    all_issues: list[dict[str, Any]] = []
-    start_at = 0
-    last_total = 0
-
-    while len(all_issues) < max_results:
-        page_size = min(max_results - len(all_issues), 100)
-        response = get(
-            "jira",
-            api_path("search"),
-            params={
-                "jql": jql,
-                "startAt": start_at,
-                "maxResults": page_size,
-                "fields": ",".join(fields),
-            },
-        )
-
-        if not isinstance(response, dict):
-            break
-
-        issues = response.get("issues", [])
-        all_issues.extend(issues)
-
-        last_total = response.get("total", 0)
-        if not issues or start_at + len(issues) >= last_total:
-            break
-
-        start_at += len(issues)
-
-    result = all_issues[:max_results]
-    if last_total >= 1000 and len(result) < last_total:
         _warn_truncated_results(len(result))
     return result
 
@@ -2557,8 +2278,7 @@ def extract_contributors(issue: dict[str, Any], comments: list[dict[str, Any]]) 
 def resolve_user(query: str) -> list[dict[str, Any]]:
     """Search for Jira users by email, name, or username.
 
-    On Cloud, uses the user search API to find matching accounts.
-    On Data Center/Server, returns the query as-is (usernames work directly in JQL).
+    Uses the Jira Cloud user search API to find matching accounts.
 
     Args:
         query: Email address, display name, or username to search for.
@@ -2566,41 +2286,32 @@ def resolve_user(query: str) -> list[dict[str, Any]]:
     Returns:
         List of user dictionaries with keys: accountId, emailAddress, displayName, active.
     """
-    if is_cloud():
-        response = get("jira", api_path("user/search"), params={"query": query})
-        if isinstance(response, list):
-            return [
-                {
-                    "accountId": u.get("accountId", ""),
-                    "emailAddress": u.get("emailAddress", ""),
-                    "displayName": u.get("displayName", ""),
-                    "active": u.get("active", True),
-                }
-                for u in response
-            ]
-        return []
-    else:
-        return [{"username": query, "displayName": query}]
+    response = get("jira", api_path("user/search"), params={"query": query})
+    if isinstance(response, list):
+        return [
+            {
+                "accountId": u.get("accountId", ""),
+                "emailAddress": u.get("emailAddress", ""),
+                "displayName": u.get("displayName", ""),
+                "active": u.get("active", True),
+            }
+            for u in response
+        ]
+    return []
 
 
 def resolve_user_for_jql(user: str) -> str:
-    """Resolve a user identifier to the appropriate JQL value.
-
-    On Cloud: converts email/name to accountId (required for JQL).
-    On DC/Server: returns the input unchanged (usernames work in JQL).
+    """Resolve a user identifier to an accountId for use in JQL.
 
     Args:
         user: Email address, display name, or username.
 
     Returns:
-        accountId string for Cloud, or original value for DC/Server.
+        The Jira Cloud accountId.
 
     Raises:
-        ValueError: If the user cannot be resolved on Cloud.
+        ValueError: If the user cannot be resolved.
     """
-    if not is_cloud():
-        return user
-
     # If it already looks like an accountId (hex string), use as-is
     if len(user) >= 20 and all(c in "0123456789abcdef:" for c in user):
         return user
@@ -2672,9 +2383,8 @@ def search_by_contributor(
 def _build_epic_children_jql(epic_key: str) -> str:
     """Build JQL to find children of an epic.
 
-    Uses is_cloud() to build the correct JQL:
-    - Cloud: "Epic Link" = KEY OR parent = KEY (covers classic and next-gen)
-    - DC: "Epic Link" = KEY only
+    Covers classic company-managed projects ("Epic Link") and team-managed
+    or new-hierarchy projects (parent).
 
     Args:
         epic_key: The epic issue key.
@@ -2682,9 +2392,7 @@ def _build_epic_children_jql(epic_key: str) -> str:
     Returns:
         JQL query string.
     """
-    if is_cloud():
-        return f'"Epic Link" = {epic_key} OR parent = {epic_key}'
-    return f'"Epic Link" = {epic_key}'
+    return f'"Epic Link" = {epic_key} OR parent = {epic_key}'
 
 
 def get_epic_children(epic_key: str, fields: list[str] | None = None) -> list[dict[str, Any]]:
@@ -2920,16 +2628,22 @@ def cmd_check() -> int:
         print("   ERROR: No API token configured")
         print("\n   Configure using one of these methods:")
         print("   - Environment: export JIRA_API_TOKEN=your-token-here")
-        if is_cloud():
-            print("   - Also set: export JIRA_EMAIL=your-email@example.com")
+        print("   - Also set: export JIRA_EMAIL=your-email@example.com")
         print("   - Config file: ~/.config/agent-skills/jira.yaml")
         print("   - Keyring: Use a setup script to store in system keyring")
         return 1
 
     print(f"   Token: {'*' * 8} (configured)")
 
-    if creds.email:
-        print(f"   Email: {creds.email}")
+    if not creds.email:
+        print("   ERROR: No email configured (Jira Cloud requires an email address)")
+        print("\n   Configure using one of these methods:")
+        print("   - Environment: export JIRA_EMAIL=your-email@example.com")
+        print("   - Config file: ~/.config/agent-skills/jira.yaml")
+        print("   - Keyring: Use a setup script to store in system keyring")
+        return 1
+
+    print(f"   Email: {creds.email}")
 
     if not creds.is_valid():
         print("   ERROR: Invalid credentials")
@@ -2937,41 +2651,22 @@ def cmd_check() -> int:
 
     print("   Credentials: OK\n")
 
-    # 2. Test connectivity and detect deployment type
+    # 2. Test connectivity and API access
     print("2. Testing connectivity...")
     try:
-        deployment_type = detect_deployment_type(force_refresh=True)
-        print(f"   Deployment: {deployment_type}")
-        print(f"   API Version: {get_api_version()}")
-        print("   Connection: OK\n")
-    except JiraDetectionError as e:
-        print(f"   ERROR: {e}")
-        return 1
-
-    # 3. Test a simple API call
-    print("3. Testing API access...")
-    try:
-        # Use a simple search with limit 1 to test API access
-        if is_cloud():
-            search_endpoint = api_path("search/jql")
-            response = post(
-                "jira",
-                search_endpoint,
-                data={
-                    "jql": "created >= -30d ORDER BY created DESC",
-                    "maxResults": 1,
-                    "fields": ["summary"],
-                },
-            )
-        else:
-            search_endpoint = api_path("search")
-            response = get(
-                "jira",
-                search_endpoint,
-                params={"jql": "created >= -30d ORDER BY created DESC", "maxResults": 1},
-            )
+        search_endpoint = api_path("search/jql")
+        response = post(
+            "jira",
+            search_endpoint,
+            data={
+                "jql": "created >= -30d ORDER BY created DESC",
+                "maxResults": 1,
+                "fields": ["summary"],
+            },
+        )
         print(f"   Search endpoint: {search_endpoint}")
         if isinstance(response, dict) and "issues" in response:
+            print("   Connection: OK")
             print("   API access: OK\n")
         else:
             print("   WARNING: Unexpected response format")
@@ -2982,44 +2677,41 @@ def cmd_check() -> int:
         print(f"   ERROR: {e}")
         return 1
 
-    # 4. Check Automation API access (Cloud-only)
-    if is_cloud():
-        print("\n5. Checking Automation API access...")
-        try:
-            # Check user permissions
-            perms_response = get(
-                "jira",
-                api_path("mypermissions"),
-                params={"permissions": "ADMINISTER"},
-            )
-            perms = perms_response.get("permissions", {})
-            administer = perms.get("ADMINISTER", {})
-            has_admin = administer.get("havePermission", False)
-            if has_admin:
-                print("   Jira admin permission: YES")
-            else:
-                print("   Jira admin permission: NO")
-                print("   (Automation rules may require admin access)")
+    # 3. Check Automation API access
+    print("3. Checking Automation API access...")
+    try:
+        # Check user permissions
+        perms_response = get(
+            "jira",
+            api_path("mypermissions"),
+            params={"permissions": "ADMINISTER"},
+        )
+        perms = perms_response.get("permissions", {})
+        administer = perms.get("ADMINISTER", {})
+        has_admin = administer.get("havePermission", False)
+        if has_admin:
+            print("   Jira admin permission: YES")
+        else:
+            print("   Jira admin permission: NO")
+            print("   (Automation rules may require admin access)")
 
-            # Try the automation endpoint
-            cloud_id = get_cloud_id()
-            print(f"   Cloud ID: {cloud_id}")
-            endpoint = automation_path("rule/summary")
-            auto_response = get("jira", endpoint, params={"limit": 1})
-            rule_count = len(auto_response.get("data", []))
-            print(f"   Automation API: OK (test returned {rule_count} rule(s))")
-        except APIError as e:
-            print(f"   Automation API: FAILED — {e}")
-            print("   (Your token may lack automation access or admin permissions)")
-        except Exception as e:
-            print(f"   WARNING: Could not check Automation API: {e}")
-    else:
-        print("\n5. Automation API: Skipped (Cloud-only feature)")
+        # Try the automation endpoint
+        cloud_id = get_cloud_id()
+        print(f"   Cloud ID: {cloud_id}")
+        endpoint = automation_path("rule/summary")
+        auto_response = get("jira", endpoint, params={"limit": 1})
+        rule_count = len(auto_response.get("data", []))
+        print(f"   Automation API: OK (test returned {rule_count} rule(s))")
+    except APIError as e:
+        print(f"   Automation API: FAILED — {e}")
+        print("   (Your token may lack automation access or admin permissions)")
+    except Exception as e:
+        print(f"   WARNING: Could not check Automation API: {e}")
 
-    # 6. Validate custom field mappings
+    # 4. Validate custom field mappings
     defaults = get_jira_defaults()
     if defaults.custom_fields:
-        print("\n6. Validating custom field mappings...")
+        print("\n4. Validating custom field mappings...")
         errors = validate_custom_fields(defaults.custom_fields)
         if errors:
             print("   WARNING: Some custom field mappings are invalid:")
@@ -3998,7 +3690,7 @@ def cmd_user(args: argparse.Namespace) -> int:
                 else:
                     rows = [
                         {
-                            "accountId": u.get("accountId", u.get("username", "N/A")),
+                            "accountId": u.get("accountId", "N/A"),
                             "email": u.get("emailAddress", "N/A"),
                             "name": u.get("displayName", "N/A"),
                             "active": "Yes" if u.get("active", True) else "No",

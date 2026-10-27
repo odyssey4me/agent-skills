@@ -84,7 +84,7 @@ $SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
 
 ## automations
 
-List and inspect Jira automation rules. Uses the Automation Rule Management API via the gateway path, reusing existing Jira Cloud credentials. **Cloud-only** — Data Center and Server instances will receive a clear error.
+List and inspect Jira automation rules. Uses the Automation Rule Management API via the gateway path, reusing existing Jira Cloud credentials. The Automation API requires admin access.
 
 ```bash
 # List all automation rules
