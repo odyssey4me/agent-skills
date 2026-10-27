@@ -9,6 +9,7 @@ import pytest
 
 # Import from skills module
 from skills.jira.scripts.jira import (
+    COLLABORATION_EPIC_FIELDS,
     APIError,
     Credentials,
     JiraDefaults,
@@ -4230,6 +4231,20 @@ class TestCollaborativeEpics:
         """An unknown date field is rejected before it reaches JQL."""
         with pytest.raises(ValueError, match="--date-field must be one of"):
             find_collaborative_epics(date_field="closed")
+
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_requests_review_fields(self, mock_search, mock_children):
+        """The epic payload carries level, provenance and hierarchy."""
+        mock_search.return_value = []
+        mock_children.return_value = []
+
+        find_collaborative_epics(project="DEMO")
+
+        fields = mock_search.call_args[0][2]
+        assert fields == COLLABORATION_EPIC_FIELDS
+        for name in ("created", "resolutiondate", "issuetype", "parent"):
+            assert name in fields
 
     @patch("skills.jira.scripts.jira.get_epic_children")
     @patch("skills.jira.scripts.jira.search_issues")

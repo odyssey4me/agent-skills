@@ -2591,6 +2591,20 @@ def _validated_date(value: str, flag: str) -> date:
 
 COLLABORATION_DATE_FIELDS = ("created", "updated", "resolved")
 
+# Fields returned with each epic. Level (issuetype), provenance (created,
+# resolutiondate) and hierarchy (parent) answer a review question without a
+# second search over the returned keys.
+COLLABORATION_EPIC_FIELDS = [
+    "summary",
+    "status",
+    "issuetype",
+    "parent",
+    "assignee",
+    "reporter",
+    "created",
+    "resolutiondate",
+]
+
 
 def _jql_quote(value: str) -> str:
     """Quote a value as a JQL string literal.
@@ -2681,7 +2695,9 @@ def find_collaborative_epics(
             Done exclusion.
 
     Returns:
-        List of dicts with keys: epic, children_count, contributors.
+        List of dicts with keys: epic, children_count, contributors. Each
+        epic carries summary, status, issuetype, parent, assignee, reporter,
+        created and resolutiondate.
     """
     since_date = _validated_date(since, "--since") if since else None
     until_date = _validated_date(until, "--until") if until else None
@@ -2697,7 +2713,7 @@ def find_collaborative_epics(
 
     contributor_id = resolve_user_for_jql(contributor) if contributor else None
 
-    epics = search_issues(jql, max_results, ["summary", "status", "assignee", "reporter"])
+    epics = search_issues(jql, max_results, COLLABORATION_EPIC_FIELDS)
 
     results = []
     for epic in epics:
