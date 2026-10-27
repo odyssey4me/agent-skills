@@ -15,6 +15,7 @@ from skills.jira.scripts.jira import (
     ProjectDefaults,
     _adf_to_markdown,
     _build_children_jql,
+    _build_collaborative_epics_jql,
     _cloud_id_cache,
     _format_component,
     _format_scope_ari,
@@ -44,6 +45,7 @@ from skills.jira.scripts.jira import (
     cmd_user,
     cmd_versions,
     coerce_field_value,
+    comments_from_field,
     create_issue,
     create_link,
     delete_credential,
@@ -54,6 +56,7 @@ from skills.jira.scripts.jira import (
     extract_contributors,
     find_collaborative_epics,
     find_removed_jql_functions,
+    format_assignee_set,
     format_automation_detail,
     format_automation_summary,
     format_collaborative_epics,
@@ -81,6 +84,7 @@ from skills.jira.scripts.jira import (
     get_filter,
     get_issue,
     get_issue_children,
+    get_issues_bulk,
     get_jira_defaults,
     get_link_types,
     get_project_defaults,
@@ -629,6 +633,43 @@ class TestFormatting:
         assert "### DEMO-2: Second" in result
         assert "- **Assignee:** Alice" in result
         assert "- **Assignee:** Unassigned" in result
+
+    def test_format_issues_list_renders_parent(self):
+        """A requested parent renders as KEY: summary, not raw JSON."""
+        issue = {
+            "key": "RELDEL-9003",
+            "fields": {
+                "summary": "OSP 13-Security01 Maintenance Release",
+                "issuetype": {"name": "Epic"},
+                "status": {"name": "In Progress"},
+                "assignee": {"displayName": "Alice"},
+                "parent": {
+                    "key": "RHOSSTRAT-1280",
+                    "fields": {"summary": "RHOS 13.0 Security 01 Release Initiative"},
+                },
+            },
+        }
+
+        result = format_issues_list([issue])
+
+        assert "- **Type:** Epic" in result
+        assert "- **Parent:** RHOSSTRAT-1280: RHOS 13.0 Security 01 Release Initiative" in result
+        assert "{" not in result
+
+    def test_format_issues_list_renders_parent_without_summary(self):
+        """A parent without a requested summary renders as its key."""
+        issue = {
+            "key": "DEMO-1",
+            "fields": {
+                "summary": "Child",
+                "status": {"name": "Open"},
+                "parent": {"key": "EPIC-1"},
+            },
+        }
+
+        result = format_issues_list([issue])
+
+        assert "- **Parent:** EPIC-1" in result
 
     def test_format_issue_with_custom_fields(self):
         """Test issue formatting includes custom fields when configured."""
@@ -3404,6 +3445,289 @@ class TestContributors:
         call_args = mock_format_json.call_args[0][0]
         assert call_args["_contributors"] == [{"name": "Alice", "roles": ["reporter"]}]
 
+    @patch("skills.jira.scripts.jira.get_comments")
+    @patch("skills.jira.scripts.jira.get_issues_bulk")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_get_many_with_contributors(
+        self, mock_defaults, mock_bulk, mock_comments, capsys
+    ):
+        """Comma-separated keys are read in one batch with contributors."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_bulk.return_value = [
+            {
+                "key": "DEMO-1",
+                "fields": {
+                    "summary": "One",
+                    "status": {"name": "Closed"},
+                    "reporter": {"displayName": "Alice"},
+                    "assignee": {"displayName": "Bob"},
+                    "comment": {
+                        "comments": [{"author": {"displayName": "Carol"}}],
+                        "total": 1,
+                    },
+                },
+            },
+            {
+                "key": "DEMO-2",
+                "fields": {
+                    "summary": "Two",
+                    "status": {"name": "In Progress"},
+                    "comment": {"comments": [], "total": 0},
+                },
+            },
+        ]
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-1, DEMO-2",
+            fields=None,
+            json=False,
+            contributors=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "DEMO-1: One" in captured.out
+        assert "DEMO-2: Two" in captured.out
+        assert "Alice (reporter), Bob (assignee), Carol (commenter)" in captured.out
+        mock_bulk.assert_called_once()
+        assert mock_bulk.call_args[0][0] == ["DEMO-1", "DEMO-2"]
+        assert "comment" in mock_bulk.call_args.kwargs["fields"]
+        mock_comments.assert_not_called()
+
+    @patch("skills.jira.scripts.jira.get_comments")
+    @patch("skills.jira.scripts.jira.get_issues_bulk")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_get_many_reads_truncated_thread(
+        self, mock_defaults, mock_bulk, mock_comments, capsys
+    ):
+        """A bounded comment page is replaced by the full thread."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_bulk.return_value = [
+            {
+                "key": "DEMO-1",
+                "fields": {
+                    "summary": "One",
+                    "status": {"name": "Closed"},
+                    "comment": {
+                        "comments": [{"author": {"displayName": "Carol"}}],
+                        "total": 5,
+                    },
+                },
+            },
+            {
+                "key": "DEMO-2",
+                "fields": {
+                    "summary": "Two",
+                    "status": {"name": "Closed"},
+                    "comment": {"comments": [], "total": 0},
+                },
+            },
+        ]
+        mock_comments.return_value = [
+            {"author": {"displayName": "Carol"}},
+            {"author": {"displayName": "Eve"}},
+            {"author": {"displayName": "Frank"}},
+            {"author": {"displayName": "Grace"}},
+            {"author": {"displayName": "Heidi"}},
+        ]
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-1,DEMO-2",
+            fields=None,
+            json=False,
+            contributors=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        assert "Eve (commenter)" in capsys.readouterr().out
+        mock_comments.assert_called_once_with("DEMO-1", max_results=None)
+
+    @patch("skills.jira.scripts.jira.get_issues_bulk")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.format_json")
+    def test_cmd_issue_get_many_json(self, mock_format_json, mock_defaults, mock_bulk):
+        """A batched JSON read returns a list with contributors per issue."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_bulk.return_value = [
+            {
+                "key": "DEMO-1",
+                "fields": {
+                    "reporter": {"displayName": "Alice"},
+                    "comment": {"comments": [], "total": 0},
+                },
+            }
+        ]
+        mock_format_json.return_value = "[]"
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-1,DEMO-2",
+            fields=None,
+            json=True,
+            contributors=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        payload = mock_format_json.call_args[0][0]
+        assert payload[0]["_contributors"] == [{"name": "Alice", "roles": ["reporter"]}]
+
+    @patch("skills.jira.scripts.jira.get_issues_bulk")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_get_many_without_contributors(self, mock_defaults, mock_bulk, capsys):
+        """A batch without --contributors leaves fields to the search default."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_bulk.return_value = [
+            {"key": "DEMO-1", "fields": {"summary": "One", "status": {"name": "Closed"}}},
+            {"key": "DEMO-2", "fields": {"summary": "Two", "status": {"name": "Closed"}}},
+        ]
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-1,DEMO-2",
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "DEMO-1: One" in captured.out
+        assert "DEMO-2: Two" in captured.out
+        assert "Contributors" not in captured.out
+        assert mock_bulk.call_args.kwargs["fields"] is None
+
+    @patch("skills.jira.scripts.jira.get_issues_bulk")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_get_many_does_not_force_issuelinks(self, mock_defaults, mock_bulk, capsys):
+        """An explicit --fields list is passed to the search unchanged."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_bulk.return_value = [
+            {"key": "DEMO-1", "fields": {"summary": "One", "status": {"name": "Closed"}}},
+            {"key": "DEMO-2", "fields": {"summary": "Two", "status": {"name": "Closed"}}},
+        ]
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-1,DEMO-2",
+            fields="summary",
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        assert mock_bulk.call_args.kwargs["fields"] == ["summary"]
+
+    @patch("skills.jira.scripts.jira.get_issues_bulk")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_get_many_missing_key_fails(self, mock_defaults, mock_bulk, capsys):
+        """A missing key in a batch reports the key and fails the command."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_bulk.side_effect = ValueError("Issue(s) not found or not visible: DEMO-9")
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-1,DEMO-9",
+            fields=None,
+            json=False,
+            contributors=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 1
+        assert "DEMO-9" in capsys.readouterr().err
+
+    @patch("skills.jira.scripts.jira.get_comments")
+    @patch("skills.jira.scripts.jira.get_issues_bulk")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_get_many_reads_thread_when_field_absent(
+        self, mock_defaults, mock_bulk, mock_comments, capsys
+    ):
+        """A response without the comment field falls back to the comments API."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_bulk.return_value = [
+            {"key": "DEMO-1", "fields": {"summary": "One", "status": {"name": "Closed"}}},
+            {
+                "key": "DEMO-2",
+                "fields": {
+                    "summary": "Two",
+                    "status": {"name": "Closed"},
+                    "comment": {"comments": [], "total": 0},
+                },
+            },
+        ]
+        mock_comments.return_value = [{"author": {"displayName": "Eve"}}]
+
+        args = argparse.Namespace(
+            issue_command="get",
+            issue_key="DEMO-1,DEMO-2",
+            fields=None,
+            json=False,
+            contributors=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        assert "Eve (commenter)" in capsys.readouterr().out
+        mock_comments.assert_called_once_with("DEMO-1", max_results=None)
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_get_issues_bulk_preserves_key_order(self, mock_search):
+        """Bulk results are returned in the order the keys were requested."""
+        mock_search.return_value = [{"key": "DEMO-2"}, {"key": "DEMO-1"}]
+
+        result = get_issues_bulk(["DEMO-1", "DEMO-2"], fields=["summary"])
+
+        assert [issue["key"] for issue in result] == ["DEMO-1", "DEMO-2"]
+        assert mock_search.call_args[0][0] == "key in (DEMO-1, DEMO-2)"
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_get_issues_bulk_matches_lowercase_keys(self, mock_search):
+        """JQL matches keys case-insensitively, so the lookup must too."""
+        mock_search.return_value = [{"key": "DEMO-1"}]
+
+        result = get_issues_bulk(["demo-1"])
+
+        assert result == [{"key": "DEMO-1"}]
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_get_issues_bulk_rejects_missing_key(self, mock_search):
+        """A key that is absent or invisible fails the batch explicitly."""
+        mock_search.return_value = [{"key": "DEMO-1"}]
+
+        with pytest.raises(ValueError, match="DEMO-2"):
+            get_issues_bulk(["DEMO-1", "DEMO-2"])
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_get_issues_bulk_empty_list(self, mock_search):
+        """An empty key list makes no API call."""
+        assert get_issues_bulk([]) == []
+        mock_search.assert_not_called()
+
+    def test_comments_from_field_reads_total(self):
+        """The embedded comment field reports the full comment count."""
+        issue = {"fields": {"comment": {"comments": [{"id": "1"}], "total": 7}}}
+
+        comments, total = comments_from_field(issue)
+
+        assert len(comments) == 1
+        assert total == 7
+
+    def test_comments_from_field_missing(self):
+        """A missing comment field reads as empty."""
+        assert comments_from_field({"fields": {}}) == ([], 0)
+
 
 class TestUserResolution:
     """Tests for user resolution functions."""
@@ -3689,6 +4013,90 @@ class TestCollaborativeEpics:
         assert "TASK-1: Child one" in captured.out
         assert "Alice" in captured.out
 
+    @patch("skills.jira.scripts.jira.get_issue_children")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_children_assignees_only(self, mock_defaults, mock_children, capsys):
+        """--assignees-only prints the distinct collaborator set."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_children.return_value = [
+            {"key": "TASK-1", "fields": {"assignee": {"displayName": "Bob"}}},
+            {"key": "TASK-2", "fields": {"assignee": {"displayName": "Alice"}}},
+            {"key": "TASK-3", "fields": {"assignee": {"displayName": "Bob"}}},
+            {"key": "TASK-4", "fields": {"assignee": None}},
+        ]
+
+        args = argparse.Namespace(
+            issue_command="children",
+            issue_key="EPIC-1",
+            max_results=100,
+            json=False,
+            assignees_only=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "## Child assignees for EPIC-1" in captured.out
+        assert captured.out.count("- Bob") == 1
+        assert "- Alice" in captured.out
+        assert mock_children.call_args.kwargs["fields"] == ["assignee"]
+
+    @patch("skills.jira.scripts.jira.get_issue_children")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.format_json")
+    def test_cmd_issue_children_assignees_only_json(
+        self, mock_format_json, mock_defaults, mock_children
+    ):
+        """--assignees-only --json returns the sorted name list."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_children.return_value = [
+            {"key": "TASK-1", "fields": {"assignee": {"displayName": "Bob"}}},
+            {"key": "TASK-2", "fields": {"assignee": {"displayName": "Alice"}}},
+        ]
+        mock_format_json.return_value = "[]"
+
+        args = argparse.Namespace(
+            issue_command="children",
+            issue_key="EPIC-1",
+            max_results=100,
+            json=True,
+            assignees_only=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        assert mock_format_json.call_args[0][0] == ["Alice", "Bob"]
+
+    def test_format_assignee_set_empty(self):
+        """An unassigned child set reports rather than printing a heading."""
+        assert "No child assignees found for EPIC-1" in format_assignee_set("EPIC-1", [])
+
+    @patch("skills.jira.scripts.jira.get_issue_children")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_children_assignees_only_warns_on_truncation(
+        self, mock_defaults, mock_children, capsys
+    ):
+        """A full result page warns that the assignee set may be incomplete."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_children.return_value = [
+            {"key": "TASK-1", "fields": {"assignee": {"displayName": "Alice"}}},
+        ]
+
+        args = argparse.Namespace(
+            issue_command="children",
+            issue_key="EPIC-1",
+            max_results=1,
+            json=False,
+            assignees_only=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        assert "may be incomplete" in capsys.readouterr().err
+
     @patch("skills.jira.scripts.jira.get_epic_children")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics(self, mock_search, mock_children):
@@ -3748,6 +4156,23 @@ class TestCollaborativeEpics:
         assert "Children:** 5" in output
         assert "Alice, Bob" in output
 
+    def test_format_collaborative_epics_shows_status(self):
+        """Status is shown so done and in-flight epics are distinguishable."""
+        results = [
+            {
+                "epic": {
+                    "key": "EPIC-1",
+                    "fields": {"summary": "My Epic", "status": {"name": "Closed"}},
+                },
+                "children_count": 5,
+                "contributors": ["Alice", "Bob"],
+            }
+        ]
+
+        output = format_collaborative_epics(results)
+
+        assert "- **Status:** Closed" in output
+
     def test_format_collaborative_epics_empty(self):
         """Test formatting when no results."""
         output = format_collaborative_epics([])
@@ -3767,6 +4192,87 @@ class TestCollaborativeEpics:
         assert 'updated >= "2026-07-01"' in jql
         assert 'updated < "2026-10-01"' in jql
         assert "ORDER BY updated DESC" in jql
+
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_resolved_date_range(self, mock_search, mock_children):
+        """A period review can bound the resolved date instead of updated."""
+        mock_search.return_value = []
+        mock_children.return_value = []
+
+        find_collaborative_epics(
+            project="DEMO",
+            since="2026-07-01",
+            until="2026-09-30",
+            date_field="resolved",
+        )
+
+        jql = mock_search.call_args[0][0]
+        assert 'resolved >= "2026-07-01"' in jql
+        assert 'resolved < "2026-10-01"' in jql
+        assert "updated" not in jql
+        assert "ORDER BY resolved DESC" in jql
+
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_created_date_range(self, mock_search, mock_children):
+        """The date bounds follow --date-field created."""
+        mock_search.return_value = []
+        mock_children.return_value = []
+
+        find_collaborative_epics(since="2026-07-01", date_field="created")
+
+        jql = mock_search.call_args[0][0]
+        assert 'created >= "2026-07-01"' in jql
+        assert "ORDER BY created DESC" in jql
+
+    def test_find_collaborative_epics_rejects_bad_date_field(self):
+        """An unknown date field is rejected before it reaches JQL."""
+        with pytest.raises(ValueError, match="--date-field must be one of"):
+            find_collaborative_epics(date_field="closed")
+
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_excludes_done_by_default(self, mock_search, mock_children):
+        """Done epics stay out of the default in-flight view."""
+        mock_search.return_value = []
+        mock_children.return_value = []
+
+        find_collaborative_epics(project="DEMO")
+
+        jql = mock_search.call_args[0][0]
+        assert "statusCategory != Done" in jql
+
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_include_done(self, mock_search, mock_children):
+        """--include-done removes the status category exclusion."""
+        mock_search.return_value = []
+        mock_children.return_value = []
+
+        find_collaborative_epics(project="DEMO", include_done=True)
+
+        jql = mock_search.call_args[0][0]
+        assert "statusCategory" not in jql
+
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_status_filter(self, mock_search, mock_children):
+        """An explicit status list replaces the default Done exclusion."""
+        mock_search.return_value = []
+        mock_children.return_value = []
+
+        find_collaborative_epics(project="DEMO", statuses=["Closed", "Done"])
+
+        jql = mock_search.call_args[0][0]
+        assert 'status in ("Closed", "Done")' in jql
+        assert "statusCategory" not in jql
+
+    def test_build_collaborative_epics_jql_quotes_status(self):
+        """Quotes in a status name are escaped in JQL."""
+        jql = _build_collaborative_epics_jql(statuses=['Needs "Review"'])
+
+        assert 'status in ("Needs \\"Review\\"")' in jql
 
     def test_find_collaborative_epics_rejects_bad_date(self):
         """A malformed date is rejected before it reaches JQL."""
@@ -3923,8 +4429,45 @@ class TestCmdCollaboration:
             contributor="alice",
             since="2026-07-01",
             until="2026-09-30",
+            date_field="updated",
+            include_done=False,
+            statuses=None,
         )
         assert "No collaborative epics found" in capsys.readouterr().out
+
+    @patch("skills.jira.scripts.jira.find_collaborative_epics")
+    def test_cmd_collaboration_epics_retrospective_flags(self, mock_find, capsys):
+        """--include-done, --status and --date-field reach the search."""
+        mock_find.return_value = []
+
+        args = argparse.Namespace(
+            collaboration_command="epics",
+            project="DEMO",
+            contributor=None,
+            min_contributors=2,
+            max_results=50,
+            since="2026-07-01",
+            until="2026-09-30",
+            date_field="resolved",
+            include_done=True,
+            status="Closed, Done",
+            json=False,
+        )
+
+        result = cmd_collaboration(args)
+
+        assert result == 0
+        mock_find.assert_called_once_with(
+            project="DEMO",
+            min_contributors=2,
+            max_results=50,
+            contributor=None,
+            since="2026-07-01",
+            until="2026-09-30",
+            date_field="resolved",
+            include_done=True,
+            statuses=["Closed", "Done"],
+        )
 
     @patch("skills.jira.scripts.jira.find_collaborative_epics")
     def test_cmd_collaboration_epics_error(self, mock_find, capsys):

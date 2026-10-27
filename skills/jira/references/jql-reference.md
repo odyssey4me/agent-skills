@@ -124,3 +124,8 @@ Use `issue get PROJ-123 --fields parent` to read the parent directly.
 comments, field edits, and transitions. To find issues with comments only,
 request the comment field and filter locally. The `--contributor` search
 flag combines reporter, assignee, and updater in one query.
+
+Requesting `comment` in a search returns each issue's comments and a
+`total`. The comment array is a bounded page, so compare `total` with
+`len(comments)` before treating the authors as the complete set; fetch the
+full thread with `issue comments KEY` when the counts differ.

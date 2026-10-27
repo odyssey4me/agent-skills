@@ -75,6 +75,11 @@ $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO --min-contributors
 $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO \
   --contributor "jane@example.com" --since 2026-07-01 --until 2026-09-30
 
+# Retrospective: epics resolved in Q3, including completed ones
+$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO \
+  --contributor "jane@example.com" --date-field resolved \
+  --since 2026-07-01 --until 2026-09-30 --include-done
+
 # Limit number of epics checked
 $SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
 ```
@@ -84,11 +89,22 @@ $SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
 - `--contributor`: Only epics this user contributed to (epic reporter or assignee,
   or assignee of a child issue). Email and display name are resolved to an
   accountId. Peer contributors are still listed.
-- `--since` / `--until`: Inclusive `YYYY-MM-DD` bounds on the epic's `updated`
-  date. An epic counts as active in the range when the epic itself was updated.
+- `--since` / `--until`: Inclusive `YYYY-MM-DD` bounds on the field named by
+  `--date-field`. An epic counts as in range when that field falls inside it.
+- `--date-field`: Field the bounds and sort order use: `created`, `updated`
+  (default) or `resolved`. Use `resolved` for a period review; unresolved
+  epics have no resolved date and are excluded.
+- `--include-done`: Include epics in the Done status category.
+- `--status`: Comma-separated status names (e.g. `Closed,Done`) to match
+  instead of the default Done exclusion.
 - `--min-contributors`: Minimum unique contributors to qualify (default: 2, or
   1 when `--contributor` is used, so epics the person drove alone are kept)
 - `--max-results`: Maximum epics to check (default: 50)
+
+Done epics are excluded by default, which suits an in-flight view. Use
+`--include-done` or `--status` when a retrospective needs completed epics;
+without one of them a closed epic will not appear even if the person is its
+reporter or assignee.
 
 Contributors are the epic's reporter and assignee plus the assignees of its
 child issues.

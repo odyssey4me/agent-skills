@@ -74,7 +74,15 @@ $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO
 
 # Require at least 3 contributors
 $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO --min-contributors 3
+
+# Quarter retrospective: closed epics included, bounded by resolution date
+$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO \
+  --contributor "jane@example.com" --date-field resolved \
+  --since 2026-07-01 --until 2026-09-30 --include-done
 ```
+
+Done epics are excluded by default. `--include-done` includes them, and
+`--status Closed,Done` narrows to specific statuses instead.
 
 ## Search with Specific Fields
 
@@ -83,6 +91,23 @@ $SKILL_DIR/scripts/jira.py search \
   "project = DEMO AND created >= -7d" \
   --fields "key,summary,status,assignee,created"
 ```
+
+## Collect Comment Authors in Bulk
+
+Request the `comment` field instead of calling `issue comments` once per
+issue. A single search returns the comment authors inline and cuts a crawl
+from one call per issue to one call per page.
+
+```bash
+$SKILL_DIR/scripts/jira.py search \
+  "project = DEMO AND statusCategory = Done" \
+  --fields key,comment --json
+```
+
+Each issue carries `fields.comment.comments` (with `author`) and
+`fields.comment.total`. The field is a bounded page, so compare `total` with
+`len(comments)` before treating the author list as complete; when they
+differ, fetch the issue's full thread with `issue comments`.
 
 ## Using Configuration Defaults
 

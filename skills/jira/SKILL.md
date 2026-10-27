@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "1.0.0"
+  version: "1.1.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -127,6 +127,13 @@ $SKILL_DIR/scripts/jira.py search "assignee = currentUser() ORDER BY updated DES
 - `--max-results`: Maximum number of results (default: 50)
 - `--fields`: Comma-separated list of fields to include
 
+Text output renders the summary, type, parent, status, resolution and
+assignee; a parent renders as `KEY: summary`. Use `--json` for fields
+without a text rendering.
+
+The bulk comment-author recipe (`--fields key,comment --json`) and its
+paging caveat are in [examples.md](references/examples.md#collect-comment-authors-in-bulk).
+
 **JQL patterns:** See [jql-reference.md](references/jql-reference.md) for
 Cloud-native JQL patterns (status, dates, fields, ordering, linked issues,
 hierarchy).
@@ -140,11 +147,15 @@ Get, create, update, or comment on issues.
 $SKILL_DIR/scripts/jira.py issue get DEMO-123
 $SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status,assignee" --contributors
 
+# Batch several issues into one search call
+$SKILL_DIR/scripts/jira.py issue get DEMO-1,DEMO-2,DEMO-3 --contributors
+
 # List comments
 $SKILL_DIR/scripts/jira.py issue comments DEMO-123
 
-# List child issues and subtasks
+# List child issues and subtasks, or only their distinct assignees
 $SKILL_DIR/scripts/jira.py issue children EPIC-123
+$SKILL_DIR/scripts/jira.py issue children EPIC-123 --assignees-only
 
 # Create (--project, --type, --summary required; --description, --priority, --labels, --assignee, --parent, --set-field, --link, --from-file, --json)
 $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task"
@@ -165,7 +176,13 @@ $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
 `--contributors` reports each person with the roles they hold: `reporter`,
 `assignee`, and `commenter`. Every comment is read, so a commenter late in a
 long thread is still reported. With `--json`, `_contributors` is
-`[{"name": "Jane Doe", "roles": ["reporter", "commenter"]}]`.
+`[{"name": "Jane Doe", "roles": ["reporter", "commenter"]}]`. A batch reads
+the `comment` field from the search result, falls back to the full thread
+when the page is truncated, and uses the default fields (no description,
+issue links or web links); pass `--fields` to request more.
+
+`issue children --assignees-only` prints just the distinct assignee names —
+the cheap way to get the collaborator set.
 
 See [from-file-format.md](references/from-file-format.md) for the `--from-file` markdown format and [examples.md](references/examples.md) for more patterns.
 

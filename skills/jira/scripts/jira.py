@@ -1296,9 +1296,18 @@ def format_issues_list(
         resolution_name = resolution_obj.get("name") if resolution_obj else None
         issue_type = fields.get("issuetype", {})
         issue_type_name = issue_type.get("name") if issue_type else None
+        parent = fields.get("parent")
+        parent_str = None
+        if parent and isinstance(parent, dict):
+            parent_key = parent.get("key", "")
+            parent_summary = (parent.get("fields") or {}).get("summary", "")
+            if parent_key:
+                parent_str = f"{parent_key}: {parent_summary}" if parent_summary else parent_key
         entry = f"### {key}: {summary}\n"
         if issue_type_name:
             entry += f"- **Type:** {issue_type_name}\n"
+        if parent_str:
+            entry += f"- **Parent:** {parent_str}\n"
         entry += f"- **Status:** {status}\n"
         if resolution_name:
             entry += f"- **Resolution:** {resolution_name}\n"
@@ -1307,6 +1316,24 @@ def format_issues_list(
         parts.append(entry)
 
     return "\n\n".join(parts)
+
+
+def format_assignee_set(issue_key: str, names: list[str]) -> str:
+    """Format the distinct assignees of an issue's children.
+
+    Args:
+        issue_key: The parent or epic issue key.
+        names: Distinct assignee display names.
+
+    Returns:
+        Formatted markdown string.
+    """
+    if not names:
+        return f"No child assignees found for {issue_key}."
+
+    lines = [f"## Child assignees for {issue_key}", ""]
+    lines.extend(f"- {name}" for name in names)
+    return "\n".join(lines)
 
 
 # ============================================================================
@@ -1861,6 +1888,35 @@ def get_issue(issue_key: str, fields: list[str] | None = None) -> dict[str, Any]
     return {}
 
 
+def get_issues_bulk(keys: list[str], fields: list[str] | None = None) -> list[dict[str, Any]]:
+    """Fetch several issues in one search call.
+
+    Batched reads keep a multi-issue check to a single API call instead of
+    one call per key. Results are returned in the order the keys were given.
+
+    Args:
+        keys: Issue keys to fetch.
+        fields: Optional list of fields to include.
+
+    Returns:
+        List of issue dictionaries in key order.
+
+    Raises:
+        ValueError: If a key is missing or not visible to the user.
+    """
+    if not keys:
+        return []
+
+    jql = f"key in ({', '.join(keys)})"
+    issues = search_issues(jql, max_results=len(keys), fields=fields)
+    # JQL matches keys case-insensitively, so compare the same way.
+    by_key = {(issue.get("key") or "").upper(): issue for issue in issues}
+    missing = [key for key in keys if key.upper() not in by_key]
+    if missing:
+        raise ValueError(f"Issue(s) not found or not visible: {', '.join(missing)}")
+    return [by_key[key.upper()] for key in keys]
+
+
 def get_project_issue_types(project: str) -> list[str]:
     """Get valid issue type names for a project via createmeta.
 
@@ -2250,6 +2306,26 @@ def get_comments(issue_key: str, max_results: int | None = 50) -> list[dict[str,
     return all_comments[:max_results]
 
 
+def comments_from_field(issue: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
+    """Read the comment field embedded in a search result.
+
+    A search returns the comment field as a bounded page. ``total`` is the
+    number of comments on the issue, so a caller can tell whether the page
+    is complete before treating its authors as the full set.
+
+    Args:
+        issue: Issue dictionary from a search result.
+
+    Returns:
+        Tuple of (comments, total).
+    """
+    comment_field = (issue.get("fields") or {}).get("comment")
+    if not isinstance(comment_field, dict):
+        return [], 0
+    comments = comment_field.get("comments") or []
+    return comments, comment_field.get("total", len(comments))
+
+
 def format_comments(comments: list[dict[str, Any]], issue_key: str) -> str:
     """Format comments for display.
 
@@ -2513,6 +2589,66 @@ def _validated_date(value: str, flag: str) -> date:
         raise ValueError(f"{flag} must be a date in YYYY-MM-DD format") from exc
 
 
+COLLABORATION_DATE_FIELDS = ("created", "updated", "resolved")
+
+
+def _jql_quote(value: str) -> str:
+    """Quote a value as a JQL string literal.
+
+    Args:
+        value: Raw string to quote.
+
+    Returns:
+        The value wrapped in double quotes with embedded quotes escaped.
+    """
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _build_collaborative_epics_jql(
+    project: str | None = None,
+    since: date | None = None,
+    until: date | None = None,
+    date_field: str = "updated",
+    include_done: bool = False,
+    statuses: list[str] | None = None,
+) -> str:
+    """Build the JQL used to find collaborative epics.
+
+    Done epics are excluded by default because the common question is what
+    is in flight. Retrospective use needs them, so ``include_done`` removes
+    the exclusion and an explicit ``statuses`` list overrides it.
+
+    Args:
+        project: Optional project key to scope the search.
+        since: Optional inclusive lower bound.
+        until: Optional inclusive upper bound.
+        date_field: Field the bounds apply to: created, updated or resolved.
+        include_done: Include epics in the Done status category.
+        statuses: Optional status names to match instead of the default
+            Done exclusion.
+
+    Returns:
+        JQL query string.
+    """
+    if date_field not in COLLABORATION_DATE_FIELDS:
+        raise ValueError(f"--date-field must be one of: {', '.join(COLLABORATION_DATE_FIELDS)}")
+
+    clauses = ["issuetype = Epic"]
+    if project:
+        clauses.insert(0, f"project = {project}")
+    if statuses:
+        quoted = ", ".join(_jql_quote(status) for status in statuses)
+        clauses.append(f"status in ({quoted})")
+    elif not include_done:
+        clauses.append("statusCategory != Done")
+    if since:
+        clauses.append(f'{date_field} >= "{since.isoformat()}"')
+    if until:
+        clauses.append(f'{date_field} < "{(until + timedelta(days=1)).isoformat()}"')
+
+    return " AND ".join(clauses) + f" ORDER BY {date_field} DESC"
+
+
 def find_collaborative_epics(
     project: str | None = None,
     min_contributors: int = 2,
@@ -2520,6 +2656,9 @@ def find_collaborative_epics(
     contributor: str | None = None,
     since: str | None = None,
     until: str | None = None,
+    date_field: str = "updated",
+    include_done: bool = False,
+    statuses: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Find epics with multiple contributors.
 
@@ -2532,24 +2671,31 @@ def find_collaborative_epics(
         max_results: Maximum number of epics to check.
         contributor: Optional user whose epics to return. Resolved to an
             accountId before matching.
-        since: Optional inclusive lower bound (YYYY-MM-DD) on epic updated.
-        until: Optional inclusive upper bound (YYYY-MM-DD) on epic updated.
+        since: Optional inclusive lower bound (YYYY-MM-DD) on ``date_field``.
+        until: Optional inclusive upper bound (YYYY-MM-DD) on ``date_field``.
+        date_field: Field the date bounds apply to: created, updated or
+            resolved. The default keeps the previous updated-date behaviour.
+        include_done: Include epics in the Done status category. Done epics
+            are excluded by default.
+        statuses: Optional status names to match instead of the default
+            Done exclusion.
 
     Returns:
         List of dicts with keys: epic, children_count, contributors.
     """
     since_date = _validated_date(since, "--since") if since else None
     until_date = _validated_date(until, "--until") if until else None
-    contributor_id = resolve_user_for_jql(contributor) if contributor else None
 
-    jql = "issuetype = Epic AND statusCategory != Done"
-    if project:
-        jql = f"project = {project} AND {jql}"
-    if since_date:
-        jql += f' AND updated >= "{since_date.isoformat()}"'
-    if until_date:
-        jql += f' AND updated < "{(until_date + timedelta(days=1)).isoformat()}"'
-    jql += " ORDER BY updated DESC"
+    jql = _build_collaborative_epics_jql(
+        project=project,
+        since=since_date,
+        until=until_date,
+        date_field=date_field,
+        include_done=include_done,
+        statuses=statuses,
+    )
+
+    contributor_id = resolve_user_for_jql(contributor) if contributor else None
 
     epics = search_issues(jql, max_results, ["summary", "status", "assignee", "reporter"])
 
@@ -2602,13 +2748,15 @@ def format_collaborative_epics(results: list[dict[str, Any]]) -> str:
         epic = result["epic"]
         key = epic.get("key", "N/A")
         summary = epic.get("fields", {}).get("summary", "No summary")
+        status = ((epic.get("fields") or {}).get("status") or {}).get("name")
         children_count = result["children_count"]
         contributors = ", ".join(result["contributors"])
-        parts.append(
-            f"\n### {key}: {summary}\n"
-            f"- **Children:** {children_count}\n"
-            f"- **Contributors:** {contributors}"
-        )
+        lines = [f"\n### {key}: {summary}"]
+        if status:
+            lines.append(f"- **Status:** {status}")
+        lines.append(f"- **Children:** {children_count}")
+        lines.append(f"- **Contributors:** {contributors}")
+        parts.append("\n".join(lines))
 
     return "\n".join(parts)
 
@@ -3332,6 +3480,53 @@ def _load_from_file(args: argparse.Namespace) -> tuple[dict[str, Any], str | Non
         return 1
 
 
+def _cmd_issue_get_many(
+    args: argparse.Namespace,
+    keys: list[str],
+    fields: list[str] | None,
+    custom_fields: dict[str, str],
+) -> int:
+    """Handle a batched issue get with one search call.
+
+    Web links are not fetched for a batch because they cost one call per
+    issue; use a single-key ``issue get`` when those are needed.
+    """
+    show_contributors = getattr(args, "contributors", False)
+    if show_contributors:
+        fields = ensure_field_included(fields, "comment")
+
+    issues = get_issues_bulk(keys, fields=fields)
+
+    if show_contributors:
+        for issue in issues:
+            comments, total = comments_from_field(issue)
+            fields_present = issue.get("fields") or {}
+            if "comment" not in fields_present or total > len(comments):
+                # The search field carries a bounded page. Read the full
+                # thread so a commenter late in it is not missed.
+                comments = get_comments(issue.get("key", ""), max_results=None)
+            contributors = extract_contributors(issue, comments)
+            issue["_contributors"] = [
+                {"name": name, "roles": roles} for name, roles in contributors.items()
+            ]
+
+    if getattr(args, "json", False):
+        print(format_json(issues))
+        return 0
+
+    parts = []
+    for issue in issues:
+        output = format_issue(issue, custom_fields=custom_fields)
+        if show_contributors:
+            contributors = {
+                entry["name"]: entry["roles"] for entry in issue.get("_contributors", [])
+            }
+            output += f"\n- **Contributors:** {format_contributor_roles(contributors)}"
+        parts.append(output)
+    print("\n\n".join(parts))
+    return 0
+
+
 def cmd_issue(args: argparse.Namespace) -> int:
     """Handle issue command."""
     try:
@@ -3348,14 +3543,22 @@ def cmd_issue(args: argparse.Namespace) -> int:
 
             for field_id in custom_fields.values():
                 fields = ensure_field_included(fields, field_id)
+
+            keys = [key.strip() for key in args.issue_key.split(",") if key.strip()]
+            if not keys:
+                print("Error: at least one issue key is required", file=sys.stderr)
+                return 1
+            if len(keys) > 1:
+                return _cmd_issue_get_many(args, keys, fields, custom_fields)
+
             if fields is not None:
                 fields = ensure_field_included(fields, "issuelinks")
 
-            issue = get_issue(args.issue_key, fields=fields)
-            remote_links = get_remote_links(args.issue_key)
+            issue = get_issue(keys[0], fields=fields)
+            remote_links = get_remote_links(keys[0])
 
             if getattr(args, "contributors", False):
-                comments = get_comments(args.issue_key, max_results=None)
+                comments = get_comments(keys[0], max_results=None)
                 contributors = extract_contributors(issue, comments)
                 if args.json:
                     issue["_contributors"] = [
@@ -3387,15 +3590,36 @@ def cmd_issue(args: argparse.Namespace) -> int:
             max_results = getattr(args, "max_results", 100) or 100
             defaults = get_jira_defaults()
             custom_fields = defaults.custom_fields or {}
-            fields = ["summary", "issuetype", "status", "resolution", "assignee"]
-            for field_id in custom_fields.values():
-                fields = ensure_field_included(fields, field_id)
+            assignees_only = getattr(args, "assignees_only", False)
+            if assignees_only:
+                fields = ["assignee"]
+            else:
+                fields = ["summary", "issuetype", "status", "resolution", "assignee"]
+                for field_id in custom_fields.values():
+                    fields = ensure_field_included(fields, field_id)
             children = get_issue_children(
                 args.issue_key,
                 max_results=max_results,
                 fields=fields,
             )
-            if args.json:
+            if assignees_only and len(children) >= max_results:
+                print(
+                    f"Warning: reached --max-results {max_results}; the assignee set "
+                    "may be incomplete. Raise --max-results to cover every child.",
+                    file=sys.stderr,
+                )
+            if assignees_only:
+                names: set[str] = set()
+                for child in children:
+                    child_assignee = (child.get("fields") or {}).get("assignee")
+                    if child_assignee and child_assignee.get("displayName"):
+                        names.add(child_assignee["displayName"])
+                sorted_names = sorted(names)
+                if args.json:
+                    print(format_json(sorted_names))
+                else:
+                    print(format_assignee_set(args.issue_key, sorted_names))
+            elif args.json:
                 print(format_json(children))
             else:
                 print(format_issues_list(children, custom_fields=custom_fields))
@@ -3878,6 +4102,12 @@ def cmd_collaboration(args: argparse.Namespace) -> int:
             if min_contributors is None:
                 min_contributors = 1 if contributor else 2
             max_results = getattr(args, "max_results", 50) or 50
+            status_arg = getattr(args, "status", None)
+            statuses = (
+                [status.strip() for status in status_arg.split(",") if status.strip()]
+                if status_arg
+                else None
+            )
 
             results = find_collaborative_epics(
                 project=project,
@@ -3886,6 +4116,9 @@ def cmd_collaboration(args: argparse.Namespace) -> int:
                 contributor=contributor,
                 since=getattr(args, "since", None),
                 until=getattr(args, "until", None),
+                date_field=getattr(args, "date_field", None) or "updated",
+                include_done=getattr(args, "include_done", False),
+                statuses=statuses,
             )
 
             if args.json:
@@ -4183,7 +4416,10 @@ def main() -> int:
 
     # Get subcommand
     get_parser = issue_subparsers.add_parser("get", help="Get issue details")
-    get_parser.add_argument("issue_key", help="Issue key (e.g., DEMO-123)")
+    get_parser.add_argument(
+        "issue_key",
+        help="Issue key (e.g., DEMO-123), or comma-separated keys for a batched read",
+    )
     get_parser.add_argument(
         "--fields",
         help="Comma-separated list of fields to include",
@@ -4192,7 +4428,10 @@ def main() -> int:
     get_parser.add_argument(
         "--contributors",
         action="store_true",
-        help="Show contributors (reporter, assignee, commenters) — requires extra API call",
+        help=(
+            "Show contributors (reporter, assignee, commenters) — one comments "
+            "call, or the search comment field for a batch"
+        ),
     )
 
     # Comments subcommand
@@ -4216,6 +4455,11 @@ def main() -> int:
         type=int,
         default=100,
         help="Maximum number of children (default: 100)",
+    )
+    children_parser.add_argument(
+        "--assignees-only",
+        action="store_true",
+        help="Print only the distinct assignees of the children",
     )
     children_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
@@ -4441,11 +4685,32 @@ def main() -> int:
     )
     epics_parser.add_argument(
         "--since",
-        help="Only epics updated on or after this date (YYYY-MM-DD)",
+        help="Only epics dated on or after this date (YYYY-MM-DD), applied to --date-field",
     )
     epics_parser.add_argument(
         "--until",
-        help="Only epics updated on or before this date (YYYY-MM-DD)",
+        help="Only epics dated on or before this date (YYYY-MM-DD), applied to --date-field",
+    )
+    epics_parser.add_argument(
+        "--date-field",
+        choices=COLLABORATION_DATE_FIELDS,
+        default="updated",
+        help=(
+            "Field --since/--until apply to, and the sort order: created, updated "
+            "or resolved (default: updated). Use resolved for period reviews."
+        ),
+    )
+    epics_parser.add_argument(
+        "--include-done",
+        action="store_true",
+        help="Include epics in the Done status category (excluded by default)",
+    )
+    epics_parser.add_argument(
+        "--status",
+        help=(
+            "Comma-separated status names to match instead of the default Done "
+            "exclusion (e.g. 'Closed,Done')"
+        ),
     )
     epics_parser.add_argument(
         "--min-contributors",
