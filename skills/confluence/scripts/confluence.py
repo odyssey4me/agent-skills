@@ -28,7 +28,6 @@ from dataclasses import dataclass
 from datetime import UTC
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 
 # ============================================================================
 # DEPENDENCY CHECKS
@@ -133,16 +132,10 @@ class Credentials:
     url: str | None = None
     email: str | None = None
     token: str | None = None
-    username: str | None = None
-    password: str | None = None
 
     def is_valid(self) -> bool:
-        """Check if credentials are sufficient for authentication."""
-        # Token-based auth
-        if self.token and self.url:
-            return True
-        # Username/password auth
-        return bool(self.username and self.password and self.url)
+        """Check if credentials are sufficient for Confluence Cloud authentication."""
+        return bool(self.token and self.email and self.url)
 
 
 @dataclass
@@ -219,8 +212,6 @@ def get_credentials(service: str) -> Credentials:
     creds.url = get_credential(f"{service}-url")
     creds.email = get_credential(f"{service}-email")
     creds.token = get_credential(f"{service}-token")
-    creds.username = get_credential(f"{service}-username")
-    creds.password = get_credential(f"{service}-password")
 
     # 2. Fall back to environment variables
     prefix = service.upper().replace("-", "_")
@@ -230,10 +221,6 @@ def get_credentials(service: str) -> Credentials:
         creds.email = os.environ.get(f"{prefix}_EMAIL")
     if not creds.token:
         creds.token = os.environ.get(f"{prefix}_API_TOKEN") or os.environ.get(f"{prefix}_TOKEN")
-    if not creds.username:
-        creds.username = os.environ.get(f"{prefix}_USERNAME")
-    if not creds.password:
-        creds.password = os.environ.get(f"{prefix}_PASSWORD")
 
     # 3. Fall back to config file
     config = load_config(service)
@@ -244,10 +231,6 @@ def get_credentials(service: str) -> Credentials:
             creds.email = config.get("email")
         if not creds.token:
             creds.token = config.get("token")
-        if not creds.username:
-            creds.username = config.get("username")
-        if not creds.password:
-            creds.password = config.get("password")
 
     return creds
 
@@ -770,14 +753,8 @@ def make_request(
         request_headers.setdefault("Content-Type", "application/json")
     request_headers.setdefault("Accept", "application/json")
 
-    # Add authentication
-    auth = None
-    if creds.email and creds.token:
-        auth = (creds.email, creds.token)
-    elif creds.token:
-        request_headers["Authorization"] = f"Bearer {creds.token}"
-    elif creds.username and creds.password:
-        auth = (creds.username, creds.password)
+    # Add Confluence Cloud basic authentication
+    auth = (creds.email, creds.token) if creds.email and creds.token else None
 
     response = requests.request(
         method=method.upper(),
@@ -1440,15 +1417,8 @@ def download_attachment(download_path: str, filename: str, output_dir: Path) -> 
     prefix = api_base.rsplit("/rest/api", 1)[0]
     download_url = f"{base_url}{prefix}{download_path}"
 
-    auth = None
-    if creds.email and creds.token:
-        auth = (creds.email, creds.token)
-    elif creds.username and creds.password:
-        auth = (creds.username, creds.password)
-
+    auth = (creds.email, creds.token) if creds.email and creds.token else None
     headers: dict[str, str] = {}
-    if creds.token and not (creds.email or creds.username):
-        headers["Authorization"] = f"Bearer {creds.token}"
 
     response = requests.get(download_url, auth=auth, headers=headers, timeout=30)
     response.raise_for_status()
@@ -1903,20 +1873,22 @@ def cmd_check() -> int:
         print("   ERROR: No API token configured")
         print("\n   Configure using one of these methods:")
         print("   - Environment: export CONFLUENCE_API_TOKEN=your-token-here")
-        try:
-            hostname = (urlsplit(creds.url).hostname or "").rstrip(".")
-        except ValueError:
-            hostname = ""
-        if hostname == "atlassian.net" or hostname.endswith(".atlassian.net"):
-            print("   - Also set: export CONFLUENCE_EMAIL=your-email@example.com")
+        print("   - Also set: export CONFLUENCE_EMAIL=your-email@example.com")
         print("   - Config file: ~/.config/agent-skills/confluence.yaml")
         print("   - Keyring: Use a setup script to store in system keyring")
         return 1
 
     print(f"   Token: {'*' * 8} (configured)")
 
-    if creds.email:
-        print(f"   Email: {creds.email}")
+    if not creds.email:
+        print("   ERROR: No email configured (Confluence Cloud requires an email address)")
+        print("\n   Configure using one of these methods:")
+        print("   - Environment: export CONFLUENCE_EMAIL=your-email@example.com")
+        print("   - Config file: ~/.config/agent-skills/confluence.yaml")
+        print("   - Keyring: Use a setup script to store in system keyring")
+        return 1
+
+    print(f"   Email: {creds.email}")
 
     if not creds.is_valid():
         print("   ERROR: Invalid credentials")
