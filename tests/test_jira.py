@@ -3650,6 +3650,88 @@ class TestCollaborativeEpics:
 
         assert "No collaborative epics found" in output
 
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_date_range(self, mock_search, mock_children):
+        """Since and until bound the epic updated date."""
+        mock_search.return_value = []
+        mock_children.return_value = []
+
+        find_collaborative_epics(project="DEMO", since="2026-07-01", until="2026-09-30")
+
+        jql = mock_search.call_args[0][0]
+        assert 'updated >= "2026-07-01"' in jql
+        assert 'updated <= "2026-09-30 23:59"' in jql
+        assert "ORDER BY updated DESC" in jql
+
+    def test_find_collaborative_epics_rejects_bad_date(self):
+        """A malformed date is rejected before it reaches JQL."""
+        with pytest.raises(ValueError, match="--since must be a date"):
+            find_collaborative_epics(since="last quarter")
+
+    @patch("skills.jira.scripts.jira.resolve_user_for_jql")
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_contributor(self, mock_search, mock_children, mock_resolve):
+        """The contributor filter selects their epics and keeps peer names."""
+        mock_resolve.return_value = "account-alice"
+        mock_search.return_value = [
+            {
+                "key": "EPIC-1",
+                "fields": {
+                    "summary": "Epic 1",
+                    "assignee": {"accountId": "account-alice", "displayName": "Alice"},
+                },
+            },
+            {
+                "key": "EPIC-2",
+                "fields": {
+                    "summary": "Epic 2",
+                    "assignee": {"accountId": "account-carol", "displayName": "Carol"},
+                },
+            },
+        ]
+        mock_children.side_effect = [
+            [
+                {"fields": {"assignee": {"accountId": "account-bob", "displayName": "Bob"}}},
+            ],
+            [
+                {"fields": {"assignee": {"accountId": "account-carol", "displayName": "Carol"}}},
+            ],
+        ]
+
+        result = find_collaborative_epics(contributor="alice", min_contributors=1)
+
+        assert mock_resolve.call_args[0][0] == "alice"
+        assert len(result) == 1
+        assert result[0]["epic"]["key"] == "EPIC-1"
+        assert result[0]["contributors"] == ["Alice", "Bob"]
+
+    @patch("skills.jira.scripts.jira.resolve_user_for_jql")
+    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_excludes_non_contributor(
+        self, mock_search, mock_children, mock_resolve
+    ):
+        """Epics the contributor is not involved in are excluded."""
+        mock_resolve.return_value = "account-alice"
+        mock_search.return_value = [
+            {
+                "key": "EPIC-2",
+                "fields": {
+                    "summary": "Epic 2",
+                    "reporter": {"accountId": "account-carol", "displayName": "Carol"},
+                },
+            }
+        ]
+        mock_children.return_value = [
+            {"fields": {"assignee": {"accountId": "account-bob", "displayName": "Bob"}}}
+        ]
+
+        result = find_collaborative_epics(contributor="alice", min_contributors=1)
+
+        assert result == []
+
 
 class TestCmdCollaboration:
     """Tests for cmd_collaboration handler."""
@@ -3705,6 +3787,35 @@ class TestCmdCollaboration:
         assert result == 0
         captured = capsys.readouterr()
         assert "EPIC-1" in captured.out
+
+    @patch("skills.jira.scripts.jira.find_collaborative_epics")
+    def test_cmd_collaboration_epics_contributor_default_threshold(self, mock_find, capsys):
+        """--contributor defaults the threshold to one so solo epics are kept."""
+        mock_find.return_value = []
+
+        args = argparse.Namespace(
+            collaboration_command="epics",
+            project="DEMO",
+            contributor="alice",
+            min_contributors=None,
+            max_results=50,
+            since="2026-07-01",
+            until="2026-09-30",
+            json=False,
+        )
+
+        result = cmd_collaboration(args)
+
+        assert result == 0
+        mock_find.assert_called_once_with(
+            project="DEMO",
+            min_contributors=1,
+            max_results=50,
+            contributor="alice",
+            since="2026-07-01",
+            until="2026-09-30",
+        )
+        assert "No collaborative epics found" in capsys.readouterr().out
 
     @patch("skills.jira.scripts.jira.find_collaborative_epics")
     def test_cmd_collaboration_epics_error(self, mock_find, capsys):
