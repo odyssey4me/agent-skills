@@ -337,7 +337,7 @@ def merge_jql_with_scope(user_jql: str, scope: str | None) -> str:
 # ============================================================================
 
 # Module-level cache for deployment type detection
-# Key: Jira URL, Value: {"deployment_type": str, "api_version": str, "scriptrunner": bool}
+# Key: Jira URL, Value: {"deployment_type": str, "api_version": str}
 _deployment_cache: dict[str, dict[str, str | bool]] = {}
 
 # Rate limit retry configuration
@@ -824,203 +824,82 @@ def get_cloud_id() -> str:
     return cloud_id
 
 
-def detect_scriptrunner_support(force_refresh: bool = False) -> dict[str, Any]:
-    """Detect if ScriptRunner is available and which features are supported.
+# ScriptRunner Enhanced Search functions, mapped to their Cloud-native
+# replacement. Jira Cloud ignores unrecognised JQL functions and returns a
+# successful empty result, so these are rejected explicitly rather than
+# silently matching nothing.
+REMOVED_JQL_FUNCTIONS: dict[str, str] = {
+    # Link-related functions
+    "linkedissuesof": 'issue in linkedWorkItems("KEY")',
+    "linkedissuesofall": 'issue in linkedWorkItems("KEY") — walk the links iteratively',
+    "linkedissuesofrecursive": 'issue in linkedWorkItems("KEY") — walk the links iteratively',
+    "haslinks": "No JQL equivalent — request the issuelinks field and filter locally",
+    "haslinktype": 'issue in linkedWorkItems("KEY", "Link type")',
+    "issueswithremotelinks": "No JQL equivalent — request remote links and filter locally",
+    "hasremotelinks": "No JQL equivalent — request remote links and filter locally",
+    # Hierarchy functions
+    "subtasksof": "parent = KEY",
+    "parentsof": "issue get KEY --fields parent",
+    "hassubtasks": "parent is not EMPTY finds children; invert the result for parents",
+    "epicsof": "Read fields.parent on the child (parentEpic = KEY is the forward direction)",
+    "issuesinepics": "parentEpic = KEY, or parentEpic in (K1, K2)",
+    # Comment and user activity functions
+    "commentedbyuser": 'issue in updatedBy("user")',
+    "issueswithcomments": "No JQL equivalent — request the comment field and filter locally",
+    "lastupdatedby": 'issue in updatedBy("user")',
+    # Transitions and workflow functions
+    "transitionedissues": "status CHANGED",
+    "transitionedby": 'status CHANGED BY "user"',
+    "transitionedfrom": 'status CHANGED FROM "Status"',
+    "transitionedto": 'status CHANGED TO "Status"',
+    # Field-based functions
+    "issueswithfieldvalue": '"Field" = value',
+    "hasfieldvalue": '"Field" is not EMPTY',
+    "lastupdated": "updated >= -7d",
+    # General purpose functions
+    "expression": "No JQL equivalent — compute the condition outside Jira",
+    "searchissues": "Run the inner query as its own search call",
+}
 
-    ScriptRunner Enhanced Search provides advanced JQL functions like:
-    - issueFunction in linkedIssuesOf()
-    - issueFunction in subtasksOf()
-    - issueFunction in parentsOf()
-    - issueFunction in hasSubtasks()
-    - issueFunction in hasLinks()
-    And many more...
-
-    Note: ScriptRunner works differently on Cloud vs Data Center/Server:
-    - Cloud: Uses Atlassian Marketplace app with REST API endpoints
-    - DC/Server: Self-hosted plugin with different API structure
-
-    Args:
-        force_refresh: If True, bypass the cache and make a new request.
-
-    Returns:
-        Dictionary with keys:
-        - "available": bool - Whether ScriptRunner is installed
-        - "version": str | None - ScriptRunner version if detected
-        - "type": str - "cloud", "datacenter", or "unknown"
-        - "enhanced_search": bool - Whether Enhanced Search is available
-
-    Raises:
-        APIError: If the detection request fails.
-    """
-    creds = get_credentials("jira")
-    if not creds.url:
-        return {
-            "available": False,
-            "version": None,
-            "type": "unknown",
-            "enhanced_search": False,
-        }
-
-    # Check cache unless force refresh requested
-    if not force_refresh and creds.url in _deployment_cache:
-        cached = _deployment_cache[creds.url]
-        if "scriptrunner" in cached:
-            return cached["scriptrunner"]  # type: ignore
-
-    deployment_type = detect_deployment_type()
-    result = {
-        "available": False,
-        "version": None,
-        "type": deployment_type.lower() if deployment_type else "unknown",
-        "enhanced_search": False,
-    }
-
-    try:
-        if deployment_type == "Cloud":
-            # Cloud: Try to access ScriptRunner Enhanced Search REST API
-            # Endpoint: /rest/scriptrunner/latest/canned/com.onresolve.scriptrunner.canned.jira.utils.IssuePickerService
-            try:
-                # Try a simple test query to see if the endpoint exists
-                endpoint = "rest/scriptrunner/latest/canned/com.onresolve.scriptrunner.canned.jira.utils.IssuePickerService"
-                response = get("jira", endpoint, params={"query": ""})
-
-                # If we get here without error, ScriptRunner is available
-                result["available"] = True
-                result["enhanced_search"] = True
-
-                # Try to get version info from installed apps API
-                try:
-                    apps_response = get("jira", "rest/plugins/1.0/")
-                    if isinstance(apps_response, dict):
-                        plugins = apps_response.get("plugins", [])
-                        for plugin in plugins:
-                            if "scriptrunner" in plugin.get("key", "").lower():
-                                result["version"] = plugin.get("version")
-                                break
-                except Exception:
-                    # Version detection is optional
-                    pass
-
-            except APIError:
-                # ScriptRunner not available on Cloud
-                pass
-
-        else:  # DataCenter or Server
-            # DC/Server: Check for ScriptRunner plugin via UPM (Universal Plugin Manager)
-            # Endpoint: /rest/plugins/1.0/
-            try:
-                response = get("jira", "rest/plugins/1.0/")
-                if isinstance(response, dict):
-                    plugins = response.get("plugins", [])
-                    for plugin in plugins:
-                        plugin_key = plugin.get("key", "")
-                        if "scriptrunner" in plugin_key.lower():
-                            result["available"] = True
-                            result["version"] = plugin.get("version")
-                            result["enhanced_search"] = plugin.get("enabled", False)
-                            break
-            except APIError:
-                # Plugin API not accessible
-                pass
-
-    except Exception:
-        # Any error means ScriptRunner is not reliably available
-        pass
-
-    # Cache the result
-    if creds.url in _deployment_cache:
-        _deployment_cache[creds.url]["scriptrunner"] = result
-    else:
-        _deployment_cache[creds.url] = {"scriptrunner": result}  # type: ignore
-
-    return result
+_FUNCTION_CALL_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
 
-def validate_jql_for_scriptrunner(jql: str) -> dict[str, Any]:
-    """Validate if a JQL query uses ScriptRunner functions and if they're supported.
+def _strip_quoted_strings(text: str) -> str:
+    """Remove quoted string literals so their contents are not scanned for JQL."""
+    return re.sub(r'"(?:\\.|[^"\\])*"', '""', text)
+
+
+def find_removed_jql_functions(jql: str) -> list[str]:
+    """Return removed ScriptRunner functions used by a JQL query.
+
+    Function names inside quoted string literals are ignored.
 
     Args:
-        jql: JQL query string to validate.
+        jql: JQL query string to inspect.
 
     Returns:
-        Dictionary with keys:
-        - "uses_scriptrunner": bool - Whether query uses ScriptRunner functions
-        - "functions_detected": list[str] - List of ScriptRunner functions found
-        - "supported": bool - Whether ScriptRunner is available for this query
-        - "warning": str | None - Warning message if unsupported functions are used
-
-    Example:
-        >>> validate_jql_for_scriptrunner('issue in linkedIssuesOf("PROJ-123")')
-        {
-            "uses_scriptrunner": True,
-            "functions_detected": ["linkedIssuesOf"],
-            "supported": True,
-            "warning": None
-        }
+        List of removed function names as written in the query.
     """
-    # Common ScriptRunner Enhanced Search functions
-    scriptrunner_functions = [
-        # Link-related functions
-        "linkedIssuesOf",
-        "linkedIssuesOfAll",
-        "linkedIssuesOfRecursive",
-        "hasLinks",
-        "hasLinkType",
-        "issuesWithRemoteLinks",
-        "hasRemoteLinks",
-        # Hierarchy functions
-        "subtasksOf",
-        "parentsOf",
-        "hasSubtasks",
-        "epicsOf",
-        "issuesInEpics",
-        # Comment and user activity
-        "commentedByUser",
-        "issuesWithComments",
-        "lastUpdatedBy",
-        # Transitions and workflow
-        "transitionedIssues",
-        "transitionedBy",
-        "transitionedFrom",
-        "transitionedTo",
-        # Field-based functions
-        "issuesWithFieldValue",
-        "hasFieldValue",
-        "lastUpdated",
-        # General purpose
-        "expression",
-        "searchIssues",
+    cleaned = _strip_quoted_strings(jql)
+    found: list[str] = []
+    for name in _FUNCTION_CALL_RE.findall(cleaned):
+        if name.lower() in REMOVED_JQL_FUNCTIONS and name not in found:
+            found.append(name)
+    return found
+
+
+def removed_function_message(functions: list[str]) -> str:
+    """Build an error message mapping removed functions to replacements."""
+    lines = [
+        f"Error: JQL uses functions that are no longer supported: {', '.join(functions)}.",
+        "ScriptRunner Enhanced Search is not available on Jira Cloud, and Jira "
+        "returns an empty result set for functions it does not recognise.",
+        "Use the Cloud-native replacement instead:",
     ]
-
-    # Detect which functions are used
-    functions_detected = []
-    jql_lower = jql.lower()
-
-    for func in scriptrunner_functions:
-        if func.lower() in jql_lower:
-            functions_detected.append(func)
-
-    uses_scriptrunner = len(functions_detected) > 0
-
-    # Check if ScriptRunner is available
-    scriptrunner_info = detect_scriptrunner_support()
-    supported = scriptrunner_info["available"] and scriptrunner_info["enhanced_search"]
-
-    warning = None
-    if uses_scriptrunner and not supported:
-        deployment_type = scriptrunner_info["type"]
-        warning = (
-            f"This JQL query uses ScriptRunner functions ({', '.join(functions_detected)}) "
-            f"but ScriptRunner Enhanced Search is not detected on this {deployment_type} instance. "
-            "The query may fail."
-        )
-
-    return {
-        "uses_scriptrunner": uses_scriptrunner,
-        "functions_detected": functions_detected,
-        "supported": supported,
-        "warning": warning,
-    }
+    for name in functions:
+        lines.append(f"  - {name} -> {REMOVED_JQL_FUNCTIONS[name.lower()]}")
+    lines.append("See references/jql-reference.md for Cloud-native JQL patterns.")
+    return "\n".join(lines)
 
 
 # ============================================================================
@@ -2077,16 +1956,15 @@ def search_issues(
 ) -> list[dict[str, Any]]:
     """Search for issues using JQL with automatic pagination.
 
-    Supports standard JQL and ScriptRunner Enhanced Search functions.
-    If ScriptRunner functions are detected in the query, the function
-    will validate that ScriptRunner is available on the Jira instance
-    and warn if it's not.
+    Rejects queries that use removed ScriptRunner functions, because Jira
+    Cloud silently returns an empty result set for functions it does not
+    recognise.
 
     Automatically paginates through results when the server returns
     fewer issues than the total matching the query, up to max_results.
 
     Args:
-        jql: JQL query string (supports ScriptRunner functions).
+        jql: JQL query string using Cloud-native JQL.
         max_results: Maximum number of results to return.
         fields: List of fields to include in response.
 
@@ -2101,24 +1979,9 @@ def search_issues(
     """
     fields = fields or DEFAULT_FIELDS
 
-    validation = validate_jql_for_scriptrunner(jql)
-    if validation["uses_scriptrunner"] and not validation["supported"]:
-        funcs = ", ".join(validation["functions_detected"])
-        msg = (
-            f"Error: Query uses ScriptRunner functions ({funcs}) "
-            f"which are not available on this Jira instance.\n"
-        )
-        if is_cloud():
-            msg += (
-                "ScriptRunner Enhanced Search is not supported on Jira Cloud.\n"
-                "See references/jql-reference.md for Cloud-native alternatives."
-            )
-        else:
-            msg += (
-                "ScriptRunner Enhanced Search is not available on this instance.\n"
-                "See references/jql-reference.md for standard JQL alternatives."
-            )
-        print(msg, file=sys.stderr)
+    removed = find_removed_jql_functions(jql)
+    if removed:
+        print(removed_function_message(removed), file=sys.stderr)
         return []
 
     if is_cloud():
@@ -2775,8 +2638,9 @@ def search_by_contributor(
 ) -> list[dict[str, Any]]:
     """Search for issues where a user is a contributor.
 
-    Always searches reporter and assignee. If ScriptRunner Enhanced Search
-    is available, also searches for issues commented on by the user.
+    A contributor is anyone who reported, is assigned to, or updated the
+    issue. ``updatedBy`` covers comments, field edits and transitions, so it
+    replaces the comment-only search that previously required ScriptRunner.
 
     On Jira Cloud, resolves email/name to accountId before searching.
 
@@ -2790,21 +2654,12 @@ def search_by_contributor(
         List of issue dictionaries.
     """
     user = resolve_user_for_jql(user)
-    clauses = [f'reporter = "{user}" OR assignee = "{user}"']
-
-    scriptrunner_info = detect_scriptrunner_support()
-    if scriptrunner_info["available"] and scriptrunner_info["enhanced_search"]:
-        clauses.append(f'issue in commentedByUser("{user}")')
-    else:
-        print(
-            "Note: Comment-based contributor search requires ScriptRunner Enhanced Search. "
-            "Only reporter and assignee matches are included.",
-            file=sys.stderr,
-        )
+    clauses = [f'reporter = "{user}" OR assignee = "{user}" OR issue in updatedBy("{user}")']
 
     jql = " OR ".join(clauses)
+    jql = f"({jql})"
     if project:
-        jql = f"project = {project} AND ({jql})"
+        jql = f"project = {project} AND {jql}"
 
     return search_issues(jql, max_results, fields)
 
@@ -3127,31 +2982,7 @@ def cmd_check() -> int:
         print(f"   ERROR: {e}")
         return 1
 
-    # 4. Check for ScriptRunner support
-    print("4. Checking ScriptRunner support...")
-    try:
-        scriptrunner_info = detect_scriptrunner_support(force_refresh=True)
-        if scriptrunner_info["available"]:
-            print(f"   ScriptRunner: Available ({scriptrunner_info['type']})")
-            if scriptrunner_info["version"]:
-                print(f"   Version: {scriptrunner_info['version']}")
-            if scriptrunner_info["enhanced_search"]:
-                print("   Enhanced Search: Enabled")
-                print("   You can use advanced JQL functions like:")
-                print('     issue in linkedIssuesOf("PROJ-123")')
-                print('     issue in subtasksOf("PROJ-123")')
-                print('     issue in commentedByUser("accountId")')
-                print()
-                print("   For complete guidance, see references/scriptrunner.md")
-            else:
-                print("   Enhanced Search: Disabled")
-        else:
-            print("   ScriptRunner: Not detected")
-            print("   (Advanced JQL functions will not be available)")
-    except Exception as e:
-        print(f"   WARNING: Could not check ScriptRunner: {e}")
-
-    # 5. Check Automation API access (Cloud-only)
+    # 4. Check Automation API access (Cloud-only)
     if is_cloud():
         print("\n5. Checking Automation API access...")
         try:
@@ -4478,7 +4309,7 @@ def main() -> int:
     search_parser.add_argument("jql", nargs="?", default=None, help="JQL query string")
     search_parser.add_argument(
         "--contributor",
-        help="Search for issues where this user is a contributor (reporter, assignee, or commenter)",
+        help="Search for issues where this user is a contributor (reporter, assignee, or updater)",
     )
     search_parser.add_argument(
         "--project",

@@ -119,24 +119,14 @@ $SKILL_DIR/scripts/jira.py search "assignee = currentUser() ORDER BY updated DES
 
 **Arguments:**
 - `jql`: JQL query string (required unless `--contributor` is used)
-- `--contributor`: Search for issues where this user is a contributor (reporter, assignee, or commenter). On Jira Cloud, automatically resolves email/name to accountId.
+- `--contributor`: Search for issues where this user is a contributor (reporter, assignee, or updater). On Jira Cloud, automatically resolves email/name to accountId.
 - `--project`: Project key to scope a `--contributor` search
 - `--max-results`: Maximum number of results (default: 50)
 - `--fields`: Comma-separated list of fields to include
 
-**Deployment-specific queries:**
-
-The available JQL functions depend on your Jira deployment type. Run
-`check` to see your deployment type and ScriptRunner availability.
-
-- **All deployments**: See [jql-reference.md](references/jql-reference.md)
-  for standard JQL patterns (status, dates, fields, ordering).
-- **Data Center/Server with ScriptRunner**: See
-  [scriptrunner.md](references/scriptrunner.md) for advanced functions
-  like `linkedIssuesOf()`, `subtasksOf()`, `commentedByUser()`.
-- **Jira Cloud**: ScriptRunner functions are **not available**. Use the
-  Cloud-native alternatives documented in
-  [jql-reference.md](references/jql-reference.md#cloud-alternatives).
+**JQL patterns:** See [jql-reference.md](references/jql-reference.md) for
+Cloud-native JQL patterns (status, dates, fields, ordering, linked issues,
+hierarchy).
 
 ### issue
 

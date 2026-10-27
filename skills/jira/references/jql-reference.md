@@ -63,39 +63,58 @@ project = DEMO AND sprint in openSprints()
 priority in (High, Highest) AND statusCategory = "To Do"
 ```
 
-## Cloud Alternatives
+## Cloud-native JQL
 
-These standard JQL patterns replace ScriptRunner functions that are
-only available on Data Center/Server.
+Jira Cloud silently ignores JQL functions it does not recognise and returns
+a successful empty result, so queries must use documented Cloud functions.
+The script rejects the removed functions below with an error naming the
+Cloud-native replacement.
+
+| Removed function | Cloud-native replacement |
+|-------------------|---------------------------|
+| `linkedIssuesOf`, `linkedIssuesOfAll`, `linkedIssuesOfRecursive` | `issue in linkedWorkItems("KEY")`; walk links iteratively for recursion |
+| `hasLinks`, `hasLinkType` | No project-wide equivalent; `issue in linkedWorkItems("KEY", "Link type")` when a key is known, otherwise filter the `issuelinks` field locally |
+| `issuesWithRemoteLinks`, `hasRemoteLinks` | No general equivalent; read remote links per issue |
+| `subtasksOf` | `parent = KEY` |
+| `parentsOf` | `issue get KEY --fields parent` |
+| `hasSubtasks` | `parent is not EMPTY` finds children; invert the result for parents |
+| `epicsOf` | Read `fields.parent`; `parentEpic = KEY` is the forward direction |
+| `issuesInEpics` | `parentEpic = KEY` or `parentEpic in (K1, K2)` |
+| `commentedByUser` | `issue in updatedBy("user")` |
+| `lastUpdatedBy` | `issue in updatedBy("user")` |
+| `issuesWithComments` | No equivalent; request the comment field and filter locally |
+| `transitionedIssues` | `status CHANGED` |
+| `transitionedBy` | `status CHANGED BY "user"` |
+| `transitionedFrom` | `status CHANGED FROM "Status"` |
+| `transitionedTo` | `status CHANGED TO "Status"` |
+| `issuesWithFieldValue` | `"Field" = value` |
+| `hasFieldValue` | `"Field" is not EMPTY` |
+| `lastUpdated("7d")` | `updated >= -7d` |
+| `expression`, `searchIssues` | No JQL equivalent; compute outside Jira or run a separate search |
 
 ### Finding linked issues
 
-ScriptRunner: `issue in linkedIssuesOf("PROJ-123")`
-
-Cloud alternative: Use `issue get PROJ-123` to read the issue's links,
-then search by the linked issue keys directly.
+`issue in linkedWorkItems("PROJ-123")` returns the issues linked to
+PROJ-123. Add a link type to narrow the search:
+`issue in linkedWorkItems("PROJ-123", "Blocks")`. To walk links
+recursively, search the linked issues and query their links in turn.
 
 ### Finding subtasks
 
-ScriptRunner: `issue in subtasksOf("PROJ-123")`
-
-Cloud alternative: `parent = PROJ-123`
+`parent = PROJ-123` returns the subtasks of PROJ-123.
 
 ### Finding parent issues
 
-ScriptRunner: `issue in parentsOf("PROJ-123")`
-
-Cloud alternative: Use `issue get PROJ-123` to read the parent field.
+Use `issue get PROJ-123 --fields parent` to read the parent directly.
 
 ### Finding epic children
 
-ScriptRunner: `issue in issuesInEpics("EPIC-123")`
-
-Cloud alternative: `"Epic Link" = EPIC-123` or `parentEpic = EPIC-123`
+`parentEpic = EPIC-123` returns the children of an epic. Use
+`parentEpic in (EPIC-123, EPIC-456)` to cover several epics.
 
 ### Finding issues by commenter
 
-ScriptRunner: `issue in commentedByUser("accountId")`
-
-Cloud alternative: No direct JQL equivalent. Use the `--contributor`
-flag which searches reporter and assignee fields.
+`issue in updatedBy("user")` returns issues the user updated, including
+comments, field edits, and transitions. To find issues with comments only,
+request the comment field and filter locally. The `--contributor` search
+flag combines reporter, assignee, and updater in one query.
