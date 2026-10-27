@@ -753,8 +753,8 @@ def make_request(
         request_headers.setdefault("Content-Type", "application/json")
     request_headers.setdefault("Accept", "application/json")
 
-    # Add Confluence Cloud basic authentication
-    auth = (creds.email, creds.token) if creds.email and creds.token else None
+    # Confluence Cloud basic authentication; is_valid() guarantees both values
+    auth = (creds.email, creds.token)
 
     response = requests.request(
         method=method.upper(),
@@ -1418,9 +1418,8 @@ def download_attachment(download_path: str, filename: str, output_dir: Path) -> 
     download_url = f"{base_url}{prefix}{download_path}"
 
     auth = (creds.email, creds.token) if creds.email and creds.token else None
-    headers: dict[str, str] = {}
 
-    response = requests.get(download_url, auth=auth, headers=headers, timeout=30)
+    response = requests.get(download_url, auth=auth, timeout=30)
     response.raise_for_status()
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1855,7 +1854,7 @@ def cmd_check() -> int:
     if not creds.url:
         print("   ERROR: No Confluence URL configured")
         print("\n   Configure using one of these methods:")
-        print("   - Environment: export CONFLUENCE_URL=https://yourcompany.atlassian.net/wiki")
+        print("   - Environment: export CONFLUENCE_URL=https://yourcompany.atlassian.net")
         print("   - Config file: ~/.config/agent-skills/confluence.yaml")
         print("   - Keyring: Use a setup script to store in system keyring")
         return 1

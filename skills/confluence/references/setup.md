@@ -35,6 +35,8 @@ export CONFLUENCE_EMAIL="you@example.com"
 export CONFLUENCE_API_TOKEN="your-token"
 ```
 
+`CONFLUENCE_TOKEN` is accepted as an alias for `CONFLUENCE_API_TOKEN`.
+
 Add these to your `~/.bashrc` or `~/.zshrc` for persistence.
 
 ### Option 2: Config File
