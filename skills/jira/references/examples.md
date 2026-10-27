@@ -62,14 +62,14 @@ $SKILL_DIR/scripts/jira.py issue comments DEMO-123
 ## Find Issues by Contributor
 
 ```bash
-# Find all issues where jsmith is reporter, assignee, or commenter
+# Find all issues where jsmith reported, is assigned to, or updated
 $SKILL_DIR/scripts/jira.py search --contributor "jsmith" --project DEMO
 ```
 
 ## Find Collaborative Epics
 
 ```bash
-# Find epics in DEMO project with 2+ assignees on child issues
+# Find epics in DEMO project with 2+ contributors
 $SKILL_DIR/scripts/jira.py collaboration epics --project DEMO
 
 # Require at least 3 contributors

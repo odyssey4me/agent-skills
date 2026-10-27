@@ -24,7 +24,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass
-from datetime import UTC
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -353,8 +353,7 @@ def automation_path(endpoint: str) -> str:
         Full gateway path string.
 
     Raises:
-        APIError: If the instance is not Cloud or the Cloud ID cannot
-            be determined.
+        APIError: If the Cloud ID cannot be determined.
     """
     cloud_id = get_cloud_id()
     return f"gateway/api/automation/public/jira/{cloud_id}/rest/v1/{endpoint.lstrip('/')}"
@@ -652,7 +651,7 @@ _FUNCTION_CALL_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
 def _strip_quoted_strings(text: str) -> str:
     """Remove quoted string literals so their contents are not scanned for JQL."""
-    return re.sub(r'"(?:\\.|[^"\\])*"', '""', text)
+    return re.sub(r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", '""', text)
 
 
 def find_removed_jql_functions(jql: str) -> list[str]:
@@ -677,7 +676,7 @@ def find_removed_jql_functions(jql: str) -> list[str]:
 def removed_function_message(functions: list[str]) -> str:
     """Build an error message mapping removed functions to replacements."""
     lines = [
-        f"Error: JQL uses functions that are no longer supported: {', '.join(functions)}.",
+        f"JQL uses functions that are no longer supported: {', '.join(functions)}.",
         "ScriptRunner Enhanced Search is not available on Jira Cloud, and Jira "
         "returns an empty result set for functions it does not recognise.",
         "Use the Cloud-native replacement instead:",
@@ -1161,8 +1160,6 @@ def _append_custom_fields(text: str, fields: dict, custom_fields: dict[str, str]
     if not custom_fields:
         return text
     for friendly_name, field_id in custom_fields.items():
-        if friendly_name.lower() in _BUILTIN_FIELD_NAMES:
-            continue
         if field_id.lower() in _BUILTIN_FIELD_NAMES:
             continue
         value = fields.get(field_id)
@@ -1777,6 +1774,7 @@ def search_issues(
         List of issue dictionaries.
 
     Raises:
+        ValueError: If the query uses a removed ScriptRunner function.
         APIError: If the search fails.
 
     Example:
@@ -1786,8 +1784,7 @@ def search_issues(
 
     removed = find_removed_jql_functions(jql)
     if removed:
-        print(removed_function_message(removed), file=sys.stderr)
-        return []
+        raise ValueError(removed_function_message(removed))
 
     return _search_issues_cloud(jql, max_results, fields)
 
@@ -2171,8 +2168,9 @@ def add_comment(issue_key: str, body: str, security_level: str | None = None) ->
 def _adf_to_markdown(node: Any) -> str:
     """Convert an ADF (Atlassian Document Format) node to markdown.
 
-    Uses the pyadf library for conversion. For plain string bodies (Data
-    Center), returns the string as-is.
+    Uses the pyadf library for conversion. A plain string body is returned
+    as-is, which keeps the formatter tolerant of comment bodies that are not
+    ADF documents.
 
     Args:
         node: ADF JSON node (dict) or plain text string.
@@ -2434,10 +2432,7 @@ def search_by_contributor(
         List of issue dictionaries.
     """
     user = resolve_user_for_jql(user)
-    clauses = [f'reporter = "{user}" OR assignee = "{user}" OR issue in updatedBy("{user}")']
-
-    jql = " OR ".join(clauses)
-    jql = f"({jql})"
+    jql = f'(reporter = "{user}" OR assignee = "{user}" OR issue in updatedBy("{user}"))'
     if project:
         jql = f"project = {project} AND {jql}"
 
@@ -2495,7 +2490,7 @@ def get_epic_children(epic_key: str, fields: list[str] | None = None) -> list[di
     return get_issue_children(epic_key, max_results=200, fields=fields)
 
 
-def _validated_date(value: str, flag: str) -> str:
+def _validated_date(value: str, flag: str) -> date:
     """Validate a YYYY-MM-DD date argument.
 
     Args:
@@ -2503,14 +2498,15 @@ def _validated_date(value: str, flag: str) -> str:
         flag: Flag name, used in the error message.
 
     Returns:
-        The unchanged date string.
+        The parsed date.
 
     Raises:
-        ValueError: If the value is not a YYYY-MM-DD date.
+        ValueError: If the value is not a real YYYY-MM-DD date.
     """
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
-        raise ValueError(f"{flag} must be a date in YYYY-MM-DD format")
-    return value
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError(f"{flag} must be a date in YYYY-MM-DD format") from exc
 
 
 def find_collaborative_epics(
@@ -2538,15 +2534,17 @@ def find_collaborative_epics(
     Returns:
         List of dicts with keys: epic, children_count, contributors.
     """
+    since_date = _validated_date(since, "--since") if since else None
+    until_date = _validated_date(until, "--until") if until else None
     contributor_id = resolve_user_for_jql(contributor) if contributor else None
 
     jql = "issuetype = Epic AND statusCategory != Done"
     if project:
         jql = f"project = {project} AND {jql}"
-    if since:
-        jql += f' AND updated >= "{_validated_date(since, "--since")}"'
-    if until:
-        jql += f' AND updated <= "{_validated_date(until, "--until")} 23:59"'
+    if since_date:
+        jql += f' AND updated >= "{since_date.isoformat()}"'
+    if until_date:
+        jql += f' AND updated < "{(until_date + timedelta(days=1)).isoformat()}"'
     jql += " ORDER BY updated DESC"
 
     epics = search_issues(jql, max_results, ["summary", "status", "assignee", "reporter"])
@@ -3385,10 +3383,13 @@ def cmd_issue(args: argparse.Namespace) -> int:
             max_results = getattr(args, "max_results", 100) or 100
             defaults = get_jira_defaults()
             custom_fields = defaults.custom_fields or {}
+            fields = ["summary", "issuetype", "status", "resolution", "assignee"]
+            for field_id in custom_fields.values():
+                fields = ensure_field_included(fields, field_id)
             children = get_issue_children(
                 args.issue_key,
                 max_results=max_results,
-                fields=["summary", "issuetype", "status", "resolution", "assignee"],
+                fields=fields,
             )
             if args.json:
                 print(format_json(children))

@@ -722,6 +722,31 @@ class TestFormatting:
         assert "- **Story Points:** 3" in result
         assert "- **Assigned Team:** Platform" in result
 
+    def test_format_custom_field_list_values(self):
+        """List-valued and unlabelled dict custom fields render compactly."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test",
+                "status": {"name": "Open"},
+                "assignee": None,
+                "priority": None,
+                "customfield_10060": [{"value": "Alpha"}, {"value": "Beta"}],
+                "customfield_10061": {"odd": "shape"},
+            },
+        }
+
+        result = format_issue(
+            issue,
+            custom_fields={
+                "flavours": "customfield_10060",
+                "odd_shape": "customfield_10061",
+            },
+        )
+
+        assert "- **Flavours:** Alpha, Beta" in result
+        assert '- **Odd Shape:** {"odd": "shape"}' in result
+
     def test_format_issue_ignores_builtin_field_mappings(self):
         """Built-in fields mapped as custom fields are not rendered twice."""
         issue = {
@@ -3706,13 +3731,18 @@ class TestCollaborativeEpics:
 
         jql = mock_search.call_args[0][0]
         assert 'updated >= "2026-07-01"' in jql
-        assert 'updated <= "2026-09-30 23:59"' in jql
+        assert 'updated < "2026-10-01"' in jql
         assert "ORDER BY updated DESC" in jql
 
     def test_find_collaborative_epics_rejects_bad_date(self):
         """A malformed date is rejected before it reaches JQL."""
         with pytest.raises(ValueError, match="--since must be a date"):
             find_collaborative_epics(since="last quarter")
+
+    def test_find_collaborative_epics_rejects_impossible_date(self):
+        """A date-shaped but impossible date is rejected locally."""
+        with pytest.raises(ValueError, match="--since must be a date"):
+            find_collaborative_epics(since="2026-02-30")
 
     @patch("skills.jira.scripts.jira.resolve_user_for_jql")
     @patch("skills.jira.scripts.jira.get_epic_children")
@@ -4023,31 +4053,43 @@ class TestRemovedJqlFunctions:
 
     def test_ignores_function_inside_quoted_string(self):
         """Function names inside quoted literals are not detected."""
-        result = find_removed_jql_functions('summary ~ "hasLinks()"')
-        assert result == []
+        assert find_removed_jql_functions('summary ~ "hasLinks()"') == []
+        assert find_removed_jql_functions("summary ~ 'hasLinks()'") == []
 
     def test_native_jql_not_flagged(self):
         """Cloud-native JQL constructs are not flagged as removed functions."""
         assert find_removed_jql_functions('status CHANGED FROM "In Progress" TO Done') == []
         assert find_removed_jql_functions("parentEpic in (A-1, B-2)") == []
 
-    def test_search_issues_rejects_removed_functions(self, capsys):
-        """Queries using removed functions return [] with guidance on stderr."""
-        result = search_issues("issue in hasLinks()")
+    def test_search_issues_rejects_removed_functions(self):
+        """Queries using removed functions raise instead of returning empty."""
+        with pytest.raises(ValueError, match="no longer supported") as exc:
+            search_issues("issue in hasLinks()")
 
-        assert result == []
-        captured = capsys.readouterr()
-        assert "no longer supported" in captured.err
-        assert "hasLinks" in captured.err
+        assert "hasLinks" in str(exc.value)
 
-    def test_search_issues_names_cloud_replacement(self, capsys):
+    def test_search_issues_names_cloud_replacement(self):
         """The rejection message names the Cloud-native replacement."""
-        result = search_issues('issue in linkedIssuesOf("DEMO-1")')
+        with pytest.raises(ValueError, match="no longer supported") as exc:
+            search_issues('issue in linkedIssuesOf("DEMO-1")')
 
-        assert result == []
-        captured = capsys.readouterr()
-        assert "no longer supported" in captured.err
-        assert "linkedWorkItems" in captured.err
+        assert "linkedWorkItems" in str(exc.value)
+
+    def test_cmd_search_removed_function_exits_nonzero(self, capsys):
+        """The CLI fails instead of reporting an empty result."""
+        args = argparse.Namespace(
+            jql="issue in hasLinks()",
+            contributor=None,
+            project=None,
+            max_results=10,
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_search(args)
+
+        assert result == 1
+        assert "no longer supported" in capsys.readouterr().err
 
 
 class TestParseIssueFile:
