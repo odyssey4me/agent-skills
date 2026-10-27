@@ -42,28 +42,26 @@ MINIMAL_PNG = (
 class TestCredentials:
     """Tests for Credentials dataclass."""
 
-    def test_is_valid_with_token(self):
-        """Test is_valid with token authentication."""
-        creds = Credentials(url="https://example.atlassian.net", token="token123")
-        assert creds.is_valid()
-
-    def test_is_valid_with_username_password(self):
-        """Test is_valid with username/password authentication."""
+    def test_is_valid_with_url_email_token(self):
+        """Test is_valid with url, email and token."""
         creds = Credentials(
-            url="https://example.atlassian.net",
-            username="user",
-            password="pass",
+            url="https://example.atlassian.net", email="user@example.com", token="token123"
         )
         assert creds.is_valid()
 
     def test_is_valid_missing_url(self):
         """Test is_valid fails without URL."""
-        creds = Credentials(token="token123")
+        creds = Credentials(email="user@example.com", token="token123")
         assert not creds.is_valid()
 
-    def test_is_valid_missing_token_and_password(self):
-        """Test is_valid fails without token or password."""
-        creds = Credentials(url="https://example.atlassian.net", username="user")
+    def test_is_valid_missing_token(self):
+        """Test is_valid fails without token."""
+        creds = Credentials(url="https://example.atlassian.net", email="user@example.com")
+        assert not creds.is_valid()
+
+    def test_is_valid_missing_email(self):
+        """Test is_valid fails without email."""
+        creds = Credentials(url="https://example.atlassian.net", token="token123")
         assert not creds.is_valid()
 
 
@@ -825,33 +823,28 @@ class TestCommandHandlers:
         result = cmd_check()
         assert result == 1
 
-    @pytest.mark.parametrize(
-        ("url", "cloud_guidance"),
-        [
-            ("https://example.atlassian.net", True),
-            ("https://EXAMPLE.ATLASSIAN.NET", True),
-            ("https://example.atlassian.net.", True),
-            ("https://atlassian.net", True),
-            ("https://confluence.example.org", False),
-            ("https://evil-atlassian.net", False),
-            ("https://example.atlassian.net.evil.org", False),
-            ("https://evil.org/atlassian.net", False),
-            ("https://evil.org?host=atlassian.net", False),
-            ("https://atlassian.net@evil.org", False),
-            ("https://[invalid", False),
-        ],
-    )
     @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_missing_token_cloud_guidance_uses_hostname(
-        self, mock_creds, url, cloud_guidance, capsys
-    ):
-        """Cloud-specific setup hints depend on the host, not URL substrings."""
-        mock_creds.return_value = Credentials(url=url)
-        assert confluence.cmd_check() == 1
+    def test_cmd_check_no_token_mentions_email(self, mock_creds, capsys):
+        """Test check command mentions the email hint for any host when token missing."""
+        from skills.confluence.scripts.confluence import cmd_check
+
+        mock_creds.return_value = Credentials(url="https://confluence.example.org")
+        result = cmd_check()
+        assert result == 1
         assert (
             "   - Also set: export CONFLUENCE_EMAIL=your-email@example.com"
             in capsys.readouterr().out.splitlines()
-        ) is cloud_guidance
+        )
+
+    @patch("skills.confluence.scripts.confluence.get_credentials")
+    def test_cmd_check_no_email(self, mock_creds, capsys):
+        """Test check command with url and token but missing email."""
+        from skills.confluence.scripts.confluence import cmd_check
+
+        mock_creds.return_value = Credentials(url="https://example.atlassian.net", token="token")
+        result = cmd_check()
+        assert result == 1
+        assert "No email configured" in capsys.readouterr().out
 
     @patch("skills.confluence.scripts.confluence.get_credentials")
     def test_cmd_check_url_with_wiki_suffix(self, mock_creds):
@@ -3244,17 +3237,17 @@ class TestDownloadExternalImages:
         mock_dl.assert_not_called()
 
 
-class TestDownloadAttachmentAuthBranches:
-    """Tests for download_attachment auth fallback branches."""
+class TestDownloadAttachmentAuth:
+    """Tests for download_attachment auth handling."""
 
     @patch("skills.confluence.scripts.confluence.requests.get")
     @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_username_password_auth(self, mock_creds, mock_get, tmp_path):
-        """Username/password creds use basic auth."""
+    def test_basic_auth_with_email_and_token(self, mock_creds, mock_get, tmp_path):
+        """Email and token creds use basic auth with no Authorization header."""
         mock_creds.return_value = Credentials(
             url="https://example.atlassian.net",
-            username="user",
-            password="pass",
+            email="user@example.com",
+            token="token123",
         )
         mock_response = Mock()
         mock_response.content = MINIMAL_PNG
@@ -3264,26 +3257,8 @@ class TestDownloadAttachmentAuthBranches:
         confluence.download_attachment("/dl/img.png", "img.png", tmp_path)
 
         call_kwargs = mock_get.call_args
-        assert call_kwargs[1]["auth"] == ("user", "pass")
-
-    @patch("skills.confluence.scripts.confluence.requests.get")
-    @patch("skills.confluence.scripts.confluence.get_credentials")
-    def test_bearer_token_auth(self, mock_creds, mock_get, tmp_path):
-        """Token-only creds (no email/username) use bearer auth header."""
-        mock_creds.return_value = Credentials(
-            url="https://example.atlassian.net",
-            token="bearer-token-123",
-        )
-        mock_response = Mock()
-        mock_response.content = MINIMAL_PNG
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
-
-        confluence.download_attachment("/dl/img.png", "img.png", tmp_path)
-
-        call_kwargs = mock_get.call_args
-        assert call_kwargs[1]["headers"]["Authorization"] == "Bearer bearer-token-123"
-        assert call_kwargs[1]["auth"] is None
+        assert call_kwargs[1]["auth"] == ("user@example.com", "token123")
+        assert "Authorization" not in call_kwargs[1]["headers"]
 
 
 class TestCmdPageGetErrorBranches:
