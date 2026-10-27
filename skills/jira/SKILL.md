@@ -163,7 +163,8 @@ $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
 ```
 
 `--contributors` reports each person with the roles they hold: `reporter`,
-`assignee`, and `commenter`. With `--json`, `_contributors` is
+`assignee`, and `commenter`. Every comment is read, so a commenter late in a
+long thread is still reported. With `--json`, `_contributors` is
 `[{"name": "Jane Doe", "roles": ["reporter", "commenter"]}]`.
 
 See [from-file-format.md](references/from-file-format.md) for the `--from-file` markdown format and [examples.md](references/examples.md) for more patterns.
