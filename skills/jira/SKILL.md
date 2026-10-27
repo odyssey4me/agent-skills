@@ -50,6 +50,8 @@ Jira API commands require outbound HTTPS to the configured Jira host. Remote ope
 
 ## Authentication
 
+This skill supports Jira Cloud only.
+
 Configure Jira authentication using one of these methods:
 
 ### Option 1: Environment Variables (Recommended)
@@ -105,8 +107,9 @@ $SKILL_DIR/scripts/jira.py check
 This validates:
 - Python dependencies are installed
 - Authentication is configured
-- Can connect to Jira
-- API version is detected and compatible
+- Can reach the Jira Cloud API
+- Automation API access
+- Custom field mappings
 
 ### search
 
