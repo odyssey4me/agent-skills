@@ -103,6 +103,12 @@ recursively, search the linked issues and query their links in turn.
 
 `parent = PROJ-123` returns the subtasks of PROJ-123.
 
+For several parents in one query, use `parent in (PROJ-123, PROJ-456)`.
+`parent` is a normal JQL field, so `=` and `in` both work. The
+`issue children KEY` command combines `parent = KEY` with
+`"Epic Link" = KEY`, so it covers subtasks, team-managed children and
+classic company-managed epic children in one call.
+
 ### Finding parent issues
 
 Use `issue get PROJ-123 --fields parent` to read the parent directly.

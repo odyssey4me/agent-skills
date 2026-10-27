@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "0.17.1"
+  version: "1.0.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -143,6 +143,9 @@ $SKILL_DIR/scripts/jira.py issue get DEMO-123 --fields "summary,status,assignee"
 # List comments
 $SKILL_DIR/scripts/jira.py issue comments DEMO-123
 
+# List child issues and subtasks
+$SKILL_DIR/scripts/jira.py issue children EPIC-123
+
 # Create (--project, --type, --summary required; --description, --priority, --labels, --assignee, --parent, --set-field, --link, --from-file, --json)
 $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task"
 $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Story --summary "New story" --parent EPIC-123
@@ -158,6 +161,10 @@ $SKILL_DIR/scripts/jira.py issue update DEMO-123 --unlink "Blocks:DEMO-456"
 # Comment (--security-level for private comments)
 $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
 ```
+
+`--contributors` reports each person with the roles they hold: `reporter`,
+`assignee`, and `commenter`. With `--json`, `_contributors` is
+`[{"name": "Jane Doe", "roles": ["reporter", "commenter"]}]`.
 
 See [from-file-format.md](references/from-file-format.md) for the `--from-file` markdown format and [examples.md](references/examples.md) for more patterns.
 
