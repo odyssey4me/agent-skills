@@ -3,7 +3,7 @@ name: confluence
 description: Search and manage Confluence pages and spaces using CQL, read/create/update pages with Markdown support. Use when working with Confluence documentation.
 metadata:
   author: odyssey4me
-  version: "2.6.3"
+  version: "3.0.0"
   category: documentation
   tags: "wiki, pages, spaces"
   complexity: standard
@@ -26,70 +26,22 @@ Confluence API commands require outbound HTTPS to the configured Confluence host
 Set it to that absolute path before running commands; do not assume the agent
 sets this shell variable. Quote the script path if it contains spaces.
 
-## Installation
+## Setup
 
-**Dependencies**: `pip install --user requests keyring pyyaml`
+This skill supports **Confluence Cloud only**. Installation and configuration
+defaults are documented in [references/setup.md](references/setup.md).
 
-## Setup Verification
-
-After installation, verify the skill configuration by running:
+Verify the setup with:
 
 ```bash
 $SKILL_DIR/scripts/confluence.py check
 ```
 
-This will check:
-- Python dependencies (requests, keyring, pyyaml)
-- Authentication configuration
-- Connectivity to Confluence
-
-If anything is missing, the check command will provide setup instructions.
-
 ## Authentication
 
-Configure Confluence authentication using one of these methods:
-
-### Option 1: Environment Variables (Recommended)
-
-```bash
-export CONFLUENCE_URL="https://yourcompany.atlassian.net/wiki"
-export CONFLUENCE_EMAIL="you@example.com"
-export CONFLUENCE_API_TOKEN="your-token"
-```
-
-Add these to your `~/.bashrc` or `~/.zshrc` for persistence.
-
-### Option 2: Config File
-
-Create `~/.config/agent-skills/confluence.yaml`:
-
-```yaml
-url: https://yourcompany.atlassian.net/wiki
-email: you@example.com
-token: your-token
-```
-
-### Required Credentials
-
-- **URL**: Your Confluence Cloud URL (e.g. `https://yourcompany.atlassian.net/wiki`)
-- **Email**: Your Atlassian account email
-- **API Token**: Create at https://id.atlassian.com/manage-profile/security/api-tokens
-
-## Configuration Defaults
-
-Optionally configure defaults in `~/.config/agent-skills/confluence.yaml`:
-
-```yaml
-url: https://yourcompany.atlassian.net/wiki
-email: you@example.com
-token: your-token
-defaults:
-  cql_scope: "space = DEMO"
-  max_results: 25
-  default_space: "DEMO"
-```
-
-View configuration: `$SKILL_DIR/scripts/confluence.py config show`
+Confluence Cloud authenticates with an Atlassian account email and API token.
+See [Authentication](references/setup.md#authentication) for environment
+variables, the config file and keyring storage.
 
 ## Commands
 
@@ -97,7 +49,8 @@ See [permissions.md](references/permissions.md) for read/write classification of
 
 ### check
 
-See [Setup Verification](#setup-verification) for dependency, authentication, and connectivity checks.
+See [Setup Verification](references/setup.md#setup-verification) for dependency,
+authentication, and connectivity checks.
 
 ### search
 
@@ -198,7 +151,7 @@ $SKILL_DIR/scripts/confluence.py page move 123456
 
 ### page delete
 
-Delete a page by ID (moves to trash on Cloud).
+Delete a page by ID (moves to trash).
 
 ```bash
 $SKILL_DIR/scripts/confluence.py page delete 123456

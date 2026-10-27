@@ -1659,7 +1659,7 @@ def move_page(page_id: str, parent_id: str | None) -> dict[str, Any]:
 
 
 def delete_page(page_id: str) -> dict[str, Any]:
-    """Delete a page (moves to trash on Cloud).
+    """Delete a page (moves to trash).
 
     Args:
         page_id: Page ID to delete.
