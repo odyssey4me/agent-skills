@@ -58,6 +58,7 @@ from skills.jira.scripts.jira import (
     format_automation_summary,
     format_collaborative_epics,
     format_comments,
+    format_contributor_roles,
     format_dashboard,
     format_filter,
     format_gadget,
@@ -719,6 +720,50 @@ class TestFormatting:
 
         assert "- **Story Points:** 3" in result
         assert "- **Assigned Team:** Platform" in result
+
+    def test_format_issue_ignores_builtin_field_mappings(self):
+        """Built-in fields mapped as custom fields are not rendered twice."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test",
+                "status": {"name": "Open"},
+                "assignee": None,
+                "priority": None,
+                "issuetype": {"name": "Epic"},
+                "parent": {"key": "EPIC-1", "fields": {"summary": "Parent epic"}},
+            },
+        }
+
+        result = format_issue(
+            issue,
+            custom_fields={"parent": "parent", "issuetype": "issuetype"},
+        )
+
+        assert result.count("**Parent:**") == 1
+        assert "- **Parent:** EPIC-1: Parent epic" in result
+        assert "{'id'" not in result
+        assert result.count("**Type:**") == 1
+
+    def test_format_custom_field_issue_reference(self):
+        """A custom field holding an issue reference renders key and summary."""
+        issue = {
+            "key": "DEMO-123",
+            "fields": {
+                "summary": "Test",
+                "status": {"name": "Open"},
+                "assignee": None,
+                "priority": None,
+                "customfield_10050": {
+                    "key": "OTHER-7",
+                    "fields": {"summary": "Linked work"},
+                },
+            },
+        }
+
+        result = format_issue(issue, custom_fields={"related": "customfield_10050"})
+
+        assert "- **Related:** OTHER-7: Linked work" in result
 
     def test_format_issues_list_with_custom_fields(self):
         """Test list formatting includes custom fields when configured."""
@@ -3178,7 +3223,11 @@ class TestContributors:
 
         result = extract_contributors(issue, comments)
 
-        assert result == {"Alice", "Bob", "Charlie"}
+        assert result == {
+            "Alice": ["reporter", "commenter"],
+            "Bob": ["assignee"],
+            "Charlie": ["commenter"],
+        }
 
     def test_extract_contributors_no_assignee(self):
         """Test extracting contributors when assignee is None."""
@@ -3191,7 +3240,7 @@ class TestContributors:
 
         result = extract_contributors(issue, [])
 
-        assert result == {"Alice"}
+        assert result == {"Alice": ["reporter"]}
 
     def test_extract_contributors_empty_comments(self):
         """Test extracting contributors with no comments."""
@@ -3204,7 +3253,7 @@ class TestContributors:
 
         result = extract_contributors(issue, [])
 
-        assert result == {"Alice", "Bob"}
+        assert result == {"Alice": ["reporter"], "Bob": ["assignee"]}
 
     def test_extract_contributors_no_reporter(self):
         """Test extracting contributors with no reporter."""
@@ -3212,7 +3261,13 @@ class TestContributors:
 
         result = extract_contributors(issue, [])
 
-        assert result == {"Bob"}
+        assert result == {"Bob": ["assignee"]}
+
+    def test_format_contributor_roles(self):
+        """Contributor roles are rendered next to each name."""
+        result = format_contributor_roles({"Alice": ["reporter", "commenter"], "Bob": ["assignee"]})
+
+        assert result == "Alice (reporter, commenter), Bob (assignee)"
 
     @patch("skills.jira.scripts.jira.get_remote_links")
     @patch("skills.jira.scripts.jira.get_comments")
@@ -3249,9 +3304,9 @@ class TestContributors:
         assert result == 0
         captured = capsys.readouterr()
         assert "Contributors:" in captured.out
-        assert "Alice" in captured.out
-        assert "Bob" in captured.out
-        assert "Charlie" in captured.out
+        assert "Alice (reporter)" in captured.out
+        assert "Bob (assignee)" in captured.out
+        assert "Charlie (commenter)" in captured.out
 
     @patch("skills.jira.scripts.jira.get_remote_links")
     @patch("skills.jira.scripts.jira.get_comments")
@@ -3287,8 +3342,7 @@ class TestContributors:
         assert result == 0
         # Verify _contributors key was added to the issue dict
         call_args = mock_format_json.call_args[0][0]
-        assert "_contributors" in call_args
-        assert "Alice" in call_args["_contributors"]
+        assert call_args["_contributors"] == [{"name": "Alice", "roles": ["reporter"]}]
 
 
 class TestUserResolution:

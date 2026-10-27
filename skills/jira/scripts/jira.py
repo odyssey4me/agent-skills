@@ -1110,12 +1110,49 @@ def coerce_field_value(
     return _coerce_by_type(schema.get("type", ""), value, schema.get("items", ""))
 
 
+# Built-in fields are rendered explicitly by the issue formatters. A custom
+# field mapping that points at one of them would print the raw API object a
+# second time, so those mappings are ignored.
+_BUILTIN_FIELD_NAMES = frozenset(
+    {
+        "summary",
+        "issuetype",
+        "status",
+        "resolution",
+        "assignee",
+        "reporter",
+        "priority",
+        "parent",
+        "project",
+        "created",
+        "updated",
+        "description",
+        "labels",
+        "issuelinks",
+    }
+)
+
+
 def _format_custom_field_value(value: Any) -> str:
-    """Format a custom field value for display."""
+    """Format a custom field value for display.
+
+    Values are reduced to a short display string where possible. A raw
+    object is only serialised when there is no recognisable label, and then
+    as compact JSON rather than a Python repr.
+    """
     if isinstance(value, float) and value == int(value):
         return str(int(value))
     if isinstance(value, dict):
-        return value.get("value", value.get("name", str(value)))
+        for key in ("value", "name", "displayName"):
+            display = value.get(key)
+            if display:
+                return str(display)
+        if value.get("key"):
+            summary = (value.get("fields") or {}).get("summary")
+            return f"{value['key']}: {summary}" if summary else str(value["key"])
+        return json.dumps(value, ensure_ascii=False, default=str)
+    if isinstance(value, list):
+        return ", ".join(_format_custom_field_value(item) for item in value)
     return str(value)
 
 
@@ -1124,6 +1161,10 @@ def _append_custom_fields(text: str, fields: dict, custom_fields: dict[str, str]
     if not custom_fields:
         return text
     for friendly_name, field_id in custom_fields.items():
+        if friendly_name.lower() in _BUILTIN_FIELD_NAMES:
+            continue
+        if field_id.lower() in _BUILTIN_FIELD_NAMES:
+            continue
         value = fields.get(field_id)
         if value is not None:
             label = friendly_name.replace("_", " ").title()
@@ -2239,35 +2280,63 @@ def format_comments(comments: list[dict[str, Any]], issue_key: str) -> str:
 # ============================================================================
 
 
-def extract_contributors(issue: dict[str, Any], comments: list[dict[str, Any]]) -> set[str]:
-    """Extract unique contributor display names from an issue and its comments.
+CONTRIBUTOR_ROLE_ORDER = ("reporter", "assignee", "commenter")
 
-    Contributors include: reporter, assignee, and comment authors.
+
+def extract_contributors(
+    issue: dict[str, Any], comments: list[dict[str, Any]]
+) -> dict[str, list[str]]:
+    """Map each contributor to the roles they hold on an issue.
+
+    A person can hold more than one role, for example a reporter who also
+    commented. Role order follows CONTRIBUTOR_ROLE_ORDER, and names are
+    sorted for stable output.
 
     Args:
         issue: Jira issue dictionary.
         comments: List of comment dictionaries.
 
     Returns:
-        Set of unique display names.
+        Mapping of display name to a list of roles.
     """
-    contributors: set[str] = set()
+    contributors: dict[str, list[str]] = {}
+
+    def add(name: str, role: str) -> None:
+        roles = contributors.setdefault(name, [])
+        if role not in roles:
+            roles.append(role)
+
     fields = issue.get("fields", {})
 
     reporter = fields.get("reporter")
     if reporter and reporter.get("displayName"):
-        contributors.add(reporter["displayName"])
+        add(reporter["displayName"], "reporter")
 
     assignee = fields.get("assignee")
     if assignee and assignee.get("displayName"):
-        contributors.add(assignee["displayName"])
+        add(assignee["displayName"], "assignee")
 
     for comment in comments:
         author = comment.get("author", {})
         if author.get("displayName"):
-            contributors.add(author["displayName"])
+            add(author["displayName"], "commenter")
 
-    return contributors
+    return {
+        name: sorted(roles, key=CONTRIBUTOR_ROLE_ORDER.index)
+        for name, roles in sorted(contributors.items())
+    }
+
+
+def format_contributor_roles(contributors: dict[str, list[str]]) -> str:
+    """Format contributor roles for text output.
+
+    Args:
+        contributors: Mapping of display name to roles.
+
+    Returns:
+        Comma-separated "Name (role, role)" string.
+    """
+    return ", ".join(f"{name} ({', '.join(roles)})" for name, roles in contributors.items())
 
 
 # ============================================================================
@@ -3223,16 +3292,18 @@ def cmd_issue(args: argparse.Namespace) -> int:
 
             if getattr(args, "contributors", False):
                 comments = get_comments(args.issue_key)
-                contributor_names = extract_contributors(issue, comments)
+                contributors = extract_contributors(issue, comments)
                 if args.json:
-                    issue["_contributors"] = sorted(contributor_names)
+                    issue["_contributors"] = [
+                        {"name": name, "roles": roles} for name, roles in contributors.items()
+                    ]
                     issue["_remote_links"] = remote_links
                     print(format_json(issue))
                 else:
                     output = format_issue(
                         issue, custom_fields=custom_fields, remote_links=remote_links
                     )
-                    output += f"\n- **Contributors:** {', '.join(sorted(contributor_names))}"
+                    output += f"\n- **Contributors:** {format_contributor_roles(contributors)}"
                     print(output)
             elif args.json:
                 issue["_remote_links"] = remote_links
