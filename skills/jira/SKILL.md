@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "1.2.0"
+  version: "1.3.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -121,18 +121,19 @@ $SKILL_DIR/scripts/jira.py search "assignee = currentUser() ORDER BY updated DES
 ```
 
 **Arguments:**
-- `jql`: JQL query string (required unless `--contributor` is used)
-- `--contributor`: Search for issues where this user is a contributor (reporter, assignee, or updater). On Jira Cloud, automatically resolves email/name to accountId.
+- `jql`: JQL query string (required unless `--contributor`, `--team`, or `--team-name` is used)
+- `--contributor`: Search for issues where this user is a contributor (reporter, assignee, or updater). Prefer an accountId or exact email; display names can be ambiguous.
 - `--project`: Project key to scope a `--contributor` search
 - `--max-results`: Maximum number of results (default: 50)
 - `--fields`: Comma-separated list of fields to include
+- `--team`: Team ID to scope the search; repeatable
+- `--team-name`: Team name to resolve (shared teams only); repeatable
 
-Text output renders the summary, type, parent, status, resolution and
-assignee; a parent renders as `KEY: summary`. Use `--json` for fields
-without a text rendering.
+Text output renders summary, type, parent, status, resolution and assignee;
+use `--json` for other fields.
 
-The bulk comment-author recipe (`--fields key,comment --json`) and its
-paging caveat are in [examples.md](references/examples.md#collect-comment-authors-in-bulk).
+Bulk comment authors: see
+[examples.md](references/examples.md#collect-comment-authors-in-bulk).
 
 **JQL patterns:** See [jql-reference.md](references/jql-reference.md) for
 Cloud-native JQL patterns (status, dates, fields, ordering, linked issues,
@@ -156,6 +157,7 @@ $SKILL_DIR/scripts/jira.py issue comments DEMO-123
 # List child issues and subtasks, or only their distinct assignees
 $SKILL_DIR/scripts/jira.py issue children EPIC-123
 $SKILL_DIR/scripts/jira.py issue children EPIC-123 --assignees-only
+$SKILL_DIR/scripts/jira.py issue children EPIC-1,EPIC-2 --assignees-only
 
 # Create (--project, --type, --summary required; --description, --priority, --labels, --assignee, --parent, --set-field, --link, --from-file, --json)
 $SKILL_DIR/scripts/jira.py issue create --project DEMO --type Task --summary "New task"
@@ -210,7 +212,7 @@ See [advanced-commands.md](references/advanced-commands.md) for full documentati
 - **fields** — list available fields (global or per project/issue type)
 - **statuses** — list statuses and status categories
 - **user** — search users by email/name (returns accountId on Cloud)
-- **collaboration** — discover cross-team collaboration patterns in epics
+- **collaboration** — discover cross-team collaboration patterns across issue types
 - **automations** — list and inspect Jira automation rules (Cloud-only)
 - **versions** — list project versions (releases) and view release reports
 
