@@ -70,19 +70,38 @@ $SKILL_DIR/scripts/jira.py search --contributor "jsmith" --project DEMO
 
 ```bash
 # Find epics in DEMO project with 2+ contributors
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO
+$SKILL_DIR/scripts/jira.py collaboration --project DEMO
 
 # Require at least 3 contributors
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO --min-contributors 3
+$SKILL_DIR/scripts/jira.py collaboration --project DEMO --min-contributors 3
 
 # Quarter retrospective: closed epics included, bounded by resolution date
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO \
+$SKILL_DIR/scripts/jira.py collaboration --project DEMO \
   --contributor "jane@example.com" --date-field resolved \
   --since 2026-07-01 --until 2026-09-30 --include-done
+
+# Scope by team instead of project keys: --team takes an ID, --team-name a name
+$SKILL_DIR/scripts/jira.py collaboration --team-name "rhos-product-reldel" --include-done
+
+# Execution-level ownership: stories and tasks, including their subtasks
+$SKILL_DIR/scripts/jira.py collaboration --team-name "rhos-product-reldel" \
+  --issuetype Story,Task
 ```
 
 Done epics are excluded by default. `--include-done` includes them, and
-`--status Closed,Done` narrows to specific statuses instead.
+`--status Closed,Done` narrows to specific statuses instead. Contributor
+matching walks the whole descendant hierarchy by default; add
+`--direct-children-only` to stop at direct children.
+
+## Batched Child Ownership
+
+`issue children` accepts comma-separated parents and reads them in one
+search, so a multi-epic ownership check costs one call rather than one per
+epic.
+
+```bash
+$SKILL_DIR/scripts/jira.py issue children EPIC-1,EPIC-2 --assignees-only
+```
 
 ## Search with Specific Fields
 

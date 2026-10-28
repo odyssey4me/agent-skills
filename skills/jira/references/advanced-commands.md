@@ -34,6 +34,10 @@ $SKILL_DIR/scripts/jira.py fields --project DEMO --issue-type Task
 
 Fields vary by project and issue type. Use `--project` and `--issue-type` to see only the fields available in that context.
 
+Custom fields appear under their API ID. The Team field is commonly
+`customfield_10001` and named `Team`. Pass its exact value with `--team`, or
+let `--team-name` resolve a shared team name to that value.
+
 ## statuses
 
 List available statuses and status categories.
@@ -62,59 +66,104 @@ $SKILL_DIR/scripts/jira.py user search "Jane Doe"
 
 ## collaboration
 
-Discover collaboration patterns across issues and epics.
+Discover collaboration patterns across issues. Any issue type can be
+inspected with `--issuetype`; this replaces the former `collaboration epics`
+subcommand.
 
 ```bash
 # Find epics with multiple contributors
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO
+$SKILL_DIR/scripts/jira.py collaboration --project DEMO
 
 # Require at least 3 contributors
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO --min-contributors 3
+$SKILL_DIR/scripts/jira.py collaboration --project DEMO --min-contributors 3
+
+# Scope by team ID (from `fields` or the team profile URL)
+$SKILL_DIR/scripts/jira.py collaboration \
+  --team "ec74d716-af36-4b3c-950f-f79213d08f71-2249" --include-done
+
+# Or resolve a shared team name to its ID
+$SKILL_DIR/scripts/jira.py collaboration \
+  --team-name "rhos-product-reldel" --include-done
 
 # Which epics a person drove this quarter, with their peers
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO \
+$SKILL_DIR/scripts/jira.py collaboration --project DEMO \
   --contributor "jane@example.com" --since 2026-07-01 --until 2026-09-30
 
 # Retrospective: epics resolved in Q3, including completed ones
-$SKILL_DIR/scripts/jira.py collaboration epics --project DEMO \
+$SKILL_DIR/scripts/jira.py collaboration --project DEMO \
   --contributor "jane@example.com" --date-field resolved \
   --since 2026-07-01 --until 2026-09-30 --include-done
 
-# Limit number of epics checked
-$SKILL_DIR/scripts/jira.py collaboration epics --max-results 20
+# Execution-level ownership: stories and tasks across the team
+$SKILL_DIR/scripts/jira.py collaboration --team-name "rhos-product-reldel" \
+  --issuetype Story,Task
+
+# Higher levels too: feature, initiative, outcome or subtask
+$SKILL_DIR/scripts/jira.py collaboration --team-name "rhos-product-reldel" \
+  --issuetype Initiative,Outcome --include-done
+
+# Stop at direct children instead of walking the whole hierarchy
+$SKILL_DIR/scripts/jira.py collaboration --project DEMO --direct-children-only
 ```
 
 **Arguments:**
-- `--project`: Project key to scope the search
-- `--contributor`: Only epics this user contributed to (epic reporter or assignee,
-  or assignee of a child issue). Email and display name are resolved to an
-  accountId. Peer contributors are still listed.
+- `--project`: Project key to scope the search. Use `--team` or
+  `--team-name` instead when work spans several projects.
+- `--team`: Team ID to scope by, trusted as supplied. Copy the exact value
+  from `fields` or the team profile URL; some sites suffix the UUID. Repeat
+  the flag for several teams.
+- `--team-name`: Team name to resolve to its ID. Names use the JQL
+  autocomplete endpoint, which only returns shared teams; repeat the flag
+  for several. Unknown or ambiguous names fail with suggestions rather than
+  returning an empty result.
+- `--issuetype`: Comma-separated issue types (default: `Epic`). Any level
+  works: `Feature`, `Initiative`, `Outcome`, `Story,Task`, or `Subtask`.
+- `--direct-children-only`: Match contributors from direct children only.
+  By default the whole descendant hierarchy is walked.
+- `--contributor`: Only items this user contributed to (item reporter or
+  assignee, or assignee of a descendant). Accepts an accountId, an exact
+  email, or a display name; display names are resolved through Jira user
+  search and can be ambiguous, so prefer an accountId or email. Peer
+  contributors are still listed.
 - `--since` / `--until`: Inclusive `YYYY-MM-DD` bounds on the field named by
-  `--date-field`. An epic counts as in range when that field falls inside it.
+  `--date-field`. An item counts as in range when that field falls inside it.
 - `--date-field`: Field the bounds and sort order use: `created`, `updated`
   (default) or `resolved`. Use `resolved` for a period review; unresolved
-  epics have no resolved date and are excluded.
-- `--include-done`: Include epics in the Done status category.
+  items have no resolved date and are excluded.
+- `--include-done`: Include items in the Done status category.
 - `--status`: Comma-separated status names (e.g. `Closed,Done`) to match
   instead of the default Done exclusion.
 - `--min-contributors`: Minimum unique contributors to qualify (default: 2, or
-  1 when `--contributor` is used, so epics the person drove alone are kept)
-- `--max-results`: Maximum epics to check (default: 50)
+  1 when `--contributor` is used, so items the person drove alone are kept)
+- `--max-results`: Maximum items to check (default: 50)
 
-Done epics are excluded by default, which suits an in-flight view. Use
-`--include-done` or `--status` when a retrospective needs completed epics;
-without one of them a closed epic will not appear even if the person is its
+Done items are excluded by default, which suits an in-flight view. Use
+`--include-done` or `--status` when a retrospective needs completed items;
+without one of them a closed item will not appear even if the person is its
 reporter or assignee.
 
-Contributors are the epic's reporter and assignee plus the assignees of its
-child issues.
+Contributors are the item's reporter and assignee plus the assignees of its
+descendants. Recursive descent is the default because ownership usually sits
+below the epic: an Initiative's contributors include epics, the stories under
+them, and their subtasks. Traversal walks one hierarchy level per search, so
+`--direct-children-only` is cheaper when only the first level matters. An
+item with no children, such as a Subtask, uses only its reporter/assignee.
+Descendant collection is capped at 1000 issues per item and warns when the
+cap is reached.
 
-With `--json`, each epic carries `summary`, `status`, `issuetype`, `parent`,
-`assignee`, `reporter`, `created` and `resolutiondate`. Level, provenance and
-hierarchy therefore come from the same query, with no follow-up search over
-the returned keys.
+With `--json`, each item carries `summary`, `status`, `issuetype`, `parent`,
+`assignee`, `reporter`, `created` and `resolutiondate`, plus
+`children_count` (direct children) and `descendants_count` (all levels).
+Level, provenance and hierarchy therefore come from the same query, with no
+follow-up search over the returned keys.
 
-**Note:** This makes N+1 API calls (1 for epics + 1 per epic for children). Use `--max-results` to control cost.
+**Note:** This makes N+1 API calls: 1 search for the items plus one search per
+hierarchy level per item. Use `--max-results` and `--direct-children-only` to
+control cost.
+
+Run `fields` to find the Team field. It is listed with its API ID (commonly
+`customfield_10001`) and the name `Team`. Pass the field's value with
+`--team`, or let `--team-name` resolve a shared team name to that value.
 
 ## automations
 

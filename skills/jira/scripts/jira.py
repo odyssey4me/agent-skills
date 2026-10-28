@@ -290,17 +290,146 @@ def get_project_defaults(project: str) -> ProjectDefaults:
     return ProjectDefaults.from_config(config, project)
 
 
+def _jql_quote(value: str) -> str:
+    """Quote a value as a JQL string literal.
+
+    Args:
+        value: Raw string to quote.
+
+    Returns:
+        The value wrapped in double quotes with embedded quotes escaped.
+    """
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _strip_html_tags(value: str) -> str:
+    """Remove the highlighting tags JQL autocomplete puts in display names."""
+    return re.sub(r"<[^>]+>", "", value).strip()
+
+
+def resolve_team_name(name: str) -> str:
+    """Resolve a shared team name to its Team ID via JQL autocomplete.
+
+    Jira requires the Team ID in JQL. Only shared teams are returned by the
+    autocomplete endpoint; private teams must be passed with ``--team``.
+
+    Args:
+        name: The team's display name.
+
+    Returns:
+        The team ID.
+
+    Raises:
+        ValueError: If the name cannot be resolved or is ambiguous.
+    """
+    name = name.strip()
+    response = get(
+        "jira",
+        api_path("jql/autocompletedata/suggestions"),
+        params={"fieldName": "Team", "fieldValue": name},
+    )
+    results = response.get("results", []) if isinstance(response, dict) else []
+    exact = [
+        result
+        for result in results
+        if _strip_html_tags(str(result.get("displayName", ""))).casefold() == name.casefold()
+    ]
+
+    if len(exact) == 1 and exact[0].get("value"):
+        return str(exact[0]["value"])
+    if len(exact) > 1:
+        names = ", ".join(
+            f"{_strip_html_tags(str(result.get('displayName', '')))} ({result.get('value', '?')})"
+            for result in exact
+        )
+        raise ValueError(
+            f"Team name '{name}' matches multiple teams: {names}. Use --team with the team ID."
+        )
+
+    suggestions = ", ".join(
+        _strip_html_tags(str(result.get("displayName", ""))) for result in results[:5]
+    )
+    hint = f" Suggestions: {suggestions}." if suggestions else ""
+    raise ValueError(
+        f"Could not resolve team name '{name}'.{hint} Use --team with the team ID; "
+        "only shared teams are searchable by name."
+    )
+
+
+def _team_jql(team_ids: list[str]) -> str:
+    """Build the JQL clause scoping a query to one or more team IDs.
+
+    Args:
+        team_ids: Team IDs, trusted as supplied.
+
+    Returns:
+        JQL clause matching the Team field.
+
+    Raises:
+        ValueError: If no team ID is supplied.
+    """
+    values = [str(value).strip() for value in team_ids if str(value).strip()]
+    if not values:
+        raise ValueError("--team requires at least one team ID")
+    if len(values) == 1:
+        return f"Team = {_jql_quote(values[0])}"
+    quoted = ", ".join(_jql_quote(value) for value in values)
+    return f"Team in ({quoted})"
+
+
+def _team_scope(team: list[str] | None, team_name: list[str] | None) -> str | None:
+    """Build the Team JQL clause from explicit IDs and/or resolved names.
+
+    IDs from ``--team`` are trusted as-is. Names from ``--team-name`` are
+    resolved through JQL autocomplete.
+
+    Args:
+        team: Team IDs supplied with ``--team``.
+        team_name: Team names supplied with ``--team-name``.
+
+    Returns:
+        JQL clause matching the Team field, or None when neither is given.
+    """
+    team_ids = [value.strip() for value in (team or []) if value.strip()]
+    team_ids.extend(resolve_team_name(name.strip()) for name in (team_name or []) if name.strip())
+    if not team_ids:
+        return None
+    return _team_jql(team_ids)
+
+
+_QUOTED_STRING_RE = re.compile(r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'")
+_ORDER_BY_RE = re.compile(r"\bORDER\s+BY\b", re.IGNORECASE)
+
+
+def _split_order_by(jql: str) -> tuple[str, str | None]:
+    """Split a JQL query into its filter and ORDER BY clause.
+
+    Quoted strings are masked before looking for ORDER BY so a value that
+    contains the words is not mistaken for the sort clause.
+
+    Args:
+        jql: JQL query, with or without an ORDER BY clause.
+
+    Returns:
+        Tuple of (filter, order_by). order_by is None when absent, and the
+        original casing and spacing of the clause are preserved.
+    """
+    masked = _QUOTED_STRING_RE.sub(lambda match: " " * len(match.group(0)), jql)
+    match = _ORDER_BY_RE.search(masked)
+    if not match:
+        return jql.strip(), None
+    return jql[: match.start()].strip(), jql[match.start() :].strip()
+
+
 def merge_jql_with_scope(user_jql: str, scope: str | None) -> str:
     """Merge user JQL with configured scope.
 
-    Strategy: Prepend scope as a filter that's always applied.
-    - If scope is None or empty, return user_jql unchanged
-    - If user_jql is empty, return scope
-    - Otherwise: "({scope}) AND ({user_jql})"
+    Filters are ANDed, and ORDER BY is always re-appended at the end, outside
+    the parentheses. Jira rejects a sort clause nested inside a condition.
 
     Args:
         user_jql: JQL provided by user.
-        scope: Configured JQL scope from defaults.
+        scope: Configured JQL scope from defaults, or a team clause.
 
     Returns:
         Merged JQL query.
@@ -311,8 +440,20 @@ def merge_jql_with_scope(user_jql: str, scope: str | None) -> str:
     if not user_jql or not user_jql.strip():
         return scope
 
-    # Wrap both in parentheses to ensure correct precedence
-    return f"({scope}) AND ({user_jql})"
+    user_filter, user_order = _split_order_by(user_jql)
+    scope_filter, scope_order = _split_order_by(scope)
+
+    if not scope_filter:
+        merged = user_filter
+    elif not user_filter:
+        merged = scope_filter
+    else:
+        # Wrap both in parentheses to ensure correct precedence.
+        merged = f"({scope_filter}) AND ({user_filter})"
+
+    # A caller's ORDER BY wins over one configured in the scope.
+    order = user_order or scope_order
+    return f"{merged} {order}" if order else merged
 
 
 # ============================================================================
@@ -2493,6 +2634,8 @@ def search_by_contributor(
     project: str | None = None,
     max_results: int = 50,
     fields: list[str] | None = None,
+    team: list[str] | None = None,
+    team_name: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Search for issues where a user is a contributor.
 
@@ -2507,12 +2650,18 @@ def search_by_contributor(
         project: Optional project key to scope the search.
         max_results: Maximum number of results.
         fields: Optional list of fields to include.
+        team: Optional team IDs, trusted as supplied, to scope by the Team
+            field.
+        team_name: Optional team names to resolve to IDs via JQL autocomplete.
 
     Returns:
         List of issue dictionaries.
     """
     user = resolve_user_for_jql(user)
     jql = f'(reporter = "{user}" OR assignee = "{user}" OR issue in updatedBy("{user}"))'
+    team_clause = _team_scope(team, team_name)
+    if team_clause:
+        jql = f"({team_clause}) AND {jql}"
     if project:
         jql = f"project = {project} AND {jql}"
 
@@ -2524,30 +2673,42 @@ def search_by_contributor(
 # ============================================================================
 
 
-def _build_children_jql(issue_key: str) -> str:
-    """Build JQL to find the children of an issue.
+def _build_children_jql(issue_key: str | list[str]) -> str:
+    """Build JQL to find the children of one or more issues.
 
     Covers classic company-managed projects ("Epic Link"), team-managed
     projects and new-hierarchy parents, and subtasks (parent).
 
     Args:
-        issue_key: The parent or epic issue key.
+        issue_key: A parent or epic issue key, or a list of keys.
 
     Returns:
         JQL query string.
+
+    Raises:
+        ValueError: If no issue key is supplied.
     """
-    return f'"Epic Link" = {issue_key} OR parent = {issue_key}'
+    keys = [issue_key] if isinstance(issue_key, str) else list(issue_key)
+    keys = [key.strip() for key in keys if key.strip()]
+    if not keys:
+        raise ValueError("at least one issue key is required")
+
+    if len(keys) == 1:
+        return f'"Epic Link" = {keys[0]} OR parent = {keys[0]}'
+
+    joined = ", ".join(keys)
+    return f'"Epic Link" in ({joined}) OR parent in ({joined})'
 
 
 def get_issue_children(
-    issue_key: str,
+    issue_key: str | list[str],
     max_results: int = 100,
     fields: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Get the children of an issue.
+    """Get the direct children of one or more issues.
 
     Args:
-        issue_key: The parent or epic issue key.
+        issue_key: A parent or epic issue key, or a list of keys.
         max_results: Maximum number of children to return.
         fields: Optional list of fields to include.
 
@@ -2568,6 +2729,66 @@ def get_epic_children(epic_key: str, fields: list[str] | None = None) -> list[di
         List of child issue dictionaries.
     """
     return get_issue_children(epic_key, max_results=200, fields=fields)
+
+
+def get_issue_descendants(
+    issue_key: str,
+    fields: list[str] | None = None,
+    direct_children_only: bool = False,
+    max_results: int = 1000,
+) -> tuple[list[dict[str, Any]], int]:
+    """Walk an issue's hierarchy and return its descendants.
+
+    Jira Cloud has no recursive JQL function, so traversal is breadth-first:
+    one search per hierarchy level, batched across the current frontier.
+    Subtasks, team-managed children and classic epic children are all
+    covered by the underlying parent/Epic Link query.
+
+    Args:
+        issue_key: The parent issue key to start from.
+        fields: Optional list of fields to include.
+        direct_children_only: Return only direct children.
+        max_results: Maximum number of descendants to collect.
+
+    Returns:
+        Tuple of (descendants, direct_child_count). Descendants are ordered
+        by level, direct children first.
+    """
+    direct = get_issue_children(issue_key, max_results=max_results, fields=fields)
+    if direct_children_only or not direct:
+        return direct, len(direct)
+
+    descendants = list(direct)
+    seen = {child.get("key") for child in direct if child.get("key")}
+    frontier = [child["key"] for child in direct if child.get("key")]
+
+    while frontier and len(descendants) < max_results:
+        next_frontier: list[str] = []
+        for start in range(0, len(frontier), 100):
+            remaining = max_results - len(descendants)
+            if remaining <= 0:
+                break
+            batch = get_issue_children(
+                frontier[start : start + 100],
+                max_results=remaining,
+                fields=fields,
+            )
+            for child in batch:
+                key = child.get("key")
+                if key and key not in seen:
+                    seen.add(key)
+                    next_frontier.append(key)
+                    descendants.append(child)
+        frontier = next_frontier
+
+    if len(descendants) >= max_results:
+        print(
+            f"Warning: descendant traversal for {issue_key} reached the "
+            f"{max_results}-issue cap; the contributor list may be incomplete.",
+            file=sys.stderr,
+        )
+
+    return descendants, len(direct)
 
 
 def _validated_date(value: str, flag: str) -> date:
@@ -2606,18 +2827,6 @@ COLLABORATION_EPIC_FIELDS = [
 ]
 
 
-def _jql_quote(value: str) -> str:
-    """Quote a value as a JQL string literal.
-
-    Args:
-        value: Raw string to quote.
-
-    Returns:
-        The value wrapped in double quotes with embedded quotes escaped.
-    """
-    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-
 def _build_collaborative_epics_jql(
     project: str | None = None,
     since: date | None = None,
@@ -2625,10 +2834,13 @@ def _build_collaborative_epics_jql(
     date_field: str = "updated",
     include_done: bool = False,
     statuses: list[str] | None = None,
+    team: list[str] | None = None,
+    team_name: list[str] | None = None,
+    issue_types: list[str] | None = None,
 ) -> str:
-    """Build the JQL used to find collaborative epics.
+    """Build the JQL used to find collaborative items.
 
-    Done epics are excluded by default because the common question is what
+    Done items are excluded by default because the common question is what
     is in flight. Retrospective use needs them, so ``include_done`` removes
     the exclusion and an explicit ``statuses`` list overrides it.
 
@@ -2637,9 +2849,14 @@ def _build_collaborative_epics_jql(
         since: Optional inclusive lower bound.
         until: Optional inclusive upper bound.
         date_field: Field the bounds apply to: created, updated or resolved.
-        include_done: Include epics in the Done status category.
+        include_done: Include items in the Done status category.
         statuses: Optional status names to match instead of the default
             Done exclusion.
+        team: Optional team IDs, trusted as supplied, to scope by the Team
+            field.
+        team_name: Optional team names to resolve to IDs via JQL autocomplete.
+        issue_types: Issue types to match. Defaults to Epic; any hierarchy
+            level (Feature, Initiative, Outcome) or Subtask is accepted.
 
     Returns:
         JQL query string.
@@ -2647,9 +2864,22 @@ def _build_collaborative_epics_jql(
     if date_field not in COLLABORATION_DATE_FIELDS:
         raise ValueError(f"--date-field must be one of: {', '.join(COLLABORATION_DATE_FIELDS)}")
 
-    clauses = ["issuetype = Epic"]
+    types = issue_types if issue_types is not None else ["Epic"]
+    normalized_types = [issue_type.strip() for issue_type in types if issue_type.strip()]
+    if not normalized_types:
+        raise ValueError("--issuetype requires at least one issue type")
+
+    clauses: list[str] = []
     if project:
         clauses.insert(0, f"project = {project}")
+    team_clause = _team_scope(team, team_name)
+    if team_clause:
+        clauses.append(team_clause)
+    if len(normalized_types) == 1:
+        clauses.append(f"issuetype = {_jql_quote(normalized_types[0])}")
+    else:
+        quoted_types = ", ".join(_jql_quote(issue_type) for issue_type in normalized_types)
+        clauses.append(f"issuetype in ({quoted_types})")
     if statuses:
         quoted = ", ".join(_jql_quote(status) for status in statuses)
         clauses.append(f"status in ({quoted})")
@@ -2673,31 +2903,42 @@ def find_collaborative_epics(
     date_field: str = "updated",
     include_done: bool = False,
     statuses: list[str] | None = None,
+    team: list[str] | None = None,
+    team_name: list[str] | None = None,
+    issue_types: list[str] | None = None,
+    direct_children_only: bool = False,
 ) -> list[dict[str, Any]]:
-    """Find epics with multiple contributors.
+    """Find issues with multiple contributors.
 
-    Contributors are the epic's reporter and assignee plus the assignees of
-    its child issues.
+    Contributors are the item's reporter and assignee plus the assignees of
+    its descendants. The item may be an Epic (the default) or any other
+    issue type, including Feature, Initiative, Outcome and Subtask.
 
     Args:
         project: Optional project key to scope the search.
         min_contributors: Minimum number of unique contributors required.
-        max_results: Maximum number of epics to check.
-        contributor: Optional user whose epics to return. Resolved to an
+        max_results: Maximum number of items to check.
+        contributor: Optional user whose items to return. Resolved to an
             accountId before matching.
         since: Optional inclusive lower bound (YYYY-MM-DD) on ``date_field``.
         until: Optional inclusive upper bound (YYYY-MM-DD) on ``date_field``.
         date_field: Field the date bounds apply to: created, updated or
             resolved. The default keeps the previous updated-date behaviour.
-        include_done: Include epics in the Done status category. Done epics
+        include_done: Include items in the Done status category. Done items
             are excluded by default.
         statuses: Optional status names to match instead of the default
             Done exclusion.
+        team: Optional team IDs, trusted as supplied, to scope by the Team
+            field.
+        team_name: Optional team names to resolve to IDs via JQL autocomplete.
+        issue_types: Issue types to match. Defaults to Epic.
+        direct_children_only: Count and match only direct children instead
+            of walking the whole hierarchy. Recursive descent is the default.
 
     Returns:
-        List of dicts with keys: epic, children_count, contributors. Each
-        epic carries summary, status, issuetype, parent, assignee, reporter,
-        created and resolutiondate.
+        List of dicts with keys: epic, children_count, descendants_count,
+        contributors. Each epic carries summary, status, issuetype, parent,
+        assignee, reporter, created and resolutiondate.
     """
     since_date = _validated_date(since, "--since") if since else None
     until_date = _validated_date(until, "--until") if until else None
@@ -2709,6 +2950,9 @@ def find_collaborative_epics(
         date_field=date_field,
         include_done=include_done,
         statuses=statuses,
+        team=team,
+        team_name=team_name,
+        issue_types=issue_types,
     )
 
     contributor_id = resolve_user_for_jql(contributor) if contributor else None
@@ -2719,14 +2963,18 @@ def find_collaborative_epics(
     for epic in epics:
         epic_fields = epic.get("fields", {})
         epic_key = epic.get("key", "")
-        children = get_epic_children(epic_key, fields=["assignee"])
+        descendants, direct_count = get_issue_descendants(
+            epic_key,
+            fields=["assignee"],
+            direct_children_only=direct_children_only,
+        )
 
         contributors: dict[str, str] = {}
         for role in ("reporter", "assignee"):
             person = epic_fields.get(role)
             if person and person.get("displayName"):
                 contributors[person.get("accountId", person["displayName"])] = person["displayName"]
-        for child in children:
+        for child in descendants:
             child_assignee = child.get("fields", {}).get("assignee")
             if child_assignee and child_assignee.get("displayName"):
                 contributors[child_assignee.get("accountId", child_assignee["displayName"])] = (
@@ -2739,7 +2987,8 @@ def find_collaborative_epics(
             results.append(
                 {
                     "epic": epic,
-                    "children_count": len(children),
+                    "children_count": direct_count,
+                    "descendants_count": len(descendants),
                     "contributors": sorted(contributors.values()),
                 }
             )
@@ -2747,30 +2996,42 @@ def find_collaborative_epics(
     return results
 
 
-def format_collaborative_epics(results: list[dict[str, Any]]) -> str:
-    """Format collaborative epics for display.
+def format_collaborative_epics(
+    results: list[dict[str, Any]], issue_types: list[str] | None = None
+) -> str:
+    """Format collaborative items for display.
 
     Args:
         results: List of result dicts from find_collaborative_epics.
+        issue_types: Issue types the search covered. Defaults to Epic, which
+            only affects the heading; the items themselves carry their type.
 
     Returns:
         Formatted markdown string.
     """
+    is_epic_only = not issue_types or [t.lower() for t in issue_types] == ["epic"]
+    label = "Epics" if is_epic_only else "Issues"
     if not results:
-        return "No collaborative epics found."
+        return f"No collaborative {label.lower()} found."
 
-    parts = ["## Collaborative Epics"]
+    parts = [f"## Collaborative {label}"]
     for result in results:
         epic = result["epic"]
         key = epic.get("key", "N/A")
         summary = epic.get("fields", {}).get("summary", "No summary")
         status = ((epic.get("fields") or {}).get("status") or {}).get("name")
+        issue_type = ((epic.get("fields") or {}).get("issuetype") or {}).get("name")
         children_count = result["children_count"]
+        descendants_count = result.get("descendants_count")
         contributors = ", ".join(result["contributors"])
         lines = [f"\n### {key}: {summary}"]
+        if issue_type:
+            lines.append(f"- **Type:** {issue_type}")
         if status:
             lines.append(f"- **Status:** {status}")
         lines.append(f"- **Children:** {children_count}")
+        if descendants_count is not None and descendants_count != children_count:
+            lines.append(f"- **Descendants:** {descendants_count}")
         lines.append(f"- **Contributors:** {contributors}")
         parts.append("\n".join(lines))
 
@@ -3383,9 +3644,14 @@ def cmd_search(args: argparse.Namespace) -> int:
 
         contributor = getattr(args, "contributor", None)
         jql = getattr(args, "jql", None)
+        team = getattr(args, "team", None)
+        team_name = getattr(args, "team_name", None)
 
-        if not contributor and not jql:
-            print("Error: either a JQL query or --contributor is required", file=sys.stderr)
+        if not contributor and not jql and not team and not team_name:
+            print(
+                "Error: either a JQL query, --contributor, --team, or --team-name is required",
+                file=sys.stderr,
+            )
             return 1
 
         # Apply max_results (detect if user explicitly provided it)
@@ -3406,10 +3672,23 @@ def cmd_search(args: argparse.Namespace) -> int:
 
         if contributor:
             project = getattr(args, "project", None)
-            issues = search_by_contributor(contributor, project, max_results, fields)
+            if team or team_name:
+                issues = search_by_contributor(
+                    contributor,
+                    project,
+                    max_results,
+                    fields,
+                    team=team,
+                    team_name=team_name,
+                )
+            else:
+                issues = search_by_contributor(contributor, project, max_results, fields)
         else:
-            # Apply JQL scope
+            # Apply JQL scope, then the team scope when one is requested.
             jql = merge_jql_with_scope(jql, defaults.jql_scope)
+            team_clause = _team_scope(team, team_name)
+            if team_clause:
+                jql = merge_jql_with_scope(jql, team_clause)
             issues = search_issues(jql, max_results, fields)
 
         if args.json:
@@ -3607,14 +3886,21 @@ def cmd_issue(args: argparse.Namespace) -> int:
             defaults = get_jira_defaults()
             custom_fields = defaults.custom_fields or {}
             assignees_only = getattr(args, "assignees_only", False)
+            keys = [key.strip() for key in args.issue_key.split(",") if key.strip()]
+            if not keys:
+                print("Error: at least one issue key is required", file=sys.stderr)
+                return 1
+            target: str | list[str] = keys[0] if len(keys) == 1 else keys
             if assignees_only:
                 fields = ["assignee"]
             else:
                 fields = ["summary", "issuetype", "status", "resolution", "assignee"]
+                if len(keys) > 1:
+                    fields = ensure_field_included(fields, "parent")
                 for field_id in custom_fields.values():
                     fields = ensure_field_included(fields, field_id)
             children = get_issue_children(
-                args.issue_key,
+                target,
                 max_results=max_results,
                 fields=fields,
             )
@@ -3634,7 +3920,7 @@ def cmd_issue(args: argparse.Namespace) -> int:
                 if args.json:
                     print(format_json(sorted_names))
                 else:
-                    print(format_assignee_set(args.issue_key, sorted_names))
+                    print(format_assignee_set(", ".join(keys), sorted_names))
             elif args.json:
                 print(format_json(children))
             else:
@@ -4111,36 +4397,45 @@ def cmd_user(args: argparse.Namespace) -> int:
 def cmd_collaboration(args: argparse.Namespace) -> int:
     """Handle collaboration command."""
     try:
-        if args.collaboration_command == "epics":
-            project = getattr(args, "project", None)
-            contributor = getattr(args, "contributor", None)
-            min_contributors = getattr(args, "min_contributors", None)
-            if min_contributors is None:
-                min_contributors = 1 if contributor else 2
-            max_results = getattr(args, "max_results", 50) or 50
-            status_arg = getattr(args, "status", None)
-            statuses = (
-                [status.strip() for status in status_arg.split(",") if status.strip()]
-                if status_arg
-                else None
-            )
+        project = getattr(args, "project", None)
+        contributor = getattr(args, "contributor", None)
+        min_contributors = getattr(args, "min_contributors", None)
+        if min_contributors is None:
+            min_contributors = 1 if contributor else 2
+        max_results = getattr(args, "max_results", 50) or 50
+        status_arg = getattr(args, "status", None)
+        statuses = (
+            [status.strip() for status in status_arg.split(",") if status.strip()]
+            if status_arg
+            else None
+        )
+        issue_type_arg = getattr(args, "issuetype", None)
+        issue_types = (
+            [issue_type.strip() for issue_type in issue_type_arg.split(",") if issue_type.strip()]
+            if issue_type_arg is not None
+            else None
+        )
 
-            results = find_collaborative_epics(
-                project=project,
-                min_contributors=min_contributors,
-                max_results=max_results,
-                contributor=contributor,
-                since=getattr(args, "since", None),
-                until=getattr(args, "until", None),
-                date_field=getattr(args, "date_field", None) or "updated",
-                include_done=getattr(args, "include_done", False),
-                statuses=statuses,
-            )
+        results = find_collaborative_epics(
+            project=project,
+            min_contributors=min_contributors,
+            max_results=max_results,
+            contributor=contributor,
+            since=getattr(args, "since", None),
+            until=getattr(args, "until", None),
+            date_field=getattr(args, "date_field", None) or "updated",
+            include_done=getattr(args, "include_done", False),
+            statuses=statuses,
+            team=getattr(args, "team", None),
+            team_name=getattr(args, "team_name", None),
+            issue_types=issue_types,
+            direct_children_only=getattr(args, "direct_children_only", False),
+        )
 
-            if args.json:
-                print(format_json(results))
-            else:
-                print(format_collaborative_epics(results))
+        if args.json:
+            print(format_json(results))
+        else:
+            print(format_collaborative_epics(results, issue_types=issue_types))
 
         return 0
 
@@ -4406,6 +4701,18 @@ def main() -> int:
         help="Project key to scope contributor search",
     )
     search_parser.add_argument(
+        "--team",
+        action="append",
+        metavar="ID",
+        help="Team ID to scope by the Team field; repeat for several (trusted as an ID)",
+    )
+    search_parser.add_argument(
+        "--team-name",
+        action="append",
+        metavar="NAME",
+        help="Team name to resolve to its ID; repeat for several (shared teams only)",
+    )
+    search_parser.add_argument(
         "--max-results",
         type=int,
         default=None,
@@ -4465,7 +4772,10 @@ def main() -> int:
     children_parser = issue_subparsers.add_parser(
         "children", help="List child issues and subtasks of an issue"
     )
-    children_parser.add_argument("issue_key", help="Parent or epic issue key (e.g., EPIC-123)")
+    children_parser.add_argument(
+        "issue_key",
+        help="Parent or epic issue key, or comma-separated keys to batch",
+    )
     children_parser.add_argument(
         "--max-results",
         type=int,
@@ -4681,33 +4991,53 @@ def main() -> int:
     # ========================================================================
     collaboration_parser = subparsers.add_parser(
         "collaboration",
-        help="Discover collaboration patterns",
+        help="Discover collaboration patterns across issues",
     )
-    collaboration_subparsers = collaboration_parser.add_subparsers(
-        dest="collaboration_command", required=True
+    collaboration_parser.add_argument("--project", help="Project key to scope the search")
+    collaboration_parser.add_argument(
+        "--team",
+        action="append",
+        metavar="ID",
+        help="Team ID to scope by the Team field; repeat for several (trusted as an ID)",
     )
-
-    # Epics subcommand
-    epics_parser = collaboration_subparsers.add_parser(
-        "epics", help="Find epics with multiple contributors"
+    collaboration_parser.add_argument(
+        "--team-name",
+        action="append",
+        metavar="NAME",
+        help="Team name to resolve to its ID; repeat for several (shared teams only)",
     )
-    epics_parser.add_argument("--project", help="Project key to scope the search")
-    epics_parser.add_argument(
-        "--contributor",
+    collaboration_parser.add_argument(
+        "--issuetype",
         help=(
-            "Only epics this user contributed to (epic reporter/assignee or child "
-            "assignee); supplies peer contributors"
+            "Comma-separated issue types (default: Epic). Any level works, "
+            "e.g. 'Feature', 'Initiative,Outcome' or 'Story,Task'"
         ),
     )
-    epics_parser.add_argument(
+    collaboration_parser.add_argument(
+        "--direct-children-only",
+        action="store_true",
+        help=(
+            "Use only direct children for contributor matching; by default the "
+            "whole descendant hierarchy is walked"
+        ),
+    )
+    collaboration_parser.add_argument(
+        "--contributor",
+        help=(
+            "Only items this user contributed to (item reporter/assignee or "
+            "descendant assignee); supplies peer contributors. Use an accountId "
+            "or exact email; display names are resolved through Jira user search"
+        ),
+    )
+    collaboration_parser.add_argument(
         "--since",
-        help="Only epics dated on or after this date (YYYY-MM-DD), applied to --date-field",
+        help="Only items dated on or after this date (YYYY-MM-DD), applied to --date-field",
     )
-    epics_parser.add_argument(
+    collaboration_parser.add_argument(
         "--until",
-        help="Only epics dated on or before this date (YYYY-MM-DD), applied to --date-field",
+        help="Only items dated on or before this date (YYYY-MM-DD), applied to --date-field",
     )
-    epics_parser.add_argument(
+    collaboration_parser.add_argument(
         "--date-field",
         choices=COLLABORATION_DATE_FIELDS,
         default="updated",
@@ -4716,31 +5046,31 @@ def main() -> int:
             "or resolved (default: updated). Use resolved for period reviews."
         ),
     )
-    epics_parser.add_argument(
+    collaboration_parser.add_argument(
         "--include-done",
         action="store_true",
-        help="Include epics in the Done status category (excluded by default)",
+        help="Include items in the Done status category (excluded by default)",
     )
-    epics_parser.add_argument(
+    collaboration_parser.add_argument(
         "--status",
         help=(
             "Comma-separated status names to match instead of the default Done "
             "exclusion (e.g. 'Closed,Done')"
         ),
     )
-    epics_parser.add_argument(
+    collaboration_parser.add_argument(
         "--min-contributors",
         type=int,
         default=None,
         help="Minimum number of unique contributors (default: 2, or 1 with --contributor)",
     )
-    epics_parser.add_argument(
+    collaboration_parser.add_argument(
         "--max-results",
         type=int,
         default=50,
-        help="Maximum number of epics to check (default: 50)",
+        help="Maximum number of items to check (default: 50)",
     )
-    epics_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    collaboration_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # ========================================================================
     # AUTOMATIONS COMMAND (Cloud-only)

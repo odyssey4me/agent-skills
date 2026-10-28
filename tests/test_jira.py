@@ -25,7 +25,10 @@ from skills.jira.scripts.jira import (
     _parse_inline,
     _parse_link_args,
     _parse_markdown_to_adf,
+    _split_order_by,
     _summarise_value,
+    _team_jql,
+    _team_scope,
     _truncate,
     add_comment,
     api_path,
@@ -85,6 +88,7 @@ from skills.jira.scripts.jira import (
     get_filter,
     get_issue,
     get_issue_children,
+    get_issue_descendants,
     get_issues_bulk,
     get_jira_defaults,
     get_link_types,
@@ -105,9 +109,11 @@ from skills.jira.scripts.jira import (
     list_status_categories,
     list_statuses,
     load_config,
+    merge_jql_with_scope,
     parse_issue_file,
     resolve_custom_field,
     resolve_or_discover_field,
+    resolve_team_name,
     resolve_user,
     resolve_user_for_jql,
     save_config,
@@ -2615,7 +2621,7 @@ class TestMetadataDiscovery:
         """Test fields command with table output."""
         mock_list_fields.return_value = [
             {"id": "summary", "name": "Summary", "custom": False},
-            {"id": "customfield_10001", "name": "Story Points", "custom": True},
+            {"id": "customfield_10001", "name": "Team", "custom": True},
         ]
 
         args = argparse.Namespace(
@@ -2629,7 +2635,8 @@ class TestMetadataDiscovery:
         assert result == 0
         captured = capsys.readouterr()
         assert "Summary" in captured.out
-        assert "Story Points" in captured.out
+        assert "Team" in captured.out
+        assert "customfield_10001" in captured.out
 
     @patch("skills.jira.scripts.jira.list_fields")
     @patch("skills.jira.scripts.jira.format_json")
@@ -3947,7 +3954,258 @@ class TestContributorSearch:
 
         assert result == 1
         captured = capsys.readouterr()
-        assert "either a JQL query or --contributor is required" in captured.err
+        assert (
+            "either a JQL query, --contributor, --team, or --team-name is required" in captured.err
+        )
+
+    @patch("skills.jira.scripts.jira.resolve_user_for_jql")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_search_by_contributor_team_scope(self, mock_search, mock_resolve):
+        """A team scope is ANDed with the contributor clause."""
+        mock_resolve.return_value = "account-jsmith"
+        mock_search.return_value = []
+
+        search_by_contributor("jsmith", team=["36885b3c-1bf0-4f85-a357-c5b858c31de4"])
+
+        jql = mock_search.call_args[0][0]
+        assert 'Team = "36885b3c-1bf0-4f85-a357-c5b858c31de4"' in jql
+        assert 'reporter = "account-jsmith"' in jql
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_search_team_only(self, mock_defaults, mock_search):
+        """--team alone is a complete search criterion."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_search.return_value = []
+
+        args = argparse.Namespace(
+            jql=None,
+            contributor=None,
+            project=None,
+            team=["36885b3c-1bf0-4f85-a357-c5b858c31de4"],
+            max_results=None,
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_search(args)
+
+        assert result == 0
+        assert mock_search.call_args[0][0] == 'Team = "36885b3c-1bf0-4f85-a357-c5b858c31de4"'
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_search_team_with_jql(self, mock_defaults, mock_search):
+        """A team scope is ANDed with the user's JQL."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_search.return_value = []
+
+        args = argparse.Namespace(
+            jql="project = DEMO",
+            contributor=None,
+            project=None,
+            team=["36885b3c-1bf0-4f85-a357-c5b858c31de4"],
+            max_results=None,
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_search(args)
+
+        assert result == 0
+        jql = mock_search.call_args[0][0]
+        assert '(Team = "36885b3c-1bf0-4f85-a357-c5b858c31de4")' in jql
+        assert "(project = DEMO)" in jql
+
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_search_team_keeps_order_by_outside(self, mock_defaults, mock_search):
+        """A user ORDER BY stays outside the merged team condition."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_search.return_value = []
+
+        args = argparse.Namespace(
+            jql="issuetype = Epic ORDER BY resolutiondate DESC",
+            contributor=None,
+            project=None,
+            team=["36885b3c-1bf0-4f85-a357-c5b858c31de4"],
+            max_results=None,
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_search(args)
+
+        assert result == 0
+        assert (
+            mock_search.call_args[0][0] == '(Team = "36885b3c-1bf0-4f85-a357-c5b858c31de4") AND '
+            "(issuetype = Epic) ORDER BY resolutiondate DESC"
+        )
+
+    @patch("skills.jira.scripts.jira.resolve_team_name")
+    @patch("skills.jira.scripts.jira.search_issues")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_search_team_name_only(self, mock_defaults, mock_search, mock_resolve):
+        """--team-name resolves the name and builds the scope."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_search.return_value = []
+        mock_resolve.return_value = "36885b3c-1bf0-4f85-a357-c5b858c31de4"
+
+        args = argparse.Namespace(
+            jql=None,
+            contributor=None,
+            project=None,
+            team=None,
+            team_name=["Platform"],
+            max_results=None,
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_search(args)
+
+        assert result == 0
+        assert mock_search.call_args[0][0] == 'Team = "36885b3c-1bf0-4f85-a357-c5b858c31de4"'
+        mock_resolve.assert_called_once_with("Platform")
+
+    @patch("skills.jira.scripts.jira.search_by_contributor")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_search_team_with_contributor(self, mock_defaults, mock_contrib):
+        """--team is passed through to the contributor search."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_contrib.return_value = []
+
+        args = argparse.Namespace(
+            jql=None,
+            contributor="jsmith",
+            project="DEMO",
+            team=["36885b3c-1bf0-4f85-a357-c5b858c31de4"],
+            max_results=None,
+            fields=None,
+            json=False,
+        )
+
+        result = cmd_search(args)
+
+        assert result == 0
+        mock_contrib.assert_called_once_with(
+            "jsmith",
+            "DEMO",
+            50,
+            None,
+            team=["36885b3c-1bf0-4f85-a357-c5b858c31de4"],
+            team_name=None,
+        )
+
+
+class TestMergeJql:
+    """ORDER BY must stay outside merged conditionals."""
+
+    def test_order_by_stays_outside_scope(self):
+        merged = merge_jql_with_scope("issuetype = Epic ORDER BY resolutiondate DESC", 'Team = "x"')
+
+        assert merged == '(Team = "x") AND (issuetype = Epic) ORDER BY resolutiondate DESC'
+
+    def test_order_by_case_and_spacing_preserved(self):
+        merged = merge_jql_with_scope("issuetype = Epic order   by resolutiondate", 'Team = "x"')
+
+        assert merged == '(Team = "x") AND (issuetype = Epic) order   by resolutiondate'
+
+    def test_order_by_inside_string_is_not_split(self):
+        merged = merge_jql_with_scope('summary ~ "ORDER BY anything"', 'Team = "x"')
+
+        assert merged == '(Team = "x") AND (summary ~ "ORDER BY anything")'
+
+    def test_scope_order_by_is_kept(self):
+        merged = merge_jql_with_scope("issuetype = Epic", 'Team = "x" ORDER BY created DESC')
+
+        assert merged == '(Team = "x") AND (issuetype = Epic) ORDER BY created DESC'
+
+    def test_user_order_by_wins_over_scope(self):
+        merged = merge_jql_with_scope(
+            "issuetype = Epic ORDER BY updated DESC",
+            'Team = "x" ORDER BY created DESC',
+        )
+
+        assert merged == '(Team = "x") AND (issuetype = Epic) ORDER BY updated DESC'
+
+    def test_order_only_user_jql(self):
+        merged = merge_jql_with_scope("ORDER BY created DESC", 'Team = "x"')
+
+        assert merged == 'Team = "x" ORDER BY created DESC'
+
+    def test_no_order_by(self):
+        merged = merge_jql_with_scope("issuetype = Epic", 'Team = "x"')
+
+        assert merged == '(Team = "x") AND (issuetype = Epic)'
+
+    def test_split_keeps_quoted_order_by_in_filter(self):
+        filter_jql, order_by = _split_order_by('summary ~ "ORDER BY x" ORDER BY updated DESC')
+
+        assert filter_jql == 'summary ~ "ORDER BY x"'
+        assert order_by == "ORDER BY updated DESC"
+
+
+class TestTeamJql:
+    """Tests for Team field JQL construction."""
+
+    def test_single_team_id(self):
+        team_id = "36885b3c-1bf0-4f85-a357-c5b858c31de4"
+
+        assert _team_jql([team_id]) == f'Team = "{team_id}"'
+
+    def test_multiple_team_ids(self):
+        assert _team_jql(["one", "two"]) == 'Team in ("one", "two")'
+
+    def test_empty_team_rejected(self):
+        with pytest.raises(ValueError, match="at least one team ID"):
+            _team_jql([])
+
+    @patch("skills.jira.scripts.jira.get")
+    def test_team_name_resolves_to_id(self, mock_get):
+        team_id = "36885b3c-1bf0-4f85-a357-c5b858c31de4"
+        mock_get.return_value = {
+            "results": [{"value": team_id, "displayName": "<b>Platform</b> Team"}]
+        }
+
+        assert resolve_team_name("Platform Team") == team_id
+        assert mock_get.call_args.kwargs["params"] == {
+            "fieldName": "Team",
+            "fieldValue": "Platform Team",
+        }
+
+    @patch("skills.jira.scripts.jira.get")
+    def test_ambiguous_team_name_raises(self, mock_get):
+        mock_get.return_value = {
+            "results": [
+                {"value": "id-1", "displayName": "<b>Platform</b>"},
+                {"value": "id-2", "displayName": "<b>Platform</b>"},
+            ]
+        }
+
+        with pytest.raises(ValueError, match="matches multiple teams"):
+            resolve_team_name("platform")
+
+    @patch("skills.jira.scripts.jira.get")
+    def test_unknown_team_name_raises_with_suggestions(self, mock_get):
+        mock_get.return_value = {
+            "results": [{"value": "id-1", "displayName": "<b>Platform</b> Team"}]
+        }
+
+        with pytest.raises(ValueError, match="Could not resolve team name"):
+            resolve_team_name("Plat")
+
+    @patch("skills.jira.scripts.jira.resolve_team_name")
+    def test_team_scope_trusts_ids_and_resolves_names(self, mock_resolve):
+        mock_resolve.side_effect = ["id-1", "id-2"]
+
+        assert (
+            _team_scope(["trusted-id"], ["One", "Two"]) == 'Team in ("trusted-id", "id-1", "id-2")'
+        )
+        assert [call.args[0] for call in mock_resolve.call_args_list] == ["One", "Two"]
+
+    def test_team_scope_with_no_values_returns_none(self):
+        assert _team_scope(None, None) is None
 
 
 class TestCollaborativeEpics:
@@ -3959,6 +4217,44 @@ class TestCollaborativeEpics:
 
         assert '"Epic Link" = EPIC-1' in jql
         assert "parent = EPIC-1" in jql
+
+    def test_build_children_jql_batch(self):
+        """Several parents become an IN clause."""
+        jql = _build_children_jql(["EPIC-1", "EPIC-2"])
+
+        assert '"Epic Link" in (EPIC-1, EPIC-2)' in jql
+        assert "parent in (EPIC-1, EPIC-2)" in jql
+
+    def test_build_children_jql_rejects_empty(self):
+        """An empty key list is rejected."""
+        with pytest.raises(ValueError, match="at least one issue key"):
+            _build_children_jql([])
+
+    @patch("skills.jira.scripts.jira.get_issue_children")
+    def test_get_issue_descendants_recurses(self, mock_children):
+        """Traversal walks down the hierarchy a level at a time."""
+        mock_children.side_effect = [
+            [{"key": "STORY-1"}],
+            [{"key": "SUB-1"}],
+            [],
+        ]
+
+        descendants, direct_count = get_issue_descendants("EPIC-1")
+
+        assert [item["key"] for item in descendants] == ["STORY-1", "SUB-1"]
+        assert direct_count == 1
+        assert mock_children.call_count == 3
+
+    @patch("skills.jira.scripts.jira.get_issue_children")
+    def test_get_issue_descendants_direct_only(self, mock_children):
+        """Direct-only mode makes one search and stops."""
+        mock_children.return_value = [{"key": "STORY-1"}]
+
+        descendants, direct_count = get_issue_descendants("EPIC-1", direct_children_only=True)
+
+        assert descendants == [{"key": "STORY-1"}]
+        assert direct_count == 1
+        mock_children.assert_called_once()
 
     @patch("skills.jira.scripts.jira.search_issues")
     def test_get_epic_children(self, mock_search):
@@ -4098,7 +4394,63 @@ class TestCollaborativeEpics:
         assert result == 0
         assert "may be incomplete" in capsys.readouterr().err
 
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_children")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_children_batch(self, mock_defaults, mock_children, capsys):
+        """Comma-separated parents are read in one search."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_children.return_value = [
+            {"key": "TASK-1", "fields": {"assignee": {"displayName": "Alice"}}},
+            {"key": "TASK-2", "fields": {"assignee": {"displayName": "Bob"}}},
+        ]
+
+        args = argparse.Namespace(
+            issue_command="children",
+            issue_key="EPIC-1,EPIC-2",
+            max_results=100,
+            json=False,
+            assignees_only=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        assert mock_children.call_args[0][0] == ["EPIC-1", "EPIC-2"]
+        captured = capsys.readouterr()
+        assert "Child assignees for EPIC-1, EPIC-2" in captured.out
+        assert "- Bob" in captured.out
+
+    @patch("skills.jira.scripts.jira.get_issue_children")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_cmd_issue_children_batch_requests_parent(self, mock_defaults, mock_children, capsys):
+        """A batched listing asks for parent so children can be grouped."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_children.return_value = [
+            {
+                "key": "TASK-1",
+                "fields": {
+                    "summary": "Child",
+                    "status": {"name": "Open"},
+                    "parent": {"key": "EPIC-1"},
+                },
+            }
+        ]
+
+        args = argparse.Namespace(
+            issue_command="children",
+            issue_key="EPIC-1,EPIC-2",
+            max_results=100,
+            json=False,
+            assignees_only=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        assert "parent" in mock_children.call_args.kwargs["fields"]
+        assert "- **Parent:** EPIC-1" in capsys.readouterr().out
+
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics(self, mock_search, mock_children):
         """Test finding collaborative epics."""
@@ -4108,14 +4460,15 @@ class TestCollaborativeEpics:
         ]
         mock_children.side_effect = [
             # EPIC-1: two different assignees
-            [
-                {"fields": {"assignee": {"displayName": "Alice"}}},
-                {"fields": {"assignee": {"displayName": "Bob"}}},
-            ],
+            (
+                [
+                    {"fields": {"assignee": {"displayName": "Alice"}}},
+                    {"fields": {"assignee": {"displayName": "Bob"}}},
+                ],
+                2,
+            ),
             # EPIC-2: one assignee
-            [
-                {"fields": {"assignee": {"displayName": "Alice"}}},
-            ],
+            ([{"fields": {"assignee": {"displayName": "Alice"}}}], 1),
         ]
 
         result = find_collaborative_epics(project="DEMO", min_contributors=2)
@@ -4125,16 +4478,17 @@ class TestCollaborativeEpics:
         assert result[0]["children_count"] == 2
         assert sorted(result[0]["contributors"]) == ["Alice", "Bob"]
 
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_none_found(self, mock_search, mock_children):
         """Test when no collaborative epics are found."""
         mock_search.return_value = [
             {"key": "EPIC-1", "fields": {"summary": "Solo epic"}},
         ]
-        mock_children.return_value = [
-            {"fields": {"assignee": {"displayName": "Alice"}}},
-        ]
+        mock_children.return_value = (
+            [{"fields": {"assignee": {"displayName": "Alice"}}}],
+            1,
+        )
 
         result = find_collaborative_epics(min_contributors=2)
 
@@ -4180,12 +4534,12 @@ class TestCollaborativeEpics:
 
         assert "No collaborative epics found" in output
 
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_date_range(self, mock_search, mock_children):
         """Since and until bound the epic updated date."""
         mock_search.return_value = []
-        mock_children.return_value = []
+        mock_children.return_value = ([], 0)
 
         find_collaborative_epics(project="DEMO", since="2026-07-01", until="2026-09-30")
 
@@ -4194,12 +4548,12 @@ class TestCollaborativeEpics:
         assert 'updated < "2026-10-01"' in jql
         assert "ORDER BY updated DESC" in jql
 
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_resolved_date_range(self, mock_search, mock_children):
         """A period review can bound the resolved date instead of updated."""
         mock_search.return_value = []
-        mock_children.return_value = []
+        mock_children.return_value = ([], 0)
 
         find_collaborative_epics(
             project="DEMO",
@@ -4214,12 +4568,12 @@ class TestCollaborativeEpics:
         assert "updated" not in jql
         assert "ORDER BY resolved DESC" in jql
 
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_created_date_range(self, mock_search, mock_children):
         """The date bounds follow --date-field created."""
         mock_search.return_value = []
-        mock_children.return_value = []
+        mock_children.return_value = ([], 0)
 
         find_collaborative_epics(since="2026-07-01", date_field="created")
 
@@ -4232,12 +4586,12 @@ class TestCollaborativeEpics:
         with pytest.raises(ValueError, match="--date-field must be one of"):
             find_collaborative_epics(date_field="closed")
 
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_requests_review_fields(self, mock_search, mock_children):
         """The epic payload carries level, provenance and hierarchy."""
         mock_search.return_value = []
-        mock_children.return_value = []
+        mock_children.return_value = ([], 0)
 
         find_collaborative_epics(project="DEMO")
 
@@ -4246,36 +4600,36 @@ class TestCollaborativeEpics:
         for name in ("created", "resolutiondate", "issuetype", "parent"):
             assert name in fields
 
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_excludes_done_by_default(self, mock_search, mock_children):
         """Done epics stay out of the default in-flight view."""
         mock_search.return_value = []
-        mock_children.return_value = []
+        mock_children.return_value = ([], 0)
 
         find_collaborative_epics(project="DEMO")
 
         jql = mock_search.call_args[0][0]
         assert "statusCategory != Done" in jql
 
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_include_done(self, mock_search, mock_children):
         """--include-done removes the status category exclusion."""
         mock_search.return_value = []
-        mock_children.return_value = []
+        mock_children.return_value = ([], 0)
 
         find_collaborative_epics(project="DEMO", include_done=True)
 
         jql = mock_search.call_args[0][0]
         assert "statusCategory" not in jql
 
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_status_filter(self, mock_search, mock_children):
         """An explicit status list replaces the default Done exclusion."""
         mock_search.return_value = []
-        mock_children.return_value = []
+        mock_children.return_value = ([], 0)
 
         find_collaborative_epics(project="DEMO", statuses=["Closed", "Done"])
 
@@ -4289,6 +4643,84 @@ class TestCollaborativeEpics:
 
         assert 'status in ("Needs \\"Review\\"")' in jql
 
+    def test_build_collaborative_epics_jql_team_and_types(self):
+        """Team and issue-type scopes land in the query."""
+        team_id = "36885b3c-1bf0-4f85-a357-c5b858c31de4"
+
+        jql = _build_collaborative_epics_jql(
+            team=[team_id],
+            issue_types=["Story", "Task"],
+        )
+
+        assert f'Team = "{team_id}"' in jql
+        assert 'issuetype in ("Story", "Task")' in jql
+
+    def test_build_collaborative_epics_jql_defaults_to_epic(self):
+        """The default payload still scopes to Epic."""
+        assert 'issuetype = "Epic"' in _build_collaborative_epics_jql()
+
+    def test_build_collaborative_epics_jql_rejects_empty_types(self):
+        """An empty --issuetype list is rejected."""
+        with pytest.raises(ValueError, match="--issuetype requires"):
+            _build_collaborative_epics_jql(issue_types=[" "])
+
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_walks_descendants(self, mock_search, mock_desc):
+        """Contributors come from the whole hierarchy by default."""
+        mock_search.return_value = [
+            {
+                "key": "EPIC-1",
+                "fields": {
+                    "summary": "Epic",
+                    "assignee": {"displayName": "Alice"},
+                },
+            }
+        ]
+        mock_desc.return_value = (
+            [
+                {"key": "STORY-1", "fields": {"assignee": {"displayName": "Bob"}}},
+                {"key": "SUB-1", "fields": {"assignee": {"displayName": "Carol"}}},
+            ],
+            1,
+        )
+
+        result = find_collaborative_epics(min_contributors=2)
+
+        assert result[0]["children_count"] == 1
+        assert result[0]["descendants_count"] == 2
+        assert "Carol" in result[0]["contributors"]
+        assert mock_desc.call_args.kwargs["direct_children_only"] is False
+
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
+    @patch("skills.jira.scripts.jira.search_issues")
+    def test_find_collaborative_epics_direct_children_only(self, mock_search, mock_desc):
+        """--direct-children-only stops at the first level."""
+        mock_search.return_value = [
+            {"key": "EPIC-1", "fields": {"summary": "Epic"}},
+        ]
+        mock_desc.return_value = ([], 0)
+
+        find_collaborative_epics(direct_children_only=True)
+
+        assert mock_desc.call_args.kwargs["direct_children_only"] is True
+
+    def test_format_collaborative_issues_for_non_epic_types(self):
+        """Non-Epic scopes use an issues heading and show descendant counts."""
+        results = [
+            {
+                "epic": {"key": "STORY-1", "fields": {"summary": "Story"}},
+                "children_count": 1,
+                "descendants_count": 3,
+                "contributors": ["Alice"],
+            }
+        ]
+
+        output = format_collaborative_epics(results, issue_types=["Story"])
+
+        assert "## Collaborative Issues" in output
+        assert "- **Descendants:** 3" in output
+
     def test_find_collaborative_epics_rejects_bad_date(self):
         """A malformed date is rejected before it reaches JQL."""
         with pytest.raises(ValueError, match="--since must be a date"):
@@ -4300,7 +4732,7 @@ class TestCollaborativeEpics:
             find_collaborative_epics(since="2026-02-30")
 
     @patch("skills.jira.scripts.jira.resolve_user_for_jql")
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_contributor(self, mock_search, mock_children, mock_resolve):
         """The contributor filter selects their epics and keeps peer names."""
@@ -4322,12 +4754,14 @@ class TestCollaborativeEpics:
             },
         ]
         mock_children.side_effect = [
-            [
-                {"fields": {"assignee": {"accountId": "account-bob", "displayName": "Bob"}}},
-            ],
-            [
-                {"fields": {"assignee": {"accountId": "account-carol", "displayName": "Carol"}}},
-            ],
+            (
+                [{"fields": {"assignee": {"accountId": "account-bob", "displayName": "Bob"}}}],
+                1,
+            ),
+            (
+                [{"fields": {"assignee": {"accountId": "account-carol", "displayName": "Carol"}}}],
+                1,
+            ),
         ]
 
         result = find_collaborative_epics(contributor="alice", min_contributors=1)
@@ -4338,7 +4772,7 @@ class TestCollaborativeEpics:
         assert result[0]["contributors"] == ["Alice", "Bob"]
 
     @patch("skills.jira.scripts.jira.resolve_user_for_jql")
-    @patch("skills.jira.scripts.jira.get_epic_children")
+    @patch("skills.jira.scripts.jira.get_issue_descendants")
     @patch("skills.jira.scripts.jira.search_issues")
     def test_find_collaborative_epics_excludes_non_contributor(
         self, mock_search, mock_children, mock_resolve
@@ -4354,13 +4788,42 @@ class TestCollaborativeEpics:
                 },
             }
         ]
-        mock_children.return_value = [
-            {"fields": {"assignee": {"accountId": "account-bob", "displayName": "Bob"}}}
-        ]
+        mock_children.return_value = (
+            [{"fields": {"assignee": {"accountId": "account-bob", "displayName": "Bob"}}}],
+            1,
+        )
 
         result = find_collaborative_epics(contributor="alice", min_contributors=1)
 
         assert result == []
+
+
+class TestCollaborationLeafCommand:
+    """collaboration is a leaf command with no subcommand."""
+
+    @patch("skills.jira.scripts.jira.find_collaborative_epics")
+    def test_cmd_collaboration_without_subcommand(self, mock_find, capsys):
+        mock_find.return_value = []
+
+        args = argparse.Namespace(
+            project=None,
+            contributor=None,
+            min_contributors=None,
+            max_results=50,
+            since=None,
+            until=None,
+            date_field=None,
+            include_done=False,
+            status=None,
+            team=None,
+            team_name=None,
+            issuetype=None,
+            direct_children_only=False,
+            json=False,
+        )
+
+        assert cmd_collaboration(args) == 0
+        assert "No collaborative epics found" in capsys.readouterr().out
 
 
 class TestCmdCollaboration:
@@ -4378,7 +4841,6 @@ class TestCmdCollaboration:
         ]
 
         args = argparse.Namespace(
-            collaboration_command="epics",
             project="DEMO",
             min_contributors=2,
             max_results=50,
@@ -4405,7 +4867,6 @@ class TestCmdCollaboration:
         mock_format_json.return_value = '[{"epic": {"key": "EPIC-1"}}]'
 
         args = argparse.Namespace(
-            collaboration_command="epics",
             project=None,
             min_contributors=2,
             max_results=50,
@@ -4424,7 +4885,6 @@ class TestCmdCollaboration:
         mock_find.return_value = []
 
         args = argparse.Namespace(
-            collaboration_command="epics",
             project="DEMO",
             contributor="alice",
             min_contributors=None,
@@ -4447,6 +4907,10 @@ class TestCmdCollaboration:
             date_field="updated",
             include_done=False,
             statuses=None,
+            team=None,
+            team_name=None,
+            issue_types=None,
+            direct_children_only=False,
         )
         assert "No collaborative epics found" in capsys.readouterr().out
 
@@ -4456,7 +4920,6 @@ class TestCmdCollaboration:
         mock_find.return_value = []
 
         args = argparse.Namespace(
-            collaboration_command="epics",
             project="DEMO",
             contributor=None,
             min_contributors=2,
@@ -4482,7 +4945,54 @@ class TestCmdCollaboration:
             date_field="resolved",
             include_done=True,
             statuses=["Closed", "Done"],
+            team=None,
+            team_name=None,
+            issue_types=None,
+            direct_children_only=False,
         )
+
+    @patch("skills.jira.scripts.jira.find_collaborative_epics")
+    def test_cmd_collaboration_team_and_issue_types(self, mock_find, capsys):
+        """--team, --issuetype and --direct-children-only reach the search."""
+        mock_find.return_value = []
+        team_id = "36885b3c-1bf0-4f85-a357-c5b858c31de4"
+
+        args = argparse.Namespace(
+            project=None,
+            contributor=None,
+            min_contributors=2,
+            max_results=50,
+            since=None,
+            until=None,
+            date_field="updated",
+            include_done=False,
+            status=None,
+            team=[team_id],
+            team_name=None,
+            issuetype="Story,Task",
+            direct_children_only=True,
+            json=False,
+        )
+
+        result = cmd_collaboration(args)
+
+        assert result == 0
+        mock_find.assert_called_once_with(
+            project=None,
+            min_contributors=2,
+            max_results=50,
+            contributor=None,
+            since=None,
+            until=None,
+            date_field="updated",
+            include_done=False,
+            statuses=None,
+            team=[team_id],
+            team_name=None,
+            issue_types=["Story", "Task"],
+            direct_children_only=True,
+        )
+        assert "No collaborative issues found" in capsys.readouterr().out
 
     @patch("skills.jira.scripts.jira.find_collaborative_epics")
     def test_cmd_collaboration_epics_error(self, mock_find, capsys):
@@ -4490,7 +5000,6 @@ class TestCmdCollaboration:
         mock_find.side_effect = Exception("API error")
 
         args = argparse.Namespace(
-            collaboration_command="epics",
             project=None,
             min_contributors=2,
             max_results=50,

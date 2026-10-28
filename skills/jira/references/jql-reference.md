@@ -14,7 +14,9 @@ Common JQL queries for use with the Jira skill.
 | `priority = High` | High priority issues |
 | `labels = "bug"` | Issues with "bug" label |
 
-Combine with `AND`, `OR`, and use `ORDER BY` for sorting.
+Combine with `AND`, `OR`, and use `ORDER BY` for sorting. `ORDER BY` must be
+the final clause; when a scope or team filter is merged into your query, the
+script moves it outside the combined filters.
 
 ## Status Categories
 
@@ -32,6 +34,22 @@ queries that work across projects:
 
 Use `$SKILL_DIR/scripts/jira.py statuses --categories` to see all status
 categories in your Jira instance.
+
+## Team Scoping
+
+The Team field compares against a team UUID; team names are not valid JQL
+values.
+
+```jql
+Team = "36885b3c-1bf0-4f85-a357-c5b858c31de4"
+Team in ("36885b3c-...", "6c9a2f11-...")
+```
+
+Find the Team field with `fields`; it is commonly `customfield_10001` and
+named `Team`. Use `--team` on `search` and `collaboration` with the
+exact team ID value (some sites suffix the UUID), or `--team-name` to
+resolve a shared team name through JQL autocomplete. Only shared teams are
+searchable by name; use the ID for private teams.
 
 ## Date Functions
 
