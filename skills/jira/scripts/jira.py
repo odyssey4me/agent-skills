@@ -2215,16 +2215,17 @@ def get_link_types() -> list[dict[str, str]]:
     return []
 
 
-def create_link(source_key: str, link_type: str, target_key: str) -> None:
-    """Create a link between two issues.
-
-    Resolves the link type name against available types (case-insensitive),
-    matching on name, inward, or outward labels to determine direction.
+def _resolve_link_type(link_type: str) -> tuple[dict[str, str], str]:
+    """Resolve a link type spelling to its configured type and link end.
 
     Args:
-        source_key: The issue being created/updated.
-        link_type: Link type name (e.g. 'Blocks', 'is blocked by', 'Relates').
-        target_key: The issue to link to.
+        link_type: Link type name, outward label, or inward label.
+
+    Returns:
+        Tuple of (link type dict, role), where role is 'outward' or 'inward'
+        and names the role the issue given on the command line takes. Type
+        names resolve to the outward role, so name and outward spellings
+        behave the same way.
 
     Raises:
         ValueError: If the link type is not recognized.
@@ -2232,34 +2233,54 @@ def create_link(source_key: str, link_type: str, target_key: str) -> None:
     link_types = get_link_types()
     lt_lower = link_type.lower()
 
-    resolved_name = None
-    outward_key = source_key
-    inward_key = target_key
-
     for lt in link_types:
-        if lt_lower == lt["name"].lower():
-            resolved_name = lt["name"]
-            break
-        if lt_lower == lt["outward"].lower():
-            resolved_name = lt["name"]
-            break
+        if lt_lower == lt["name"].lower() or lt_lower == lt["outward"].lower():
+            return lt, "outward"
         if lt_lower == lt["inward"].lower():
-            resolved_name = lt["name"]
-            outward_key = target_key
-            inward_key = source_key
-            break
+            return lt, "inward"
 
-    if not resolved_name:
-        valid = []
-        for lt in link_types:
-            valid.append(f"{lt['name']} (outward: {lt['outward']}, inward: {lt['inward']})")
-        raise ValueError(f"Unknown link type '{link_type}'. Valid types:\n  " + "\n  ".join(valid))
+    valid = []
+    for lt in link_types:
+        valid.append(f"{lt['name']} (outward: {lt['outward']}, inward: {lt['inward']})")
+    raise ValueError(f"Unknown link type '{link_type}'. Valid types:\n  " + "\n  ".join(valid))
+
+
+def create_link(source_key: str, link_type: str, target_key: str) -> None:
+    """Create a link between two issues.
+
+    The type name, outward label, or inward label may be used (matched
+    case-insensitively). ``source_key`` always takes the role named by the
+    spelling, so ``'Blocks:X'`` and ``'blocks:X'`` mean source_key blocks X,
+    while ``'is blocked by:X'`` means source_key is blocked by X.
+
+    Jira names the create-link payload by link end rather than by the issue
+    that displays each description: the issue sent as ``outwardIssue``
+    displays the type's *inward* description. This is the reverse of the
+    payload field names, so the role is assigned to the opposite field.
+    Verified against redhat.atlassian.net on 2026-11-04 by reading both
+    issues back with ``issue get A,B --fields issuelinks``; see the
+    Atlassian issue linking model for the read side of the mapping.
+
+    Args:
+        source_key: The issue being created/updated.
+        link_type: Link type name, outward label, or inward label.
+        target_key: The issue to link to.
+
+    Raises:
+        ValueError: If the link type is not recognized.
+    """
+    lt, role = _resolve_link_type(link_type)
+
+    if role == "outward":
+        outward_key, inward_key = target_key, source_key
+    else:
+        outward_key, inward_key = source_key, target_key
 
     post(
         "jira",
         api_path("issueLink"),
         {
-            "type": {"name": resolved_name},
+            "type": {"name": lt["name"]},
             "outwardIssue": {"key": outward_key},
             "inwardIssue": {"key": inward_key},
         },
@@ -2269,38 +2290,48 @@ def create_link(source_key: str, link_type: str, target_key: str) -> None:
 def delete_link(issue_key: str, link_type: str, target_key: str) -> None:
     """Remove a link between two issues.
 
-    Fetches the issue's links, finds the one matching the given type and
-    target, and deletes it via the API.
+    Only a link where ``issue_key`` takes the role named by ``link_type`` is
+    removed: ``'Blocks:X'`` unlinks "issue_key blocks X", while
+    ``'is blocked by:X'`` unlinks "issue_key is blocked by X". Fetches the
+    issue's links, finds the matching link, and deletes it via the API.
 
     Args:
         issue_key: The issue to remove the link from.
-        link_type: Link type name, inward, or outward label.
+        link_type: Link type name, outward label, or inward label.
         target_key: The linked issue key.
 
     Raises:
         ValueError: If no matching link is found.
     """
+    lt, role = _resolve_link_type(link_type)
     issue = get_issue(issue_key, fields=["issuelinks"])
     links = issue.get("fields", {}).get("issuelinks", [])
-    lt_lower = link_type.lower()
-    target_lower = target_key.upper()
+    target_upper = target_key.upper()
 
     for link in links:
         link_type_obj = link.get("type", {})
-        type_name = link_type_obj.get("name", "").lower()
-        inward_label = link_type_obj.get("inward", "").lower()
-        outward_label = link_type_obj.get("outward", "").lower()
-
-        if lt_lower not in (type_name, inward_label, outward_label):
+        if link_type_obj.get("name", "").lower() != lt["name"].lower():
             continue
 
-        outward_issue = link.get("outwardIssue", {})
-        inward_issue = link.get("inwardIssue", {})
-        linked_key = (outward_issue.get("key", "") or inward_issue.get("key", "")).upper()
+        # An issuelinks entry on this issue names the linked issue through
+        # the end this issue displays: outwardIssue means this issue takes
+        # the outward role, inwardIssue the inward role.
+        outward_issue = link.get("outwardIssue")
+        inward_issue = link.get("inwardIssue")
+        if outward_issue:
+            displayed_role = "outward"
+            linked_key = outward_issue.get("key", "")
+        elif inward_issue:
+            displayed_role = "inward"
+            linked_key = inward_issue.get("key", "")
+        else:
+            continue
 
-        if linked_key == target_lower:
-            delete("jira", api_path(f"issueLink/{link['id']}"))
-            return
+        if displayed_role != role or linked_key.upper() != target_upper:
+            continue
+
+        delete("jira", api_path(f"issueLink/{link['id']}"))
+        return
 
     raise ValueError(f"No '{link_type}' link found between {issue_key} and {target_key}")
 

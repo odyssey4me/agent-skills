@@ -25,7 +25,11 @@ links:                   # issue links (additive with --link CLI args)
 Markdown body becomes the issue description.
 Supports headings, bold, links, lists, and tables.
 
-Link type names can be the type name, outward label, or inward label
-(e.g. `blocks`, `is blocked by`, `Relates`). The direction is resolved
-automatically based on which label matches.
+Link keys can be the type name, outward label, or inward label (e.g.
+`blocks`, `is blocked by`, `Relates`). The new issue takes the role named
+by the key: `blocks: DEMO-456` makes the new issue block DEMO-456, while
+`is blocked by: DEMO-456` makes it blocked by DEMO-456. The type name
+behaves like the outward label. Direction comes from the configured labels,
+so it also covers types such as `Depend`, where the blocked side is the
+outward end.
 ```

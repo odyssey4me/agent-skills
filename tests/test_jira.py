@@ -5827,7 +5827,11 @@ class TestIssueLinking:
     @patch("skills.jira.scripts.jira.api_path")
     @patch("skills.jira.scripts.jira.get_link_types")
     def test_create_link_outward(self, mock_types, mock_api_path, mock_post):
-        """Test creating a link using outward name."""
+        """Test that the source takes the outward role via the opposite field.
+
+        Jira displays the outward description on the issue sent as
+        ``inwardIssue``, so an outward link puts the source there.
+        """
         mock_types.return_value = self.SAMPLE_LINK_TYPES
         mock_api_path.return_value = "rest/api/3/issueLink"
         mock_post.return_value = {}
@@ -5837,8 +5841,8 @@ class TestIssueLinking:
         mock_post.assert_called_once()
         payload = mock_post.call_args[0][2]
         assert payload["type"]["name"] == "Blocks"
-        assert payload["outwardIssue"]["key"] == "SRC-1"
-        assert payload["inwardIssue"]["key"] == "TGT-2"
+        assert payload["outwardIssue"]["key"] == "TGT-2"
+        assert payload["inwardIssue"]["key"] == "SRC-1"
 
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
@@ -5853,8 +5857,8 @@ class TestIssueLinking:
 
         payload = mock_post.call_args[0][2]
         assert payload["type"]["name"] == "Blocks"
-        assert payload["outwardIssue"]["key"] == "TGT-2"
-        assert payload["inwardIssue"]["key"] == "SRC-1"
+        assert payload["outwardIssue"]["key"] == "SRC-1"
+        assert payload["inwardIssue"]["key"] == "TGT-2"
 
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
@@ -5869,7 +5873,8 @@ class TestIssueLinking:
 
         payload = mock_post.call_args[0][2]
         assert payload["type"]["name"] == "Blocks"
-        assert payload["outwardIssue"]["key"] == "SRC-1"
+        assert payload["outwardIssue"]["key"] == "TGT-2"
+        assert payload["inwardIssue"]["key"] == "SRC-1"
 
     @patch("skills.jira.scripts.jira.get_link_types")
     def test_create_link_invalid_type(self, mock_types):
@@ -5899,6 +5904,12 @@ class TestIssueLinking:
 class TestDeleteLink:
     """Tests for delete_link()."""
 
+    LINK_TYPES = [
+        {"name": "Blocks", "inward": "is blocked by", "outward": "blocks"},
+        {"name": "Related", "inward": "is related to", "outward": "relates to"},
+        {"name": "Cloners", "inward": "is cloned by", "outward": "clones"},
+    ]
+
     SAMPLE_ISSUE = {
         "fields": {
             "issuelinks": [
@@ -5914,8 +5925,17 @@ class TestDeleteLink:
                 {
                     "id": "10002",
                     "type": {
-                        "name": "Relates",
-                        "inward": "relates to",
+                        "name": "Blocks",
+                        "inward": "is blocked by",
+                        "outward": "blocks",
+                    },
+                    "inwardIssue": {"key": "TGT-2"},
+                },
+                {
+                    "id": "10003",
+                    "type": {
+                        "name": "Related",
+                        "inward": "is related to",
                         "outward": "relates to",
                     },
                     "inwardIssue": {"key": "TGT-3"},
@@ -5927,8 +5947,10 @@ class TestDeleteLink:
     @patch("skills.jira.scripts.jira.delete")
     @patch("skills.jira.scripts.jira.api_path")
     @patch("skills.jira.scripts.jira.get_issue")
-    def test_delete_link_by_outward_label(self, mock_get, mock_api_path, mock_delete):
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_delete_link_by_outward_label(self, mock_types, mock_get, mock_api_path, mock_delete):
         """Test deleting a link using outward label."""
+        mock_types.return_value = self.LINK_TYPES
         mock_get.return_value = self.SAMPLE_ISSUE
         mock_api_path.return_value = "rest/api/3/issueLink/10001"
         mock_delete.return_value = {}
@@ -5940,44 +5962,309 @@ class TestDeleteLink:
     @patch("skills.jira.scripts.jira.delete")
     @patch("skills.jira.scripts.jira.api_path")
     @patch("skills.jira.scripts.jira.get_issue")
-    def test_delete_link_by_type_name(self, mock_get, mock_api_path, mock_delete):
-        """Test deleting a link using type name."""
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_delete_link_by_type_name(self, mock_types, mock_get, mock_api_path, mock_delete):
+        """Test deleting a link using type name (the outward role)."""
+        mock_types.return_value = self.LINK_TYPES
         mock_get.return_value = self.SAMPLE_ISSUE
         mock_api_path.return_value = "rest/api/3/issueLink/10001"
         mock_delete.return_value = {}
 
         delete_link("SRC-1", "Blocks", "TGT-2")
 
-        mock_delete.assert_called_once()
+        mock_delete.assert_called_once_with("jira", "rest/api/3/issueLink/10001")
 
     @patch("skills.jira.scripts.jira.delete")
     @patch("skills.jira.scripts.jira.api_path")
     @patch("skills.jira.scripts.jira.get_issue")
-    def test_delete_link_inward_issue(self, mock_get, mock_api_path, mock_delete):
-        """Test deleting a link where the target is the inward issue."""
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_delete_link_by_inward_label(self, mock_types, mock_get, mock_api_path, mock_delete):
+        """Test that an inward label deletes the inward link, not the outward one."""
+        mock_types.return_value = self.LINK_TYPES
         mock_get.return_value = self.SAMPLE_ISSUE
         mock_api_path.return_value = "rest/api/3/issueLink/10002"
         mock_delete.return_value = {}
 
-        delete_link("SRC-1", "Relates", "TGT-3")
+        delete_link("SRC-1", "is blocked by", "TGT-2")
+
+        mock_delete.assert_called_once_with("jira", "rest/api/3/issueLink/10002")
+
+    @patch("skills.jira.scripts.jira.delete")
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_delete_link_outward_does_not_match_inward_only(
+        self, mock_types, mock_get, mock_delete
+    ):
+        """Test that an outward spelling leaves an inward-only link alone."""
+        mock_types.return_value = self.LINK_TYPES
+        mock_get.return_value = {
+            "fields": {"issuelinks": [self.SAMPLE_ISSUE["fields"]["issuelinks"][1]]}
+        }
+
+        with pytest.raises(ValueError, match="No 'Blocks' link found"):
+            delete_link("SRC-1", "Blocks", "TGT-2")
+        mock_delete.assert_not_called()
+
+    @patch("skills.jira.scripts.jira.delete")
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_delete_link_inward_does_not_match_outward_only(
+        self, mock_types, mock_get, mock_delete
+    ):
+        """Test that an inward spelling leaves an outward-only link alone."""
+        mock_types.return_value = self.LINK_TYPES
+        mock_get.return_value = {
+            "fields": {"issuelinks": [self.SAMPLE_ISSUE["fields"]["issuelinks"][0]]}
+        }
+
+        with pytest.raises(ValueError, match="No 'is blocked by' link found"):
+            delete_link("SRC-1", "is blocked by", "TGT-2")
+        mock_delete.assert_not_called()
+
+    @patch("skills.jira.scripts.jira.delete")
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get_issue")
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_delete_link_symmetric_inward_issue(
+        self, mock_types, mock_get, mock_api_path, mock_delete
+    ):
+        """Test deleting a symmetric link that appears on the inward side."""
+        mock_types.return_value = self.LINK_TYPES
+        mock_get.return_value = self.SAMPLE_ISSUE
+        mock_api_path.return_value = "rest/api/3/issueLink/10003"
+        mock_delete.return_value = {}
+
+        delete_link("SRC-1", "is related to", "TGT-3")
 
         mock_delete.assert_called_once()
 
     @patch("skills.jira.scripts.jira.get_issue")
-    def test_delete_link_not_found(self, mock_get):
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_delete_link_not_found(self, mock_types, mock_get):
         """Test that missing link raises ValueError."""
+        mock_types.return_value = self.LINK_TYPES
         mock_get.return_value = self.SAMPLE_ISSUE
 
         with pytest.raises(ValueError, match="No 'Blocks' link found"):
             delete_link("SRC-1", "Blocks", "NONEXISTENT-99")
 
     @patch("skills.jira.scripts.jira.get_issue")
-    def test_delete_link_wrong_type(self, mock_get):
+    @patch("skills.jira.scripts.jira.get_link_types")
+    def test_delete_link_wrong_type(self, mock_types, mock_get):
         """Test that wrong link type raises ValueError."""
+        mock_types.return_value = self.LINK_TYPES
         mock_get.return_value = self.SAMPLE_ISSUE
 
         with pytest.raises(ValueError, match="No 'Clones' link found"):
             delete_link("SRC-1", "Clones", "TGT-2")
+
+
+class TestLinkDirectionAgainstReadModel:
+    """Verify link direction by reading the link back, not by the payload.
+
+    The fake store implements the Jira Cloud semantics verified on
+    redhat.atlassian.net on 2026-11-04: a link request's ``outwardIssue``
+    names the issue that displays the type's *inward* description, and each
+    issue's ``issuelinks`` entry names the linked issue through the end that
+    the issue itself displays.
+    """
+
+    LINK_TYPES = [
+        {"name": "Blocks", "outward": "blocks", "inward": "is blocked by"},
+        {"name": "Depend", "outward": "depends on", "inward": "is depended on by"},
+        {"name": "Related", "outward": "relates to", "inward": "is related to"},
+    ]
+
+    class FakeStore:
+        """In-memory Jira issue-link API with the observed direction mapping."""
+
+        def __init__(self, link_types):
+            self.types = {lt["name"]: lt for lt in link_types}
+            self.links = []
+            self._next_id = 1000
+
+        def post(self, _service, _path, payload):
+            self._next_id += 1
+            self.links.append(
+                {
+                    "id": str(self._next_id),
+                    "type": payload["type"]["name"],
+                    "subject": payload["inwardIssue"]["key"],
+                    "object": payload["outwardIssue"]["key"],
+                }
+            )
+            return {}
+
+        def delete(self, _service, path):
+            link_id = path.rsplit("/", 1)[-1]
+            self.links = [link for link in self.links if link["id"] != link_id]
+            return {}
+
+        def get_issue(self, issue_key, fields=None):
+            entries = []
+            for link in self.links:
+                entry = {"id": link["id"], "type": dict(self.types[link["type"]])}
+                if link["subject"] == issue_key:
+                    entry["outwardIssue"] = {"key": link["object"]}
+                elif link["object"] == issue_key:
+                    entry["inwardIssue"] = {"key": link["subject"]}
+                else:
+                    continue
+                entries.append(entry)
+            return {"key": issue_key, "fields": {"issuelinks": entries}}
+
+    def run_with_store(self, store, operation):
+        """Run a link operation against the fake store."""
+        with (
+            patch("skills.jira.scripts.jira.get_link_types", return_value=self.LINK_TYPES),
+            patch("skills.jira.scripts.jira.api_path", side_effect=lambda endpoint: endpoint),
+            patch("skills.jira.scripts.jira.post", side_effect=store.post),
+            patch("skills.jira.scripts.jira.delete", side_effect=store.delete),
+            patch("skills.jira.scripts.jira.get_issue", side_effect=store.get_issue),
+        ):
+            operation()
+
+    @staticmethod
+    def linked_entry(store, issue_key, target_key):
+        """Return the link entry that issue_key shows for target_key."""
+        for entry in store.get_issue(issue_key)["fields"]["issuelinks"]:
+            linked = entry.get("outwardIssue") or entry.get("inwardIssue") or {}
+            if linked.get("key") == target_key:
+                return entry
+        raise AssertionError(f"No link from {issue_key} to {target_key}: {store.links}")
+
+    def test_type_name_spelling_takes_outward_role(self):
+        """'Blocks:X' on A reads back as A blocks X."""
+        store = self.FakeStore(self.LINK_TYPES)
+
+        self.run_with_store(store, lambda: create_link("A-1", "Blocks", "B-2"))
+
+        entry = self.linked_entry(store, "A-1", "B-2")
+        assert "outwardIssue" in entry
+        assert "inwardIssue" not in entry
+        mirror = self.linked_entry(store, "B-2", "A-1")
+        assert "inwardIssue" in mirror
+        assert entry["type"]["name"] == "Blocks"
+
+    def test_outward_label_spelling_takes_outward_role(self):
+        """'blocks:X' on A reads back as A blocks X."""
+        store = self.FakeStore(self.LINK_TYPES)
+
+        self.run_with_store(store, lambda: create_link("A-1", "blocks", "B-2"))
+
+        entry = self.linked_entry(store, "A-1", "B-2")
+        assert "outwardIssue" in entry
+        assert "inwardIssue" not in entry
+
+    def test_inward_label_spelling_takes_inward_role(self):
+        """'is blocked by:X' on A reads back as A is blocked by X."""
+        store = self.FakeStore(self.LINK_TYPES)
+
+        self.run_with_store(store, lambda: create_link("A-1", "is blocked by", "B-2"))
+
+        entry = self.linked_entry(store, "A-1", "B-2")
+        assert "inwardIssue" in entry
+        assert "outwardIssue" not in entry
+        mirror = self.linked_entry(store, "B-2", "A-1")
+        assert "outwardIssue" in mirror
+
+    def test_depend_type_uses_its_own_direction(self):
+        """'depends on:X' on A reads back as A depends on X.
+
+        The blocked side is the outward end for Depend, unlike Blocks, so
+        the same fix must work from the configured labels, not a hardcoded
+        'blocks' assumption.
+        """
+        store = self.FakeStore(self.LINK_TYPES)
+
+        self.run_with_store(store, lambda: create_link("A-1", "depends on", "B-2"))
+
+        entry = self.linked_entry(store, "A-1", "B-2")
+        assert "outwardIssue" in entry
+        assert entry["type"]["outward"] == "depends on"
+
+    def test_symmetric_type_links_both_ways(self):
+        """Both spellings of a symmetric type link A and B."""
+        for spelling, expected_field in [
+            ("Related", "outwardIssue"),
+            ("relates to", "outwardIssue"),
+            ("is related to", "inwardIssue"),
+        ]:
+            store = self.FakeStore(self.LINK_TYPES)
+            self.run_with_store(
+                store, lambda spelling=spelling: create_link("A-1", spelling, "B-2")
+            )
+
+            entry = self.linked_entry(store, "A-1", "B-2")
+            assert expected_field in entry
+            assert entry["type"]["name"] == "Related"
+
+    def test_unlink_removes_only_the_requested_direction(self):
+        """With both directions present, only the named one is deleted."""
+        store = self.FakeStore(self.LINK_TYPES)
+        store.links = [
+            {"id": "1", "type": "Blocks", "subject": "A-1", "object": "B-2"},
+            {"id": "2", "type": "Blocks", "subject": "B-2", "object": "A-1"},
+        ]
+
+        self.run_with_store(store, lambda: delete_link("A-1", "Blocks", "B-2"))
+
+        assert [link["id"] for link in store.links] == ["2"]
+
+    def test_unlink_inward_removes_only_the_inward_direction(self):
+        """The inward spelling deletes the link where A is blocked by B."""
+        store = self.FakeStore(self.LINK_TYPES)
+        store.links = [
+            {"id": "1", "type": "Blocks", "subject": "A-1", "object": "B-2"},
+            {"id": "2", "type": "Blocks", "subject": "B-2", "object": "A-1"},
+        ]
+
+        self.run_with_store(store, lambda: delete_link("A-1", "is blocked by", "B-2"))
+
+        assert [link["id"] for link in store.links] == ["1"]
+
+    def test_create_then_unlink_round_trip(self):
+        """A CLI-created link is removed by the same spelling."""
+        store = self.FakeStore(self.LINK_TYPES)
+
+        self.run_with_store(store, lambda: create_link("A-1", "is blocked by", "B-2"))
+        self.run_with_store(store, lambda: delete_link("A-1", "is blocked by", "B-2"))
+
+        assert store.links == []
+
+    @patch("skills.jira.scripts.jira.update_issue")
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    def test_confirmation_matches_read_back(self, mock_defaults, mock_update, capsys):
+        """The CLI confirmation agrees with what the issue shows afterwards."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_update.return_value = {}
+        store = self.FakeStore(self.LINK_TYPES)
+
+        args = argparse.Namespace(
+            issue_command="update",
+            issue_key="DEMO-123",
+            summary=None,
+            description=None,
+            priority=None,
+            labels=None,
+            assignee=None,
+            from_file=None,
+            set_field=None,
+            link=["Blocks:DEMO-456"],
+        )
+
+        with (
+            patch("skills.jira.scripts.jira.get_link_types", return_value=self.LINK_TYPES),
+            patch("skills.jira.scripts.jira.api_path", side_effect=lambda endpoint: endpoint),
+            patch("skills.jira.scripts.jira.post", side_effect=store.post),
+            patch("skills.jira.scripts.jira.get_issue", side_effect=store.get_issue),
+        ):
+            result = cmd_issue(args)
+
+        assert result == 0
+        assert "Linked DEMO-123 --[Blocks]--> DEMO-456" in capsys.readouterr().out
+        entry = self.linked_entry(store, "DEMO-123", "DEMO-456")
+        assert "outwardIssue" in entry
 
 
 class TestParseLinkArgs:
@@ -6158,7 +6445,7 @@ class TestCmdIssueLinkIntegration:
         assert result == 0
         mock_link.assert_called_once_with("DEMO-123", "Blocks", "DEMO-456")
         captured = capsys.readouterr()
-        assert "Linked DEMO-123" in captured.out
+        assert "Linked DEMO-123 --[Blocks]--> DEMO-456" in captured.out
 
     @patch("skills.jira.scripts.jira.delete_link")
     @patch("skills.jira.scripts.jira.update_issue")
