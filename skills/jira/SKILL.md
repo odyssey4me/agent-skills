@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "1.3.0"
+  version: "1.3.1"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -186,7 +186,7 @@ issue links or web links); pass `--fields` to request more.
 `issue children --assignees-only` prints just the distinct assignee names —
 the cheap way to get the collaborator set.
 
-See [from-file-format.md](references/from-file-format.md) for the `--from-file` markdown format and [examples.md](references/examples.md) for more patterns.
+See [from-file-format.md](references/from-file-format.md) for the `--from-file` format and link direction, and [examples.md](references/examples.md) for more patterns.
 
 ### transitions
 
