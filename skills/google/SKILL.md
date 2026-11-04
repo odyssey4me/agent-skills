@@ -10,7 +10,7 @@ metadata:
   category: productivity
   tags: "gmail, calendar, drive, docs, sheets, slides"
   complexity: lightweight
-  gogcli-version: "0.47.0"
+  gogcli-version: "0.47.1"
   gogcli-repository: openclaw/gogcli
 license: MIT
 ---
