@@ -211,6 +211,13 @@ commands, and add them to its allow-list upfront — giving the agent
 frictionless access to queries and lookups while still gating write operations
 behind user confirmation.
 
+Not every skill publishes tables. Where the underlying CLI can enforce
+read-only mode itself — gog's `--readonly`, for example — the reference states
+that rule instead, because a hand-maintained list of commands drifts with every
+upstream release while the flag does not. Read the skill's reference for its
+shape rather than assuming tables, and prefer a flag-matching allow rule
+(`gog --readonly *`) over enumerated command names when one is available.
+
 ### Skill-Specific Commands
 
 You can also invoke skills directly with specific commands. See individual skill documentation in the [Available Skills](../README.md#available-skills) table.
