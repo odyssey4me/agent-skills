@@ -39,7 +39,7 @@ repos:
 
   # Skillsaw - Agent skill linter
   - repo: https://github.com/stbenjam/skillsaw
-    rev: v0.14.0
+    rev: v0.22.0
     hooks:
       - id: skillsaw
         args: [--strict]
@@ -84,7 +84,7 @@ repos:
 
   # Run full CI checks before push
   - repo: https://github.com/stbenjam/skillsaw
-    rev: v0.14.0
+    rev: v0.22.0
     hooks:
       - id: skillsaw
         alias: skillsaw-prepush
