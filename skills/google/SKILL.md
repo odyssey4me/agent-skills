@@ -6,7 +6,7 @@ description: >-
   files, edit documents, update spreadsheets, or create presentations.
 metadata:
   author: odyssey4me
-  version: "1.3.0"
+  version: "2.0.0"
   category: productivity
   tags: "gmail, calendar, drive, docs, sheets, slides"
   complexity: lightweight
@@ -266,7 +266,7 @@ gog gmail search "is:unread" --json --select "id,subject,from"
 
 ## Agent Safety
 
-See [permissions.md](references/permissions.md) for the read/write classification of the commands this skill documents. Treat `--readonly` as the base for read-only work rather than relying on an agent's permission layer: it blocks mutating API requests inside the CLI, so a mistyped subcommand or a mixed group cannot slip through a command-text allow-list.
+See [permissions.md](references/permissions.md) for how this skill keeps gog read-only: prefix every read-only command with `--readonly`, which blocks mutating requests inside the CLI, and treat every other invocation as a write that needs approval for that specific change.
 
 ```bash
 # Read-only mode (blocks all mutations)
