@@ -16,6 +16,9 @@
     "pre-commit",
     "custom.regex"
   ],
+  "pre-commit": {
+    "enabled": true
+  },
   "minimumReleaseAge": "14 days",
   "osvVulnerabilityAlerts": true,
   "customManagers": [
@@ -38,6 +41,17 @@
       "matchStrings": ["go install golang\\.org/x/vuln/cmd/govulncheck@(?<currentValue>v[^\\s]+)"],
       "datasourceTemplate": "go",
       "depNameTemplate": "golang.org/x/vuln"
+    },
+    {
+      "customType": "regex",
+      "description": "Update the skillsaw ruleset version in .skillsaw.yaml",
+      "managerFilePatterns": [
+        "/^\\.skillsaw\\.yaml$/"
+      ],
+      "matchStrings": ["(?:^|\\n)version:\\s*\"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "stbenjam/skillsaw",
+      "extractVersionTemplate": "^v(?<version>.*)$"
     }
   ],
   "packageRules": [
@@ -72,6 +86,14 @@
         "github-actions"
       ],
       "groupName": "github-actions"
+    },
+    {
+      "description": "skillsaw: move the hook pin and the ruleset version together",
+      "matchPackageNames": [
+        "/stbenjam\\/skillsaw$/"
+      ],
+      "groupName": "skillsaw",
+      "automerge": false
     },
     {
       "description": "gogcli: security validation with extended release age",
