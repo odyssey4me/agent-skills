@@ -1,4 +1,4 @@
-version: "0.14.0"
+version: "0.22.0"
 
 exclude:
   - "AGENTS.md"
@@ -7,6 +7,7 @@ exclude:
   - ".codex/**"
   - "templates/**"
   - "tests/**"
+  - "**/__pycache__/**"
 
 rules:
   context-budget:

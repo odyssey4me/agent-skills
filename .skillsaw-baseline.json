@@ -1,31 +1,6 @@
 {
   "version": "1",
-  "generated_by": "skillsaw 0.14.0",
-  "generated_at": "2026-06-29T11:00:25.893495+00:00",
-  "violations": [
-    {
-      "fingerprint": "34f89167ca2aa6ce",
-      "rule_id": "content-placeholder-text",
-      "file_path": "CLAUDE.md",
-      "line": 74,
-      "message": "Placeholder text (TODO marker): 'TODO'",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "1d359900e289dd3a",
-      "rule_id": "content-placeholder-text",
-      "file_path": "CLAUDE.md",
-      "line": 76,
-      "message": "Placeholder text (TODO marker): 'TODO'",
-      "severity": "warning"
-    },
-    {
-      "fingerprint": "fa39b1eccd9943d2",
-      "rule_id": "content-placeholder-text",
-      "file_path": "CLAUDE.md",
-      "line": 78,
-      "message": "Placeholder text (TODO marker): 'TODO'",
-      "severity": "warning"
-    }
-  ]
+  "generated_by": "skillsaw 0.22.0",
+  "generated_at": "2026-11-16T11:52:48.031826+00:00",
+  "violations": []
 }
