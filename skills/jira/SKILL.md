@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "1.4.0"
+  version: "1.5.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -176,6 +176,10 @@ $SKILL_DIR/scripts/jira.py issue update DEMO-123 --unlink "Blocks:DEMO-456"
 
 # Comment (--security-level for private comments)
 $SKILL_DIR/scripts/jira.py issue comment DEMO-123 "This is a comment"
+
+# Archive or restore issues (Jira admin, Premium/Enterprise; max 1000 keys)
+$SKILL_DIR/scripts/jira.py issue archive DEMO-123,DEMO-124
+$SKILL_DIR/scripts/jira.py issue unarchive DEMO-123
 ```
 
 `--contributors` reports each person with the roles they hold: `reporter`,
@@ -188,6 +192,9 @@ issue links or web links); pass `--fields` to request more.
 
 `issue children --assignees-only` prints just the distinct assignee names —
 the cheap way to get the collaborator set.
+
+`issue archive`/`issue unarchive` exit non-zero when Jira reports partial
+failures; see [examples.md](references/examples.md#archive-completed-issues).
 
 See [from-file-format.md](references/from-file-format.md) for the `--from-file` format and link direction, and [examples.md](references/examples.md) for more patterns.
 
@@ -233,44 +240,8 @@ Use `statusCategory` (`"To Do"`, `"In Progress"`, `Done`) for queries that work 
 
 ## Examples
 
-Common Jira workflows:
-
-**Search and view:**
-```bash
-# Find all open tasks assigned to you
-jira search "assignee = currentUser() AND status = Open"
-
-# Get issue details
-jira issue get DEMO-123 --fields "summary,status,assignee"
-```
-
-**Create and update:**
-```bash
-# Create a new bug
-jira issue create --project DEMO --type Bug --summary "Login page broken"
-
-# Create a story under an epic
-jira issue create --project DEMO --type Story --summary "Implement feature" --parent EPIC-123
-
-# Set or change an issue's parent (works for any hierarchy level)
-jira issue update DEMO-123 --parent EPIC-456
-
-# Remove an issue's parent
-jira issue update DEMO-123 --remove-parent
-
-# Update an issue and add a comment
-jira issue update DEMO-123 --priority High --assignee "user@example.com"
-jira issue comment DEMO-123 "Assigned to review"
-```
-
-**Workflow:**
-```bash
-# List available transitions
-jira transitions list DEMO-123
-
-# Move issue to Done
-jira transitions do DEMO-123 "Done" --comment "Completed"
-```
+See [examples.md](references/examples.md) for end-to-end workflows covering
+search, create/update, transitions, archiving, collaboration and batched reads.
 
 ## Model Guidance
 

@@ -32,6 +32,7 @@ from skills.jira.scripts.jira import (
     _truncate,
     add_comment,
     api_path,
+    archive_issues,
     automation_path,
     clear_cache,
     cmd_automations,
@@ -60,6 +61,7 @@ from skills.jira.scripts.jira import (
     extract_contributors,
     find_collaborative_epics,
     find_removed_jql_functions,
+    format_archive_result,
     format_assignee_set,
     format_automation_detail,
     format_automation_summary,
@@ -958,6 +960,51 @@ class TestFormatting:
         result = format_issues_list([])
         assert result == "No issues found"
 
+    def test_format_archive_result(self):
+        """Test formatting a successful archive response."""
+        result = format_archive_result({"numberOfIssuesUpdated": 3})
+
+        assert "## Archived issues" in result
+        assert "- **Issues updated:** 3" in result
+        assert "## Errors" not in result
+
+    def test_format_archive_result_unarchive(self):
+        """Test unarchive responses use the unarchive heading."""
+        result = format_archive_result({"numberOfIssuesUpdated": 1}, unarchive=True)
+
+        assert "## Unarchived issues" in result
+        assert "- **Issues updated:** 1" in result
+
+    def test_format_archive_result_with_errors(self):
+        """Test formatting grouped archive errors."""
+        result = format_archive_result(
+            {
+                "numberOfIssuesUpdated": 1,
+                "errors": {
+                    "issuesNotFound": {
+                        "count": 2,
+                        "issueIdsOrKeys": ["DEMO-9", "DEMO-10"],
+                        "message": "Issue not found.",
+                    }
+                },
+            }
+        )
+
+        assert "## Errors" in result
+        assert "### issuesNotFound" in result
+        assert "- **Count:** 2" in result
+        assert "- **Message:** Issue not found." in result
+        assert "- **Issues:** DEMO-9, DEMO-10" in result
+
+    def test_format_archive_result_non_dict_error(self):
+        """Test formatting an error entry that is not a dictionary."""
+        result = format_archive_result(
+            {"numberOfIssuesUpdated": 0, "errors": {"unexpected": "boom"}}
+        )
+
+        assert "### unexpected" in result
+        assert "- **Detail:** boom" in result
+
 
 class TestEnsureFieldIncluded:
     """Tests for ensure_field_included helper."""
@@ -1380,6 +1427,46 @@ class TestApiOperations:
         assert result == {}
         payload = mock_put.call_args[0][2]
         assert payload["fields"]["parent"] is None
+
+    @patch("skills.jira.scripts.jira.put")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_archive_issues(self, mock_api_path, mock_put):
+        """Test archiving issues by key."""
+        mock_api_path.return_value = "rest/api/3/issue/archive"
+        mock_put.return_value = {"numberOfIssuesUpdated": 2}
+
+        result = archive_issues(["DEMO-1", "DEMO-2"])
+
+        mock_put.assert_called_once_with(
+            "jira",
+            "rest/api/3/issue/archive",
+            {"issueIdsOrKeys": ["DEMO-1", "DEMO-2"]},
+        )
+        assert result["numberOfIssuesUpdated"] == 2
+
+    @patch("skills.jira.scripts.jira.put")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_unarchive_issues(self, mock_api_path, mock_put):
+        """Test unarchiving issues uses the unarchive endpoint."""
+        mock_api_path.return_value = "rest/api/3/issue/unarchive"
+        mock_put.return_value = {"numberOfIssuesUpdated": 1}
+
+        result = archive_issues(["DEMO-1"], unarchive=True)
+
+        mock_put.assert_called_once_with(
+            "jira",
+            "rest/api/3/issue/unarchive",
+            {"issueIdsOrKeys": ["DEMO-1"]},
+        )
+        assert result["numberOfIssuesUpdated"] == 1
+
+    @patch("skills.jira.scripts.jira.put")
+    @patch("skills.jira.scripts.jira.api_path")
+    def test_archive_issues_non_dict_response(self, _mock_api_path, mock_put):
+        """Test archive handles a non-dict response."""
+        mock_put.return_value = []
+
+        assert archive_issues(["DEMO-1"]) == {}
 
     @patch("skills.jira.scripts.jira.post")
     @patch("skills.jira.scripts.jira.api_path")
@@ -1928,6 +2015,111 @@ class TestCommandHandlers:
         captured = capsys.readouterr()
         assert "Added private comment to DEMO-123" in captured.out
         assert "Internal" in captured.out
+
+    @patch("skills.jira.scripts.jira.archive_issues")
+    def test_cmd_issue_archive(self, mock_archive, capsys):
+        """Test archiving a comma-separated list of issues."""
+        mock_archive.return_value = {"numberOfIssuesUpdated": 2}
+
+        args = argparse.Namespace(
+            issue_command="archive",
+            issue_keys="DEMO-1, DEMO-2",
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        mock_archive.assert_called_once_with(["DEMO-1", "DEMO-2"], unarchive=False)
+        captured = capsys.readouterr()
+        assert "## Archived issues" in captured.out
+        assert "- **Issues updated:** 2" in captured.out
+
+    @patch("skills.jira.scripts.jira.archive_issues")
+    def test_cmd_issue_archive_json(self, mock_archive, capsys):
+        """Test archive JSON output returns the raw response."""
+        mock_archive.return_value = {"numberOfIssuesUpdated": 1}
+
+        args = argparse.Namespace(issue_command="archive", issue_keys="DEMO-1", json=True)
+
+        assert cmd_issue(args) == 0
+        assert '"numberOfIssuesUpdated": 1' in capsys.readouterr().out
+
+    @patch("skills.jira.scripts.jira.archive_issues")
+    def test_cmd_issue_unarchive(self, mock_archive, capsys):
+        """Test unarchive calls the API in unarchive mode."""
+        mock_archive.return_value = {"numberOfIssuesUpdated": 1}
+
+        args = argparse.Namespace(issue_command="unarchive", issue_keys="DEMO-1", json=False)
+
+        assert cmd_issue(args) == 0
+        mock_archive.assert_called_once_with(["DEMO-1"], unarchive=True)
+        assert "## Unarchived issues" in capsys.readouterr().out
+
+    @patch("skills.jira.scripts.jira.archive_issues")
+    def test_cmd_issue_archive_partial_errors(self, mock_archive, capsys):
+        """Test partial archive failures print errors and return non-zero."""
+        mock_archive.return_value = {
+            "numberOfIssuesUpdated": 1,
+            "errors": {
+                "issuesNotFound": {
+                    "count": 1,
+                    "issueIdsOrKeys": ["DEMO-9"],
+                    "message": "Issue not found.",
+                }
+            },
+        }
+
+        args = argparse.Namespace(
+            issue_command="archive",
+            issue_keys="DEMO-1,DEMO-9",
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "### issuesNotFound" in captured.out
+        assert "could not be archived" in captured.err
+
+    @patch("skills.jira.scripts.jira.archive_issues")
+    def test_cmd_issue_archive_requires_key(self, mock_archive, capsys):
+        """Test archive rejects an empty key list."""
+        args = argparse.Namespace(issue_command="archive", issue_keys=" , ", json=False)
+
+        result = cmd_issue(args)
+
+        assert result == 1
+        mock_archive.assert_not_called()
+        assert "at least one issue key" in capsys.readouterr().err
+
+    @patch("skills.jira.scripts.jira.archive_issues")
+    def test_cmd_issue_archive_rejects_too_many(self, mock_archive, capsys):
+        """Test archive enforces Jira's 1000-issue request limit."""
+        keys = ",".join(f"DEMO-{i}" for i in range(1001))
+
+        args = argparse.Namespace(issue_command="archive", issue_keys=keys, json=False)
+
+        result = cmd_issue(args)
+
+        assert result == 1
+        mock_archive.assert_not_called()
+        assert "at most 1000" in capsys.readouterr().err
+
+    @patch("skills.jira.scripts.jira.archive_issues")
+    def test_cmd_issue_archive_permission_hint(self, mock_archive, capsys):
+        """Test a 403 from archive prints the permission and license hint."""
+        mock_archive.side_effect = APIError("forbidden", status_code=403)
+
+        args = argparse.Namespace(issue_command="archive", issue_keys="DEMO-1", json=False)
+
+        result = cmd_issue(args)
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Jira admin global permission" in captured.err
+        assert "Premium or Enterprise" in captured.err
 
     @patch("skills.jira.scripts.jira.do_transition")
     @patch("skills.jira.scripts.jira.get_jira_defaults")

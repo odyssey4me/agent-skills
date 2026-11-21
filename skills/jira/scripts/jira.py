@@ -463,6 +463,9 @@ def merge_jql_with_scope(user_jql: str, scope: str | None) -> str:
 # Jira Cloud is the only supported deployment.
 API_VERSION = "3"
 
+# Maximum issues Jira accepts in one archive or unarchive request.
+ARCHIVE_REQUEST_LIMIT = 1000
+
 # Module-level cache for the Cloud ID used by the Automation API.
 # Key: Jira URL, Value: {"cloud_id": str}
 _cloud_id_cache: dict[str, dict[str, str]] = {}
@@ -1459,6 +1462,40 @@ def format_issues_list(
     return "\n\n".join(parts)
 
 
+def format_archive_result(result: dict[str, Any], *, unarchive: bool = False) -> str:
+    """Format an archive or unarchive response for display.
+
+    Args:
+        result: Response from the archive or unarchive endpoint.
+        unarchive: True when the response came from an unarchive request.
+
+    Returns:
+        Formatted markdown string.
+    """
+    action = "Unarchived" if unarchive else "Archived"
+    updated = result.get("numberOfIssuesUpdated", 0)
+    lines = [f"## {action} issues", "", f"- **Issues updated:** {updated}"]
+
+    errors = result.get("errors") or {}
+    if errors:
+        lines.extend(["", "## Errors"])
+        for code in sorted(errors):
+            detail = errors[code]
+            lines.extend(["", f"### {code}"])
+            if not isinstance(detail, dict):
+                lines.append(f"- **Detail:** {detail}")
+                continue
+            if detail.get("count") is not None:
+                lines.append(f"- **Count:** {detail['count']}")
+            if detail.get("message"):
+                lines.append(f"- **Message:** {detail['message']}")
+            keys = detail.get("issueIdsOrKeys") or []
+            if keys:
+                lines.append(f"- **Issues:** {', '.join(keys)}")
+
+    return "\n".join(lines)
+
+
 def format_assignee_set(issue_key: str, names: list[str]) -> str:
     """Format the distinct assignees of an issue's children.
 
@@ -2190,6 +2227,26 @@ def update_issue(
         return {}
 
     response = put("jira", api_path(f"issue/{issue_key}"), {"fields": fields})
+    if isinstance(response, dict):
+        return response
+    return {}
+
+
+def archive_issues(issue_keys: list[str], *, unarchive: bool = False) -> dict[str, Any]:
+    """Archive or unarchive issues in bulk.
+
+    Jira accepts up to 1000 issue keys or IDs per request. Subtasks can only be
+    archived through their parent issue.
+
+    Args:
+        issue_keys: Issue keys or IDs to archive or unarchive.
+        unarchive: Restore archived issues instead of archiving them.
+
+    Returns:
+        Response dictionary with numberOfIssuesUpdated and any errors.
+    """
+    endpoint = "issue/unarchive" if unarchive else "issue/archive"
+    response = put("jira", api_path(endpoint), {"issueIdsOrKeys": issue_keys})
     if isinstance(response, dict):
         return response
     return {}
@@ -4106,6 +4163,34 @@ def cmd_issue(args: argparse.Namespace) -> int:
             else:
                 print(format_issues_list(children, custom_fields=custom_fields))
 
+        elif args.issue_command in ("archive", "unarchive"):
+            unarchive = args.issue_command == "unarchive"
+            keys = [key.strip() for key in args.issue_keys.split(",") if key.strip()]
+            if not keys:
+                print("Error: at least one issue key is required", file=sys.stderr)
+                return 1
+            if len(keys) > ARCHIVE_REQUEST_LIMIT:
+                print(
+                    f"Error: Jira accepts at most {ARCHIVE_REQUEST_LIMIT} issues per "
+                    f"request ({len(keys)} given). Split the list into smaller batches.",
+                    file=sys.stderr,
+                )
+                return 1
+
+            result = archive_issues(keys, unarchive=unarchive)
+            if args.json:
+                print(format_json(result))
+            else:
+                print(format_archive_result(result, unarchive=unarchive))
+
+            if result.get("errors"):
+                action = "unarchived" if unarchive else "archived"
+                print(
+                    f"Warning: some issues could not be {action}; see the errors above.",
+                    file=sys.stderr,
+                )
+                return 1
+
         elif args.issue_command == "create":
             # Load --from-file if provided
             result = _load_from_file(args)
@@ -4331,6 +4416,15 @@ def cmd_issue(args: argparse.Namespace) -> int:
                         f"Valid issue types for {project_key}: {', '.join(valid_types)}",
                         file=sys.stderr,
                     )
+        if e.status_code == 403 and getattr(args, "issue_command", None) in {
+            "archive",
+            "unarchive",
+        }:
+            print(
+                "Archiving requires the Jira admin global permission and a Premium or "
+                "Enterprise license.",
+                file=sys.stderr,
+            )
         return 1
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -4981,6 +5075,27 @@ def main() -> int:
         help="Print only the distinct assignees of the children",
     )
     children_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Archive subcommand
+    archive_parser = issue_subparsers.add_parser(
+        "archive",
+        help="Archive issues by key or ID (requires Jira admin and Premium/Enterprise)",
+    )
+    archive_parser.add_argument(
+        "issue_keys",
+        help="Issue key(s) or ID(s), comma-separated (e.g. DEMO-1,DEMO-2); up to 1000",
+    )
+    archive_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Unarchive subcommand
+    unarchive_parser = issue_subparsers.add_parser(
+        "unarchive", help="Restore archived issues by key or ID"
+    )
+    unarchive_parser.add_argument(
+        "issue_keys",
+        help="Archived issue key(s) or ID(s), comma-separated (e.g. DEMO-1,DEMO-2); up to 1000",
+    )
+    unarchive_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Create subcommand
     create_parser = issue_subparsers.add_parser("create", help="Create new issue")

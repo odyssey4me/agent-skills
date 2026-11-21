@@ -16,6 +16,8 @@ enforce appropriate permission controls.
 | issue comments | read | List issue comments |
 | issue changelog | read | Show an issue's full change history |
 | issue children | read | List child issues and subtasks |
+| issue archive | write | Archive issues by key or ID |
+| issue unarchive | write | Restore archived issues by key or ID |
 | issue create | write | Create a new issue |
 | issue update | write | Update issue fields |
 | issue comment | write | Add a comment to an issue |

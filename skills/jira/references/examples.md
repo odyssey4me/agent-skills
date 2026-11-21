@@ -72,6 +72,27 @@ $SKILL_DIR/scripts/jira.py issue changelog DEMO-123 --json
 $SKILL_DIR/scripts/jira.py issue changelog DEMO-123 --max-results 20
 ```
 
+## Archive Completed Issues
+
+Archived issues leave search results but keep their data. Subtasks are archived
+with their parent, and each request takes up to 1000 keys or IDs. The Jira admin
+global permission and a Premium or Enterprise license are required.
+
+```bash
+# Find candidates first
+$SKILL_DIR/scripts/jira.py search \
+  "project = DEMO AND statusCategory = Done AND updated < -2y"
+
+# Archive them in one request
+$SKILL_DIR/scripts/jira.py issue archive DEMO-1,DEMO-2,DEMO-3
+
+# Restore an issue if it was archived by mistake
+$SKILL_DIR/scripts/jira.py issue unarchive DEMO-1
+```
+
+Partial failures are reported per reason (`issuesNotFound`, `issueIsSubtask`,
+and so on), and the command exits non-zero so scripts can react.
+
 ## Find Issues by Contributor
 
 ```bash
