@@ -2257,9 +2257,9 @@ def create_link(source_key: str, link_type: str, target_key: str) -> None:
     that displays each description: the issue sent as ``outwardIssue``
     displays the type's *inward* description. This is the reverse of the
     payload field names, so the role is assigned to the opposite field.
-    Verified against a live Jira Cloud instance on 2026-11-04 by reading both
-    issues back with ``issue get A,B --fields issuelinks``; see the
-    Atlassian issue linking model for the read side of the mapping.
+    Verified against a live Jira Cloud instance by reading both issues back
+    with ``issue get A,B --fields issuelinks``; see the Atlassian issue
+    linking model for the read side of the mapping.
 
     Args:
         source_key: The issue being created/updated.
@@ -2496,6 +2496,139 @@ def comments_from_field(issue: dict[str, Any]) -> tuple[list[dict[str, Any]], in
         return [], 0
     comments = comment_field.get("comments") or []
     return comments, comment_field.get("total", len(comments))
+
+
+def get_changelog(issue_key: str, max_results: int | None = None) -> list[dict[str, Any]]:
+    """Get an issue's change history with automatic pagination.
+
+    Args:
+        issue_key: The issue key (e.g., DEMO-123).
+        max_results: Maximum number of history entries to return, or None to
+            fetch the whole changelog.
+
+    Returns:
+        List of history dictionaries in the order Jira returns them.
+    """
+    histories: list[dict[str, Any]] = []
+    start_at = 0
+
+    while max_results is None or len(histories) < max_results:
+        page_size = 100 if max_results is None else min(max_results - len(histories), 100)
+        response = get(
+            "jira",
+            api_path(f"issue/{issue_key}/changelog"),
+            params={"startAt": start_at, "maxResults": page_size},
+        )
+        if not isinstance(response, dict):
+            break
+
+        # Cloud returns "values"; older/server responses use "histories".
+        page = response.get("values")
+        if page is None:
+            page = response.get("histories") or []
+        histories.extend(page)
+
+        total = response.get("total")
+        if (
+            not page
+            or response.get("isLast")
+            or (total is not None and start_at + len(page) >= total)
+        ):
+            break
+        start_at += len(page)
+
+    if max_results is None:
+        return histories
+    return histories[:max_results]
+
+
+def _humanise_field_label(label: str) -> str:
+    """Turn a raw Jira field name into a readable label.
+
+    Handles ``customfield``-style keys, snake_case and camelCase, while
+    leaving an already human-readable label such as ``Story Points`` alone.
+    """
+    label = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", label.replace("_", " "))
+    return label[:1].upper() + label[1:]
+
+
+def _changelog_field_label(item: dict[str, Any], custom_fields: dict[str, str] | None) -> str:
+    """Resolve a changelog item to a readable field label.
+
+    Configured custom field names win over the raw ``customfield_`` ID.
+    Otherwise Jira's own label is used, falling back to the field ID and
+    humanised (``IssueParentAssociation`` → ``Issue Parent Association``).
+    """
+    field_id = item.get("fieldId") or ""
+    field_name = item.get("field") or ""
+
+    if field_id and custom_fields:
+        for friendly_name, mapped_id in custom_fields.items():
+            if mapped_id.lower() == field_id.lower():
+                return friendly_name.replace("_", " ").title()
+
+    label = field_name or field_id
+    if not label:
+        return "Unknown field"
+    return _humanise_field_label(label)
+
+
+def _changelog_value(item: dict[str, Any], prefix: str) -> str:
+    """Render the ``from`` or ``to`` side of a changelog item.
+
+    ``*String`` holds the display value for most fields; ``from``/``to``
+    hold the raw identifier and are the fallback when the display value is
+    absent. Whitespace is collapsed so a multi-line description stays on one
+    markdown line; ``--json`` preserves the original values.
+    """
+    value = item.get(f"{prefix}String")
+    if value is None or value == "":
+        value = item.get(prefix)
+    if value is None:
+        return "*(empty)*"
+    text = " ".join(str(value).split())
+    return text or "*(empty)*"
+
+
+def format_changelog(
+    histories: list[dict[str, Any]],
+    issue_key: str,
+    custom_fields: dict[str, str] | None = None,
+) -> str:
+    """Format an issue's change history as markdown.
+
+    Args:
+        histories: List of history dictionaries from get_changelog().
+        issue_key: The issue key for the heading.
+        custom_fields: Mapping of friendly names to custom field IDs.
+
+    Returns:
+        Formatted markdown string.
+    """
+    if not histories:
+        return f"## Changelog for {issue_key}\n\nNo changes found."
+
+    parts = [f"## Changelog for {issue_key}"]
+    for history in histories:
+        author = (history.get("author") or {}).get("displayName", "Unknown")
+        created = history.get("created", "")
+        # Trim to date + time (YYYY-MM-DDTHH:MM)
+        if "T" in created:
+            created = created[:16].replace("T", " ")
+        heading = f"### {created} — {author}" if created else f"### {author}"
+
+        lines = [heading]
+        items = history.get("items") or []
+        if not items:
+            lines.append("- *(no field changes recorded)*")
+        for item in items:
+            label = _changelog_field_label(item, custom_fields)
+            before = _changelog_value(item, "from")
+            after = _changelog_value(item, "to")
+            lines.append(f"- **{label}:** {before} → {after}")
+        parts.append("\n".join(lines))
+
+    return "\n\n".join(parts)
 
 
 def format_comments(comments: list[dict[str, Any]], issue_key: str) -> str:
@@ -3912,6 +4045,22 @@ def cmd_issue(args: argparse.Namespace) -> int:
             else:
                 print(format_comments(comments, args.issue_key))
 
+        elif args.issue_command == "changelog":
+            max_results = getattr(args, "max_results", None)
+            defaults = get_jira_defaults()
+            custom_fields = defaults.custom_fields or {}
+            histories = get_changelog(args.issue_key, max_results=max_results)
+            if max_results is not None and len(histories) >= max_results:
+                print(
+                    f"Warning: reached --max-results {max_results}; the changelog "
+                    "may be incomplete. Omit the flag to read the whole history.",
+                    file=sys.stderr,
+                )
+            if args.json:
+                print(format_json(histories))
+            else:
+                print(format_changelog(histories, args.issue_key, custom_fields=custom_fields))
+
         elif args.issue_command == "children":
             max_results = getattr(args, "max_results", 100) or 100
             defaults = get_jira_defaults()
@@ -4798,6 +4947,19 @@ def main() -> int:
         help="Maximum number of comments (default: 50)",
     )
     comments_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # Changelog subcommand
+    changelog_parser = issue_subparsers.add_parser(
+        "changelog", help="Show an issue's full change history"
+    )
+    changelog_parser.add_argument("issue_key", help="Issue key (e.g., DEMO-123)")
+    changelog_parser.add_argument(
+        "--max-results",
+        type=int,
+        default=None,
+        help="Maximum number of history entries (default: all)",
+    )
+    changelog_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Children subcommand
     children_parser = issue_subparsers.add_parser(

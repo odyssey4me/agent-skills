@@ -59,6 +59,19 @@ $SKILL_DIR/scripts/jira.py issue comments DEMO-123 --max-results 1
 $SKILL_DIR/scripts/jira.py issue comments DEMO-123
 ```
 
+## View an Issue's Changelog
+
+```bash
+# Whole change history as markdown (every page is fetched)
+$SKILL_DIR/scripts/jira.py issue changelog DEMO-123
+
+# Raw histories as JSON, preserving original values
+$SKILL_DIR/scripts/jira.py issue changelog DEMO-123 --json
+
+# Cap the number of entries; warns when the cap is reached
+$SKILL_DIR/scripts/jira.py issue changelog DEMO-123 --max-results 20
+```
+
 ## Find Issues by Contributor
 
 ```bash

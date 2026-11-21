@@ -14,6 +14,7 @@ enforce appropriate permission controls.
 | search | read | Search issues with JQL |
 | issue get | read | Get issue details |
 | issue comments | read | List issue comments |
+| issue changelog | read | Show an issue's full change history |
 | issue children | read | List child issues and subtasks |
 | issue create | write | Create a new issue |
 | issue update | write | Update issue fields |

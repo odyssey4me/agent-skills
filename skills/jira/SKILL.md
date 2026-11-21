@@ -3,7 +3,7 @@ name: jira
 description: Search and manage Jira issues using JQL queries, create/update tickets, and manage workflows. Use when asked to find Jira tickets, check the backlog, manage sprints, track bugs, or work with Atlassian project management.
 metadata:
   author: odyssey4me
-  version: "1.3.1"
+  version: "1.4.0"
   category: project-management
   tags: "issues, agile, sprints"
   complexity: standard
@@ -46,7 +46,7 @@ If anything is missing, the check command will provide setup instructions.
 
 ## Network access
 
-Jira API commands require outbound HTTPS to the configured Jira host. Remote operations require outbound network access. If the agent environment restricts it, obtain access through that environment's approval or network controls before the first remote command, reusing authorization already granted. Local help and file processing do not need network access. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials to resolve them. If approved access also fails, stop and report it. Authentication and permission errors require user action.
+Jira API commands require outbound HTTPS to the configured Jira host. Remote operations need network access; if the environment restricts it, get approval through that environment before the first remote command, reusing authorization already granted. Local help and file processing do not. Skill instructions do not grant network permission. Report DNS, connection, and timeout failures as network errors; do not reset credentials. If approved access also fails, stop and report it. Authentication and permission errors require user action.
 
 ## Authentication
 
@@ -154,6 +154,9 @@ $SKILL_DIR/scripts/jira.py issue get DEMO-1,DEMO-2,DEMO-3 --contributors
 # List comments
 $SKILL_DIR/scripts/jira.py issue comments DEMO-123
 
+# Show the full change history (add --json for raw histories)
+$SKILL_DIR/scripts/jira.py issue changelog DEMO-123
+
 # List child issues and subtasks, or only their distinct assignees
 $SKILL_DIR/scripts/jira.py issue children EPIC-123
 $SKILL_DIR/scripts/jira.py issue children EPIC-123 --assignees-only
@@ -239,9 +242,6 @@ jira search "assignee = currentUser() AND status = Open"
 
 # Get issue details
 jira issue get DEMO-123 --fields "summary,status,assignee"
-
-# List issue comments
-jira issue comments DEMO-123
 ```
 
 **Create and update:**

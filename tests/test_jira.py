@@ -63,6 +63,7 @@ from skills.jira.scripts.jira import (
     format_assignee_set,
     format_automation_detail,
     format_automation_summary,
+    format_changelog,
     format_collaborative_epics,
     format_comments,
     format_contributor_roles,
@@ -78,6 +79,7 @@ from skills.jira.scripts.jira import (
     format_version_report,
     format_versions_list,
     get_automation_rule,
+    get_changelog,
     get_cloud_id,
     get_comments,
     get_credential,
@@ -3313,6 +3315,173 @@ class TestComments:
         assert "ADF content" in result
 
 
+class TestChangelog:
+    """Tests for changelog retrieval and formatting."""
+
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_changelog_single_page(self, mock_get, mock_api_path):
+        """Test fetching a changelog that fits in one page."""
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123/changelog"
+        mock_get.return_value = {
+            "values": [
+                {
+                    "id": "1",
+                    "author": {"displayName": "Jane"},
+                    "created": "2026-02-20T10:00:00.000+0000",
+                    "items": [{"field": "status", "fieldId": "status"}],
+                }
+            ],
+            "startAt": 0,
+            "maxResults": 100,
+            "total": 1,
+            "isLast": True,
+        }
+
+        result = get_changelog("DEMO-123")
+
+        assert len(result) == 1
+        assert result[0]["author"]["displayName"] == "Jane"
+        mock_get.assert_called_once_with(
+            "jira",
+            "rest/api/3/issue/DEMO-123/changelog",
+            params={"startAt": 0, "maxResults": 100},
+        )
+
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_changelog_paginates(self, mock_get, mock_api_path):
+        """max_results=None walks every page of the changelog."""
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123/changelog"
+        page_one = [{"id": str(i)} for i in range(100)]
+        page_two = [{"id": str(i)} for i in range(100, 150)]
+        mock_get.side_effect = [
+            {"values": page_one, "total": 150, "isLast": False},
+            {"values": page_two, "total": 150, "isLast": True},
+        ]
+
+        result = get_changelog("DEMO-123")
+
+        assert len(result) == 150
+        assert mock_get.call_count == 2
+        assert mock_get.call_args_list[1].kwargs["params"]["startAt"] == 100
+
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_changelog_max_results(self, mock_get, mock_api_path):
+        """A max_results cap is passed to the API and enforced locally."""
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123/changelog"
+        mock_get.return_value = {
+            "values": [{"id": str(i)} for i in range(60)],
+            "total": 60,
+        }
+
+        result = get_changelog("DEMO-123", max_results=25)
+
+        assert len(result) == 25
+        assert mock_get.call_args.kwargs["params"]["maxResults"] == 25
+
+    @patch("skills.jira.scripts.jira.api_path")
+    @patch("skills.jira.scripts.jira.get")
+    def test_get_changelog_histories_fallback(self, mock_get, mock_api_path):
+        """Older responses use a "histories" key instead of "values"."""
+        mock_api_path.return_value = "rest/api/3/issue/DEMO-123/changelog"
+        mock_get.return_value = {
+            "histories": [{"id": "1"}],
+            "total": 1,
+        }
+
+        result = get_changelog("DEMO-123")
+
+        assert result == [{"id": "1"}]
+        assert mock_get.call_count == 1
+
+    def test_format_changelog(self):
+        """Test formatting a changelog as markdown."""
+        histories = [
+            {
+                "author": {"displayName": "Jane Doe"},
+                "created": "2026-02-20T14:30:00.000+0000",
+                "items": [
+                    {
+                        "field": "status",
+                        "fieldId": "status",
+                        "fromString": "Open",
+                        "toString": "In Progress",
+                    },
+                    {
+                        "field": "assignee",
+                        "fieldId": "assignee",
+                        "fromString": "",
+                        "toString": "Bob",
+                    },
+                ],
+            }
+        ]
+
+        result = format_changelog(histories, "DEMO-123")
+
+        assert "## Changelog for DEMO-123" in result
+        assert "### 2026-02-20 14:30 — Jane Doe" in result
+        assert "- **Status:** Open → In Progress" in result
+        assert "- **Assignee:** *(empty)* → Bob" in result
+
+    def test_format_changelog_custom_field_label(self):
+        """Configured custom field names replace the raw field ID."""
+        histories = [
+            {
+                "author": {"displayName": "Jane"},
+                "created": "2026-02-20T14:30:00.000+0000",
+                "items": [
+                    {
+                        "field": "customfield_10002",
+                        "fieldId": "customfield_10002",
+                        "fromString": "3",
+                        "toString": "5",
+                    }
+                ],
+            }
+        ]
+
+        result = format_changelog(
+            histories, "DEMO-123", custom_fields={"story_points": "customfield_10002"}
+        )
+
+        assert "- **Story Points:** 3 → 5" in result
+
+    def test_format_changelog_humanises_raw_field_names(self):
+        """Raw camelCase and snake_case field names become readable labels."""
+        histories = [
+            {
+                "author": {"displayName": "Jane"},
+                "created": "2026-02-20T14:30:00.000+0000",
+                "items": [
+                    {
+                        "field": "IssueParentAssociation",
+                        "fieldId": "IssueParentAssociation",
+                        "toString": "DEMO-1",
+                    },
+                    {
+                        "field": "sprint_count",
+                        "fieldId": "sprint_count",
+                        "toString": "1",
+                    },
+                ],
+            }
+        ]
+
+        result = format_changelog(histories, "DEMO-123")
+
+        assert "**Issue Parent Association:**" in result
+        assert "**Sprint count:**" in result
+
+    def test_format_changelog_empty(self):
+        """Test formatting when there is no change history."""
+        result = format_changelog([], "DEMO-123")
+
+        assert "No changes found" in result
+
+
 class TestContributors:
     """Tests for contributor extraction."""
 
@@ -3762,9 +3931,9 @@ class TestUserResolution:
 
     def test_resolve_user_for_jql_accountid_passthrough(self):
         """Test JQL resolution with an accountId passes through."""
-        result = resolve_user_for_jql("5ecff4d72490cf0c09e48bd5")
+        result = resolve_user_for_jql("0123456789abcdef01234567")
 
-        assert result == "5ecff4d72490cf0c09e48bd5"
+        assert result == "0123456789abcdef01234567"
 
     @patch("skills.jira.scripts.jira.resolve_user")
     def test_resolve_user_for_jql_email(self, mock_resolve):
@@ -5062,6 +5231,85 @@ class TestCmdIssueComments:
         assert '[{"id": "1"}]' in captured.out
 
 
+class TestCmdIssueChangelog:
+    """Tests for the issue changelog subcommand handler."""
+
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.get_changelog")
+    def test_cmd_issue_changelog(self, mock_changelog, mock_defaults, capsys):
+        """Test the changelog subcommand renders markdown."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_changelog.return_value = [
+            {
+                "author": {"displayName": "Jane"},
+                "created": "2026-02-20T10:00:00.000+0000",
+                "items": [
+                    {
+                        "field": "status",
+                        "fieldId": "status",
+                        "fromString": "Open",
+                        "toString": "Done",
+                    }
+                ],
+            }
+        ]
+
+        args = argparse.Namespace(
+            issue_command="changelog",
+            issue_key="DEMO-123",
+            max_results=None,
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Changelog for DEMO-123" in captured.out
+        assert "Open → Done" in captured.out
+        mock_changelog.assert_called_once_with("DEMO-123", max_results=None)
+
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.get_changelog")
+    def test_cmd_issue_changelog_json(self, mock_changelog, mock_defaults, capsys):
+        """Test the changelog subcommand with JSON output."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_changelog.return_value = [{"id": "1", "items": []}]
+
+        args = argparse.Namespace(
+            issue_command="changelog",
+            issue_key="DEMO-123",
+            max_results=None,
+            json=True,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert '"id": "1"' in captured.out
+
+    @patch("skills.jira.scripts.jira.get_jira_defaults")
+    @patch("skills.jira.scripts.jira.get_changelog")
+    def test_cmd_issue_changelog_max_results_warning(self, mock_changelog, mock_defaults, capsys):
+        """Reaching a cap warns that the changelog may be incomplete."""
+        mock_defaults.return_value = JiraDefaults()
+        mock_changelog.return_value = [{"id": "1"}]
+
+        args = argparse.Namespace(
+            issue_command="changelog",
+            issue_key="DEMO-123",
+            max_results=1,
+            json=False,
+        )
+
+        result = cmd_issue(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "may be incomplete" in captured.err
+
+
 class TestCmdUser:
     """Tests for cmd_user handler."""
 
@@ -6062,11 +6310,11 @@ class TestDeleteLink:
 class TestLinkDirectionAgainstReadModel:
     """Verify link direction by reading the link back, not by the payload.
 
-    The fake store implements the Jira Cloud semantics verified on
-    a live Jira Cloud instance on 2026-11-04: a link request's ``outwardIssue``
-    names the issue that displays the type's *inward* description, and each
-    issue's ``issuelinks`` entry names the linked issue through the end that
-    the issue itself displays.
+    The fake store implements the Jira Cloud semantics verified against a
+    live Cloud instance: a link request's ``outwardIssue`` names the issue
+    that displays the type's *inward* description, and each issue's
+    ``issuelinks`` entry names the linked issue through the end that the
+    issue itself displays.
     """
 
     LINK_TYPES = [
