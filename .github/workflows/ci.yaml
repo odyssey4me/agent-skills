@@ -83,7 +83,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: stbenjam/skillsaw@ac135381fc46711e7615e30b7296e857bb20b645 # v0
+      - uses: stbenjam/skillsaw@b11cf99c18ee5b1b2cb3156094b1a7d39fa0f1c7 # v0
         with:
           strict: true
 
